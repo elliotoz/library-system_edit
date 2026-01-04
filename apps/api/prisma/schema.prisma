@@ -1,0 +1,423 @@
+// Prisma Schema for AI-Integrated University Library System
+// Üsküdar University
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum Role {
+  STUDENT
+  INSTRUCTOR
+  STAFF
+  ADMIN
+}
+
+enum BookCopyStatus {
+  AVAILABLE
+  RESERVED
+  BORROWED
+  LOST
+  MAINTENANCE
+}
+
+enum ReservationStatus {
+  PENDING
+  READY_FOR_PICKUP
+  COLLECTED
+  CANCELLED
+  EXPIRED
+}
+
+enum BorrowStatus {
+  ACTIVE
+  RETURNED
+  OVERDUE
+}
+
+enum MaterialType {
+  PROFESSOR_PUBLICATION
+  RESEARCH_PAPER
+  COURSE_MATERIAL
+  THESIS
+}
+
+enum AccessLevel {
+  PUBLIC
+  FACULTY_ONLY
+  COURSE_STUDENTS
+}
+
+enum NotificationType {
+  RESERVATION_CREATED
+  RESERVATION_APPROVED
+  RESERVATION_REJECTED
+  RESERVATION_READY
+  RESERVATION_EXPIRED
+  BORROW_CREATED
+  BORROW_DUE_SOON
+  BORROW_OVERDUE
+  BOOK_AVAILABLE
+  SYSTEM
+}
+
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
+model User {
+  id       String @id @default(cuid())
+  email    String @unique
+  password String
+  name     String
+  role     Role   @default(STUDENT)
+
+  // Student/Staff identifiers
+  studentId String? @unique
+  staffId   String? @unique
+
+  // Faculty relationship (optional for Staff)
+  facultyId String?
+  faculty   Faculty? @relation(fields: [facultyId], references: [id])
+
+  // Staff-specific: Personal interests
+  interests String[] @default([])
+
+  // Profile
+  avatarUrl String?
+  isActive  Boolean @default(true)
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  lastLogin DateTime?
+
+  // Relations
+  borrows           Borrow[]
+  reservations      Reservation[]
+  uploadedBooks     Book[]         @relation("UploadedBy")
+  uploadedMaterials Material[]     @relation("MaterialUploader")
+  notifications     Notification[]
+
+  @@map("users")
+}
+
+// ============================================
+// FACULTY & CAMPUS
+// ============================================
+
+model Faculty {
+  id          String  @id @default(cuid())
+  name        String
+  code        String  @unique
+  description String?
+
+  // Default campus for this faculty
+  defaultBranchId String?
+  defaultBranch   LibraryBranch? @relation("DefaultBranch", fields: [defaultBranchId], references: [id])
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users   User[]
+  books   Book[]
+  courses Course[]
+
+  @@map("faculties")
+}
+
+model LibraryBranch {
+  id           String  @id @default(cuid())
+  name         String
+  code         String  @unique
+  address      String
+  openingHours String?
+  contactEmail String?
+  contactPhone String?
+  isActive     Boolean @default(true)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  bookCopies   BookCopy[]
+  reservations Reservation[]
+
+  // Faculties that use this as default branch
+  defaultForFaculties Faculty[] @relation("DefaultBranch")
+
+  @@map("library_branches")
+}
+
+model Course {
+  id   String @id @default(cuid())
+  code String @unique
+  name String
+
+  facultyId String
+  faculty   Faculty @relation(fields: [facultyId], references: [id])
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("courses")
+}
+
+// ============================================
+// BOOKS & CATALOG
+// ============================================
+
+model Book {
+  id          String   @id @default(cuid())
+  title       String
+  authors     String[]
+  isbn        String?  @unique
+  description String?
+
+  // Publication info
+  publisher       String?
+  publicationYear Int?
+  edition         String?
+  pageCount       Int?
+  language        String  @default("English")
+
+  // Categorization
+  mainFacultyId String?
+  mainFaculty   Faculty? @relation(fields: [mainFacultyId], references: [id])
+  subjectTags   String[] @default([])
+  category      String?
+
+  // E-book availability
+  isEbookAvailable Boolean @default(false)
+  ebookUrl         String?
+
+  // Cover image
+  coverImageUrl String?
+
+  // Source tracking
+  source String @default("Manual") // Gutendex, OpenLibrary, Manual, etc.
+
+  // Professor publication flag
+  isProfessorPublication Boolean @default(false)
+  uploadedById           String?
+  uploadedBy             User?   @relation("UploadedBy", fields: [uploadedById], references: [id])
+
+  // Status
+  isActive Boolean @default(true)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  copies BookCopy[]
+
+  @@index([title])
+  @@index([mainFacultyId])
+  @@map("books")
+}
+
+model BookCopy {
+  id      String         @id @default(cuid())
+  brandId String         @unique // Barcode/identifier
+  status  BookCopyStatus @default(AVAILABLE)
+
+  // Relations
+  bookId String
+  book   Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch   LibraryBranch @relation(fields: [branchId], references: [id])
+
+  // Physical condition
+  condition String  @default("Good") // Good, Fair, Poor
+  notes     String?
+
+  // Demo flag
+  isDemo Boolean @default(true)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  reservations Reservation[]
+  borrows      Borrow[]
+
+  @@index([bookId])
+  @@index([branchId])
+  @@index([status])
+  @@map("book_copies")
+}
+
+// ============================================
+// BORROWING SYSTEM
+// ============================================
+
+model BorrowPolicy {
+  id   String @id @default(cuid())
+  role Role   @unique
+
+  maxActiveBorrows Int @default(5)
+  maxBorrowDays    Int @default(14)
+  maxExtensions    Int @default(2)
+  extensionDays    Int @default(7)
+
+  description String?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("borrow_policies")
+}
+
+model Reservation {
+  id     String            @id @default(cuid())
+  status ReservationStatus @default(PENDING)
+
+  // User making the reservation
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  // Book copy being reserved
+  bookCopyId String
+  bookCopy   BookCopy @relation(fields: [bookCopyId], references: [id])
+
+  // Pickup location
+  branchId String
+  branch   LibraryBranch @relation(fields: [branchId], references: [id])
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  expiresAt DateTime?
+
+  // Pickup deadline (when status becomes READY_FOR_PICKUP)
+  pickupDeadline DateTime?
+
+  // Notes
+  notes String?
+
+  @@index([userId])
+  @@index([status])
+  @@map("reservations")
+}
+
+model Borrow {
+  id     String       @id @default(cuid())
+  status BorrowStatus @default(ACTIVE)
+
+  // User borrowing the book
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  // Book copy being borrowed
+  bookCopyId String
+  bookCopy   BookCopy @relation(fields: [bookCopyId], references: [id])
+
+  // Dates
+  borrowedAt DateTime  @default(now())
+  dueAt      DateTime
+  returnedAt DateTime?
+
+  // Extensions
+  extensionCount Int @default(0)
+
+  // Notes
+  notes String?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([dueAt])
+  @@map("borrows")
+}
+
+// ============================================
+// MATERIALS (Professor Publications, etc.)
+// ============================================
+
+model Material {
+  id          String       @id @default(cuid())
+  title       String
+  type        MaterialType
+  description String?
+
+  // Author/Professor
+  authorName String
+
+  // File
+  fileUrl  String?
+  fileName String?
+  fileSize Int?
+
+  // Categorization
+  keywords    String[] @default([])
+  facultyCode String?
+  courseCode  String?
+  year        Int?
+
+  // Access control
+  accessLevel AccessLevel @default(PUBLIC)
+
+  // Upload tracking
+  uploadedById String
+  uploadedBy   User   @relation("MaterialUploader", fields: [uploadedById], references: [id])
+
+  // Status
+  isPublished Boolean @default(false)
+  isApproved  Boolean @default(false)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@index([facultyCode])
+  @@map("materials")
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+model Notification {
+  id      String           @id @default(cuid())
+  type    NotificationType
+  title   String
+  message String
+  read    Boolean          @default(false)
+
+  // Related entities (optional)
+  bookId   String?
+  branchId String?
+
+  // User who receives this notification
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+  @@map("notifications")
+}
