@@ -7,7 +7,7 @@ import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-// Password for all demo accounts
+// Default password for seeded dev accounts
 const DEFAULT_PASSWORD = 'password123';
 
 async function hashPassword(password: string): Promise<string> {
@@ -206,7 +206,7 @@ async function main() {
   // ============================================
   // 5. CREATE USERS
   // ============================================
-  console.log('👥 Creating demo users...');
+  console.log('👥 Creating users...');
 
   const hashedPassword = await hashPassword(DEFAULT_PASSWORD);
 
@@ -685,7 +685,6 @@ async function main() {
           brandId: brandId,
           status: i === 1 ? BookCopyStatus.BORROWED : BookCopyStatus.AVAILABLE,
           condition: 'Good',
-          isDemo: true,
         },
       });
       copyCount++;
@@ -735,7 +734,7 @@ async function main() {
   console.log(`   • Admins: ${admins.length}`);
   console.log(`   • Books: ${books.length}`);
   console.log(`   • Book Copies: ${copyCount}`);
-  console.log('\n📧 Demo Login Accounts:');
+  console.log('\n📧 Seeded Login Accounts (dev only):');
   console.log('   ┌─────────────┬────────────────────────────────────────┬──────────────┐');
   console.log('   │ Role        │ Email                                  │ Password     │');
   console.log('   ├─────────────┼────────────────────────────────────────┼──────────────┤');
