@@ -245,9 +245,6 @@ model BookCopy {
   condition String  @default("Good") // Good, Fair, Poor
   notes     String?
 
-  // Demo flag
-  isDemo Boolean @default(true)
-
   // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

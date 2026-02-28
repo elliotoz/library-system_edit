@@ -227,7 +227,6 @@ export class BooksService {
                 brandId,
                 status: BookCopyStatus.AVAILABLE,
                 condition: "Good",
-                isDemo: false,
               });
               copyCounter++;
             }
@@ -353,7 +352,6 @@ export class BooksService {
         brandId,
         status: BookCopyStatus.AVAILABLE,
         condition: "Good",
-        isDemo: false,
       });
     }
 
