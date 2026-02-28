@@ -128,3 +128,6 @@ cookie.txt
 !.env.example
 !apps/api/.env.example
 !apps/web/.env.example
+
+# Local AI collaboration file
+local-guidance.md
