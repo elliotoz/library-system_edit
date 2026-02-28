@@ -3,7 +3,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import toast from 'react-hot-toast';
 import { Eye, EyeOff, Mail, Lock, BookOpen, GraduationCap, Library } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -44,23 +43,6 @@ export default function LoginPage() {
       toast.error(err.message || 'Login failed');
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  // Demo account quick fill
-  const fillDemoAccount = (role: string) => {
-    const accounts: Record<string, { email: string; password: string }> = {
-      student: { email: 'efe.demir@std.uskudar.edu.tr', password: 'password123' },
-      instructor: { email: 'kemal.sahin@uskudar.edu.tr', password: 'password123' },
-      staff: { email: 'ayse.yildiz@uskudar.edu.tr', password: 'password123' },
-      admin: { email: 'admin@uskudar.edu.tr', password: 'password123' },
-    };
-    
-    const account = accounts[role];
-    if (account) {
-      setEmail(account.email);
-      setPassword(account.password);
-      toast.success(`${role.charAt(0).toUpperCase() + role.slice(1)} credentials loaded`);
     }
   };
 
@@ -215,42 +197,6 @@ export default function LoginPage() {
               </button>
             </form>
 
-            {/* Demo Accounts */}
-            <div className="mt-8 pt-6 border-t border-gray-100">
-              <p className="text-center text-sm text-gray-500 mb-4">
-                Demo accounts available for testing
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => fillDemoAccount('student')}
-                  className="py-2 px-3 text-xs font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
-                >
-                  Student
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fillDemoAccount('instructor')}
-                  className="py-2 px-3 text-xs font-medium bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors"
-                >
-                  Instructor
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fillDemoAccount('staff')}
-                  className="py-2 px-3 text-xs font-medium bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 transition-colors"
-                >
-                  Staff
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fillDemoAccount('admin')}
-                  className="py-2 px-3 text-xs font-medium bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors"
-                >
-                  Admin
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* Footer */}
