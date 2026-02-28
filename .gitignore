@@ -117,3 +117,14 @@ docker-compose.override.yml
 *.temp
 tmp/
 temp/
+
+# Local-only dev credentials
+SEED_ACCOUNTS_LOCAL.md
+
+# Local cookie artifacts
+cookie.txt
+
+# Allow env templates to be committed
+!.env.example
+!apps/api/.env.example
+!apps/web/.env.example
