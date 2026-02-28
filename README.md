@@ -4,7 +4,7 @@
 
 [![Next.js](https://img.shields.io/badge/Next.js-14-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![NestJS](https://img.shields.io/badge/NestJS-10-E0234E?style=flat-square&logo=nestjs)](https://nestjs.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-5-2D3748?style=flat-square&logo=prisma)](https://www.prisma.io/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
@@ -96,8 +96,7 @@ The **AI-Integrated University Library Management System** is a comprehensive we
 | **TypeScript**      | Type-safe JavaScript                     |
 | **Tailwind CSS**    | Utility-first styling                    |
 | **Lucide React**    | Icon library                             |
-| **React Hook Form** | Form management                          |
-| **Zod**             | Schema validation                        |
+| **Axios**           | HTTP client                              |
 
 ### Backend
 
@@ -114,7 +113,7 @@ The **AI-Integrated University Library Management System** is a comprehensive we
 
 | Technology         | Purpose                       |
 | ------------------ | ----------------------------- |
-| **PostgreSQL 16**  | Primary relational database   |
+| **PostgreSQL 15**  | Primary relational database   |
 | **Docker**         | Containerized development     |
 | **Docker Compose** | Multi-container orchestration |
 
@@ -167,7 +166,7 @@ library-system/
 ### Prerequisites
 
 - **Node.js** >= 20.x
-- **pnpm** >= 8.x (recommended) or npm
+- **npm** >= 9.x
 - **Docker** & **Docker Compose**
 - **Git**
 
@@ -181,10 +180,6 @@ cd library-system
 ### Step 2: Install Dependencies
 
 ```bash
-# Using pnpm (recommended)
-pnpm install
-
-# Or using npm
 npm install
 ```
 
@@ -199,32 +194,27 @@ cp apps/web/.env.example apps/web/.env
 ### Step 4: Start the Database
 
 ```bash
-docker-compose up -d
+npm run db:start
 ```
 
 ### Step 5: Run Database Migrations
 
 ```bash
-cd  apps/api
-npx prisma migrate dev
-npx prisma db seed
+npm run db:migrate
+npm run db:seed
 ```
 
 ### Step 6: Start the Development Servers
 
 ```bash
-# Terminal 1 - Backend (from root)
-cd apps/api && pnpm dev
-
-# Terminal 2 - Frontend (from root)
-cd apps/web && pnpm dev
+npm run dev
 ```
 
 The application will be available at:
 
 - **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:4000
-- **API Documentation**: http://localhost:4000/api
+- **Backend API**: http://localhost:3001
+- **API Documentation**: http://localhost:3001/api/docs
 
 ---
 
@@ -241,7 +231,7 @@ JWT_SECRET="your-super-secret-jwt-key-change-in-production"
 JWT_EXPIRATION="7d"
 
 # Server
-PORT=4000
+PORT=3001
 NODE_ENV=development
 
 # File Upload
@@ -253,7 +243,7 @@ UPLOAD_DIR="./uploads"
 
 ```env
 # API URL
-NEXT_PUBLIC_API_URL=http://localhost:4000
+NEXT_PUBLIC_API_URL=http://localhost:3001
 
 # App Configuration
 NEXT_PUBLIC_APP_NAME="Library System"
@@ -266,36 +256,29 @@ NEXT_PUBLIC_APP_NAME="Library System"
 ### Development Mode
 
 ```bash
-# Start all services
-docker-compose up -d          # Database
-cd apps/api && pnpm dev       # Backend on :4000
-cd apps/web && pnpm dev       # Frontend on :3000
+npm run db:start              # Database on :5432
+npm run dev                   # Backend on :3001, Frontend on :3000
 ```
 
 ### Production Build
 
 ```bash
-# Build backend
-cd apps/api && pnpm build
-
-# Build frontend
-cd apps/web && pnpm build
+npm run build
 
 # Start production servers
-cd apps/api && pnpm start:prod
-cd apps/web && pnpm start
+cd apps/api && npm run start:prod
+cd apps/web && npm start
 ```
 
-### Demo Accounts
+### Seeded Development Accounts
 
-The seed script creates demo accounts for testing:
+Run the seed script to create test accounts for local development:
 
-| Role       | Email                     | Password    |
-| ---------- | ------------------------- | ----------- |
-| Admin      | admin@uskudar.edu.tr      | password123 |
-| Instructor | instructor@uskudar.edu.tr | password123 |
-| Staff      | staff@uskudar.edu.tr      | password123 |
-| Student    | student@uskudar.edu.tr    | password123 |
+```bash
+npm run db:seed
+```
+
+Credentials for all seeded roles (Student, Instructor, Staff, Admin) are printed to the terminal during seeding. To keep a local copy, save them to `SEED_ACCOUNTS_LOCAL.md` (already gitignored).
 
 ---
 
@@ -304,7 +287,7 @@ The seed script creates demo accounts for testing:
 ### Base URL
 
 ```
-http://localhost:4000/api
+http://localhost:3001
 ```
 
 ### Authentication
@@ -334,7 +317,7 @@ Content-Type: application/json
 
 {
   "email": "student@uskudar.edu.tr",
-  "password": "password123"
+  "password": "yourPassword"
 }
 ```
 
