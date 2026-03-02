@@ -2,7 +2,9 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import { User, LoginCredentials, UserProfile, ApiError } from '@/types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+// Always use the same-origin /api path so requests go through the Next.js
+// rewrite proxy. This ensures LAN devices don't try to reach localhost:3001.
+const API_URL = '/api';
 
 // Create axios instance with credentials for HttpOnly cookies
 const api: AxiosInstance = axios.create({

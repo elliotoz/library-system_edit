@@ -300,7 +300,12 @@ npm run docker:up
 
 Docker already binds all services to `0.0.0.0` via port mappings, so no extra steps are needed.
 
-> **Note:** The `/api` proxy rewrite runs server-side inside Next.js, so API calls from LAN devices are proxied automatically — no CORS or auth changes required.
+> **Note:** All browser API requests use the `/api` same-origin path and are proxied server-side by Next.js, so LAN devices work without direct backend access.
+
+> **CORS:** If you still see CORS errors (e.g., when the backend sets cookie domains), add your host IP to the API's allowed origins in `apps/api/.env`:
+> ```
+> CORS_ORIGIN="http://localhost:3000,http://<HOST_IP>:3000"
+> ```
 
 #### Off-network testing (optional)
 
