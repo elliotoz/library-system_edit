@@ -260,7 +260,7 @@ export default function DashboardLayout({
 
               {/* Notification Dropdown */}
               {notificationsOpen && (
-                <div className="absolute right-0 top-full mt-2 w-80 max-w-[calc(100vw-1rem)] rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                <div className="absolute left-1/2 top-full z-50 mt-2 w-[min(20rem,calc(100vw-1rem))] -translate-x-1/2 rounded-lg border border-gray-200 bg-white shadow-lg sm:left-auto sm:right-0 sm:translate-x-0 dark:border-gray-700 dark:bg-gray-800">
                   <div className="flex items-center justify-between border-b border-gray-200 p-3 dark:border-gray-700">
                     <h3 className="font-semibold text-gray-900 dark:text-white">
                       Notifications
