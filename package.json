@@ -23,6 +23,7 @@
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
+    "dev:lan": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
     "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules"
   },
   "keywords": [

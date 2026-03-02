@@ -270,6 +270,52 @@ cd apps/api && npm run start:prod
 cd apps/web && npm start
 ```
 
+### Test from Another Device on the Same Network (LAN)
+
+The dev server binds to `0.0.0.0` so any device on your local network can connect.
+
+**npm dev mode:**
+
+```bash
+# 1. Find your host machine IP
+#    macOS / Linux:
+ip -4 addr show | grep inet
+#    or on macOS:
+ipconfig getifaddr en0
+
+# 2. Start normally
+npm run db:start
+npm run dev
+
+# 3. On the other device, open:
+#    http://<HOST_IP>:3000
+```
+
+**Docker dev mode:**
+
+```bash
+npm run docker:up
+# Open http://<HOST_IP>:3000 on the other device
+```
+
+Docker already binds all services to `0.0.0.0` via port mappings, so no extra steps are needed.
+
+> **Note:** The `/api` proxy rewrite runs server-side inside Next.js, so API calls from LAN devices are proxied automatically — no CORS or auth changes required.
+
+#### Off-network testing (optional)
+
+For quick testing outside your LAN (e.g., on a mobile over cellular), you can use a temporary tunnel:
+
+```bash
+# Using SSH (if you have a public server):
+ssh -R 80:localhost:3000 serveo.net
+
+# Or using npx:
+npx localtunnel --port 3000
+```
+
+> **Caution:** Tunnels expose your dev server to the internet. Use only for temporary testing and shut down when done.
+
 ### Seeded Development Accounts
 
 Run the seed script to create test accounts for local development:
