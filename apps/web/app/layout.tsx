@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Toaster } from 'react-hot-toast';
 import './globals.css';
 import { AuthProvider } from '@/hooks/useAuth';
+import InjectedWalletErrorGuard from '@/components/InjectedWalletErrorGuard';
 
 export const metadata: Metadata = {
   title: 'Library System - Üsküdar University',
@@ -21,6 +22,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <AuthProvider>
+          <InjectedWalletErrorGuard />
           {children}
           <Toaster
             position="top-right"
