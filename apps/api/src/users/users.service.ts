@@ -3,6 +3,7 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { PrismaService } from '../prisma/prisma.service';
 import { Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class UsersService {
@@ -110,6 +111,32 @@ export class UsersService {
     }
 
     const { password, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  }
+
+  /**
+   * Update current user profile (self-service)
+   */
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const data: Record<string, unknown> = {};
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.avatarUrl !== undefined) data.avatarUrl = dto.avatarUrl;
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data,
+      include: { faculty: true },
+    });
+
+    const { password, ...userWithoutPassword } = updated;
     return userWithoutPassword;
   }
 

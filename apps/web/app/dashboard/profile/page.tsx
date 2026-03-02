@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, Mail, Building, BookOpen, Tag, Save, X } from 'lucide-react';
+import { User, Mail, Building, BookOpen, Tag, Save, X, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
@@ -13,6 +13,7 @@ interface UserProfile {
   studentId?: string;
   staffId?: string;
   interests: string[];
+  avatarUrl?: string;
   faculty?: { id: string; name: string; code: string };
   isActive: boolean;
   createdAt: string;
@@ -32,6 +33,10 @@ export default function ProfilePage() {
   const [interests, setInterests] = useState<string[]>([]);
   const [newInterest, setNewInterest] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editAvatarUrl, setEditAvatarUrl] = useState('');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -85,6 +90,54 @@ export default function ProfilePage() {
     }
   };
 
+  const handleEditProfile = () => {
+    if (profile) {
+      setEditName(profile.name);
+      setEditAvatarUrl(profile.avatarUrl || '');
+      setIsEditingProfile(true);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!editName.trim() || editName.trim().length < 2) {
+      toast.error('Name must be at least 2 characters');
+      return;
+    }
+    setIsSavingProfile(true);
+    try {
+      const payload: { name?: string; avatarUrl?: string } = {};
+      if (editName.trim() !== profile?.name) payload.name = editName.trim();
+      const trimmedUrl = editAvatarUrl.trim();
+      if (trimmedUrl !== (profile?.avatarUrl || '')) {
+        payload.avatarUrl = trimmedUrl || undefined;
+      }
+
+      if (Object.keys(payload).length === 0) {
+        setIsEditingProfile(false);
+        return;
+      }
+
+      const response = await fetch('/api/users/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      if (response.ok) {
+        const updated = await response.json();
+        setProfile((prev) => prev ? { ...prev, name: updated.name, avatarUrl: updated.avatarUrl } : null);
+        toast.success('Profile updated');
+        setIsEditingProfile(false);
+      } else {
+        toast.error('Failed to update profile');
+      }
+    } catch {
+      toast.error('Failed to update profile');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6 animate-pulse">
@@ -118,18 +171,57 @@ export default function ProfilePage() {
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex flex-col sm:flex-row gap-6">
           <div className="flex-shrink-0">
-            <div className="w-24 h-24 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white text-3xl font-bold">
-              {profile.name.split(' ').map((n) => n[0]).join('').toUpperCase()}
-            </div>
+            {profile.avatarUrl ? (
+              <img src={profile.avatarUrl} alt={profile.name} className="w-24 h-24 rounded-full object-cover" />
+            ) : (
+              <div className="w-24 h-24 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white text-3xl font-bold">
+                {profile.name.split(' ').map((n) => n[0]).join('').toUpperCase()}
+              </div>
+            )}
           </div>
           <div className="flex-1">
             <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">{profile.name}</h2>
-                <span className={cn('inline-block px-3 py-1 rounded-full text-sm font-medium mt-1', roleColors[profile.role as keyof typeof roleColors])}>
-                  {profile.role}
-                </span>
-              </div>
+              {isEditingProfile ? (
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Avatar URL</label>
+                    <input
+                      type="text"
+                      value={editAvatarUrl}
+                      onChange={(e) => setEditAvatarUrl(e.target.value)}
+                      placeholder="https://example.com/avatar.jpg"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-400"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setIsEditingProfile(false)} className="text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
+                    <button onClick={handleSaveProfile} disabled={isSavingProfile} className="flex items-center gap-1 px-3 py-1 bg-primary-500 text-white rounded-lg text-sm hover:bg-primary-600 disabled:opacity-50">
+                      <Save className="w-4 h-4" />{isSavingProfile ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">{profile.name}</h2>
+                    <span className={cn('inline-block px-3 py-1 rounded-full text-sm font-medium mt-1', roleColors[profile.role as keyof typeof roleColors])}>
+                      {profile.role}
+                    </span>
+                  </div>
+                  <button onClick={handleEditProfile} className="text-primary-600 hover:text-primary-700" title="Edit profile">
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                </>
+              )}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
               <div className="flex items-center gap-2 text-gray-600">

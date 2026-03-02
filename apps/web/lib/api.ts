@@ -70,6 +70,11 @@ export const usersApi = {
     return response.data;
   },
 
+  updateProfile: async (data: { name?: string; avatarUrl?: string }) => {
+    const response = await api.patch('/users/profile', data);
+    return response.data;
+  },
+
   updateInterests: async (interests: string[]) => {
     const response = await api.patch('/users/interests', { interests });
     return response.data;
