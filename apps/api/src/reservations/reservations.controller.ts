@@ -10,7 +10,7 @@ import {
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { ReservationsService } from "./reservations.service";
-import { CreateReservationDto } from "./dto/reservations.dto";
+import { CreateReservationDto, RejectReservationDto } from "./dto/reservations.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -97,8 +97,8 @@ export class ReservationsController {
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Reject a reservation" })
-  async reject(@Param("id") id: string) {
-    return this.reservationsService.reject(id);
+  async reject(@Param("id") id: string, @Body() dto: RejectReservationDto) {
+    return this.reservationsService.reject(id, dto.reason);
   }
   @Get("ready")
   @UseGuards(RolesGuard)

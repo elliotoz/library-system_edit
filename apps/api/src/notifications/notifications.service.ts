@@ -121,13 +121,14 @@ export class NotificationsService {
   async notifyReservationRejected(
     userId: string,
     bookTitle: string,
+    reason: string,
     bookId?: string
   ) {
     return this.create({
       userId,
       type: NotificationType.RESERVATION_REJECTED,
       title: "Reservation Not Approved",
-      message: `Your reservation for "${bookTitle}" could not be approved. The book may no longer be available. Please try again or contact the library.`,
+      message: `Your reservation for "${bookTitle}" was not approved. Reason: ${reason}`,
       bookId,
     });
   }

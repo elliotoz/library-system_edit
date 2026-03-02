@@ -83,6 +83,21 @@ body {
   color: white !important;
 }
 
+/* Form control base styles – ensure text is visible in both modes */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]),
+select,
+textarea {
+  color: #111827;
+  background-color: #f9fafb;
+}
+
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]),
+.dark select,
+.dark textarea {
+  color: #f3f4f6;
+  background-color: #1f2937;
+}
+
 /* Form focus states */
 input:focus,
 select:focus,

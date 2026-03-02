@@ -350,7 +350,7 @@ export class ReservationsService {
     };
   }
 
-  async reject(reservationId: string) {
+  async reject(reservationId: string, reason: string) {
     const reservation = await this.prisma.reservation.findUnique({
       where: { id: reservationId },
       include: {
@@ -367,7 +367,10 @@ export class ReservationsService {
     const [updatedReservation] = await this.prisma.$transaction([
       this.prisma.reservation.update({
         where: { id: reservationId },
-        data: { status: ReservationStatus.CANCELLED },
+        data: {
+          status: ReservationStatus.CANCELLED,
+          notes: `Rejected: ${reason}`,
+        },
         include: {
           bookCopy: { include: { book: true } },
           branch: true,
@@ -382,6 +385,7 @@ export class ReservationsService {
     await this.notificationsService.notifyReservationRejected(
       reservation.user.id,
       reservation.bookCopy.book.title,
+      reason,
       reservation.bookCopy.book.id
     );
 

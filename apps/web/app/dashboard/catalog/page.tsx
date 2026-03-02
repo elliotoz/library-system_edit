@@ -217,8 +217,24 @@ export default function CatalogPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {books.map((book) => (
             <Link key={book.id} href={`/dashboard/catalog/${book.id}`} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg hover:border-primary-200 transition-all group">
-              <div className="aspect-[3/4] bg-gradient-to-br from-primary-100 to-primary-200 rounded-lg mb-4 flex items-center justify-center">
-                <BookOpen className="w-16 h-16 text-primary-400" />
+              <div className="aspect-[2/3] w-full overflow-hidden rounded-lg mb-4 bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
+                {book.coverImageUrl ? (
+                  <img
+                    src={book.coverImageUrl}
+                    alt={book.title}
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      target.style.display = 'none';
+                      target.parentElement?.classList.add('flex', 'items-center', 'justify-center');
+                      const icon = document.createElement('div');
+                      icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-primary-400"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>';
+                      target.parentElement?.appendChild(icon);
+                    }}
+                  />
+                ) : (
+                  <BookOpen className="w-16 h-16 text-primary-400" />
+                )}
               </div>
               <h3 className="font-medium text-gray-900 group-hover:text-primary-600 line-clamp-2 mb-1">{book.title}</h3>
               <p className="text-sm text-gray-500 line-clamp-1 mb-2">{book.authors.join(', ')}</p>

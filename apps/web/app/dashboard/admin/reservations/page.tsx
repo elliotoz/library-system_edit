@@ -85,17 +85,27 @@ export default function AdminReservationsPage() {
   };
 
   const handleReject = async (id: string) => {
+    const reason = window.prompt('Enter a reason for rejecting this reservation:');
+    if (reason === null) return;
+    if (!reason.trim()) {
+      toast.error('Rejection reason is required');
+      return;
+    }
+
     setProcessingId(id);
     try {
       const response = await fetch(`/api/reservations/${id}/reject`, {
         method: 'PATCH',
         credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason.trim() }),
       });
       if (response.ok) {
         toast.success('Reservation rejected');
         fetchReservations();
       } else {
-        toast.error('Failed to reject reservation');
+        const error = await response.json().catch(() => null);
+        toast.error(error?.message || 'Failed to reject reservation');
       }
     } catch (error) {
       toast.error('Failed to reject reservation');

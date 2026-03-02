@@ -1,4 +1,4 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsNotEmpty, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateReservationDto {
@@ -9,6 +9,17 @@ export class CreateReservationDto {
   @ApiProperty()
   @IsString()
   branchId: string;
+}
+
+export class RejectReservationDto {
+  @ApiProperty({
+    description: 'Reason for rejecting the reservation',
+    example: 'Book is damaged and unavailable for lending.',
+  })
+  @IsString()
+  @IsNotEmpty({ message: 'Rejection reason is required' })
+  @MaxLength(500, { message: 'Reason must not exceed 500 characters' })
+  reason: string;
 }
 
 export class ReservationQueryDto {

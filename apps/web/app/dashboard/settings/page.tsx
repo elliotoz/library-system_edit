@@ -118,8 +118,8 @@ export default function SettingsPage() {
             >
               <span
                 className={cn(
-                  'absolute top-1 w-4 h-4 bg-white rounded-full transition-transform',
-                  settings.darkMode ? 'translate-x-7' : 'translate-x-1'
+                  'absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform',
+                  settings.darkMode ? 'translate-x-6' : 'translate-x-0'
                 )}
               />
             </button>
@@ -177,8 +177,8 @@ export default function SettingsPage() {
             >
               <span
                 className={cn(
-                  'absolute top-1 w-4 h-4 bg-white rounded-full transition-transform',
-                  settings.emailNotifications ? 'translate-x-7' : 'translate-x-1'
+                  'absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform',
+                  settings.emailNotifications ? 'translate-x-6' : 'translate-x-0'
                 )}
               />
             </button>
@@ -204,8 +204,8 @@ export default function SettingsPage() {
             >
               <span
                 className={cn(
-                  'absolute top-1 w-4 h-4 bg-white rounded-full transition-transform',
-                  settings.pushNotifications ? 'translate-x-7' : 'translate-x-1'
+                  'absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform',
+                  settings.pushNotifications ? 'translate-x-6' : 'translate-x-0'
                 )}
               />
             </button>
@@ -231,8 +231,8 @@ export default function SettingsPage() {
             >
               <span
                 className={cn(
-                  'absolute top-1 w-4 h-4 bg-white rounded-full transition-transform',
-                  settings.dueDateReminders ? 'translate-x-7' : 'translate-x-1'
+                  'absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform',
+                  settings.dueDateReminders ? 'translate-x-6' : 'translate-x-0'
                 )}
               />
             </button>
@@ -258,8 +258,8 @@ export default function SettingsPage() {
             >
               <span
                 className={cn(
-                  'absolute top-1 w-4 h-4 bg-white rounded-full transition-transform',
-                  settings.reservationAlerts ? 'translate-x-7' : 'translate-x-1'
+                  'absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform',
+                  settings.reservationAlerts ? 'translate-x-6' : 'translate-x-0'
                 )}
               />
             </button>

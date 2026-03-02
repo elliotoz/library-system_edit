@@ -17,7 +17,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "covers:backfill": "ts-node src/scripts/backfill-book-covers.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",
