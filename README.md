@@ -476,9 +476,9 @@ Authorization: Cookie (access_token)
 
 ### 🔄 Phase 2: User Features (In Progress)
 
-- [ ] User Self-Registration with Admin Approval
-- [ ] Password Reset via Email
-- [ ] Edit User Profile
+- [x] Secure User Onboarding (Google Sign-In + Verified Email/Password Signup)
+- [x] Password Reset via Email
+- [x] Edit User Profile
 - [ ] Instructor Follower System
 - [ ] Reading Lists CRUD
 

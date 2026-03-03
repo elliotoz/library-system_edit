@@ -130,7 +130,7 @@ cookie.txt
 !apps/web/.env.example
 
 # Local AI collaboration file
-local-guidance.md
+local-notes.md
 
 # Local AI logs
 .ai/
