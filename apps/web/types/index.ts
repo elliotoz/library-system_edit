@@ -131,6 +131,36 @@ export interface BranchAvailability {
   available: number;
 }
 
+// Reading Lists
+export interface ReadingListItem {
+  id: string;
+  orderIndex: number;
+  notes: string | null;
+  readingListId: string;
+  bookId: string;
+  createdAt: string;
+  book: {
+    id: string;
+    title: string;
+    authors: string[];
+    coverImageUrl: string | null;
+  };
+}
+
+export interface ReadingList {
+  id: string;
+  title: string;
+  description: string | null;
+  courseCode: string | null;
+  semester: string | null;
+  isActive: boolean;
+  ownerId: string;
+  createdAt: string;
+  updatedAt: string;
+  items: ReadingListItem[];
+  _count: { items: number };
+}
+
 export interface BookDetail {
   id: string;
   title: string;

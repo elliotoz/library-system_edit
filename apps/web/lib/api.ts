@@ -1,6 +1,6 @@
 // lib/api.ts
 import axios, { AxiosError, AxiosInstance } from 'axios';
-import { User, LoginCredentials, UserProfile, ApiError } from '@/types';
+import { User, LoginCredentials, UserProfile, ApiError, ReadingList } from '@/types';
 
 // Always use the same-origin /api path so requests go through the Next.js
 // rewrite proxy. This ensures LAN devices don't try to reach localhost:3001.
@@ -118,6 +118,29 @@ export const usersApi = {
   activate: async (id: string) => {
     const response = await api.patch(`/users/${id}/activate`);
     return response.data;
+  },
+};
+
+// Reading Lists API
+export const readingListsApi = {
+  getMyLists: async (): Promise<ReadingList[]> =>
+    (await api.get<ReadingList[]>('/reading-lists/my')).data,
+
+  create: async (data: { title: string; description?: string; courseCode?: string; semester?: string }): Promise<ReadingList> =>
+    (await api.post<ReadingList>('/reading-lists', data)).data,
+
+  update: async (id: string, data: { title?: string; description?: string; courseCode?: string; semester?: string; isActive?: boolean }): Promise<ReadingList> =>
+    (await api.patch<ReadingList>(`/reading-lists/${id}`, data)).data,
+
+  remove: async (id: string): Promise<void> => {
+    await api.delete(`/reading-lists/${id}`);
+  },
+
+  addItem: async (listId: string, data: { bookId: string; notes?: string }) =>
+    (await api.post(`/reading-lists/${listId}/items`, data)).data,
+
+  removeItem: async (listId: string, itemId: string): Promise<void> => {
+    await api.delete(`/reading-lists/${listId}/items/${itemId}`);
   },
 };
 

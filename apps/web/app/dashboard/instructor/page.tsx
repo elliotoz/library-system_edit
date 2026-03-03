@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   BookOpen,
@@ -13,26 +13,18 @@ import {
   Search,
   ListChecks,
   Mail,
-  Clock,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { readingListsApi } from '@/lib/api';
+import { ReadingList } from '@/types';
 
 interface InstructorStats {
   borrowedBooks: number;
   maxBorrowDays: number;
   maxBooks: number;
-}
-
-interface ReadingList {
-  id: string;
-  name: string;
-  courseCode: string;
-  semester: string;
-  bookCount: number;
-  studentCount: number;
-  isActive: boolean;
 }
 
 export default function InstructorDashboard() {
@@ -42,6 +34,21 @@ export default function InstructorDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [showNewListModal, setShowNewListModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+
+  // Form state for new list
+  const [newTitle, setNewTitle] = useState('');
+  const [newCourseCode, setNewCourseCode] = useState('');
+  const [newSemester, setNewSemester] = useState('Spring 2026');
+
+  const fetchReadingLists = useCallback(async () => {
+    try {
+      const lists = await readingListsApi.getMyLists();
+      setReadingLists(lists);
+    } catch {
+      // Silently fail — lists section will show empty state
+    }
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -53,27 +60,7 @@ export default function InstructorDashboard() {
           setStats(statsData);
         }
 
-        // Mock reading lists for now - will be replaced with API
-        setReadingLists([
-          {
-            id: '1',
-            name: 'Software Engineering 101',
-            courseCode: 'SE101',
-            semester: 'Fall 2025',
-            bookCount: 12,
-            studentCount: 45,
-            isActive: true,
-          },
-          {
-            id: '2',
-            name: 'Advanced Algorithms',
-            courseCode: 'CS401',
-            semester: 'Fall 2025',
-            bookCount: 8,
-            studentCount: 32,
-            isActive: true,
-          },
-        ]);
+        await fetchReadingLists();
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -82,7 +69,7 @@ export default function InstructorDashboard() {
     };
 
     fetchData();
-  }, []);
+  }, [fetchReadingLists]);
 
   const greeting = () => {
     const hour = new Date().getHours();
@@ -101,10 +88,38 @@ export default function InstructorDashboard() {
     setShowContactModal(false);
   };
 
-  const handleCreateList = (e: React.FormEvent) => {
+  const handleCreateList = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Reading list created!');
-    setShowNewListModal(false);
+    if (isCreating) return;
+    setIsCreating(true);
+    try {
+      await readingListsApi.create({
+        title: newTitle,
+        courseCode: newCourseCode || undefined,
+        semester: newSemester || undefined,
+      });
+      toast.success('Reading list created!');
+      setShowNewListModal(false);
+      setNewTitle('');
+      setNewCourseCode('');
+      setNewSemester('Spring 2026');
+      await fetchReadingLists();
+    } catch {
+      toast.error('Failed to create reading list');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleDeleteList = async (id: string, title: string) => {
+    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+    try {
+      await readingListsApi.remove(id);
+      toast.success('Reading list deleted');
+      await fetchReadingLists();
+    } catch {
+      toast.error('Failed to delete reading list');
+    }
   };
 
   if (isLoading) {
@@ -164,13 +179,13 @@ export default function InstructorDashboard() {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-purple-50 dark:bg-purple-900/30 rounded-xl flex items-center justify-center">
-              <Users className="w-6 h-6 text-purple-500" />
+              <BookOpen className="w-6 h-6 text-purple-500" />
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {readingLists.reduce((acc, list) => acc + list.studentCount, 0)}
+                {readingLists.reduce((acc, list) => acc + list._count.items, 0)}
               </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Students Enrolled</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Total Books in Lists</p>
             </div>
           </div>
         </div>
@@ -223,9 +238,11 @@ export default function InstructorDashboard() {
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="font-semibold text-gray-900 dark:text-white">{list.name}</h3>
+                      <h3 className="font-semibold text-gray-900 dark:text-white">{list.title}</h3>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {list.bookCount} books • {list.semester}
+                        {list._count.items} book{list._count.items !== 1 ? 's' : ''}
+                        {list.semester ? ` • ${list.semester}` : ''}
+                        {list.courseCode ? ` • ${list.courseCode}` : ''}
                       </p>
                     </div>
                     <span
@@ -240,16 +257,18 @@ export default function InstructorDashboard() {
                     </span>
                   </div>
                   <div className="flex items-center gap-4 mt-3 text-sm text-gray-500 dark:text-gray-400">
-                    <span className="flex items-center gap-1">
-                      <Users className="w-4 h-4" />
-                      {list.studentCount} students
-                    </span>
                     <Link
                       href={`/dashboard/instructor/reading-lists/${list.id}`}
                       className="text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1"
                     >
                       Manage List <ArrowRight className="w-3 h-3" />
                     </Link>
+                    <button
+                      onClick={() => handleDeleteList(list.id, list.title)}
+                      className="text-red-500 hover:text-red-700 dark:hover:text-red-400 flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" /> Delete
+                    </button>
                   </div>
                 </div>
               ))}
@@ -325,34 +344,41 @@ export default function InstructorDashboard() {
             <form onSubmit={handleCreateList} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Course Name
+                  List Title
                 </label>
                 <input
                   type="text"
                   required
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
                   placeholder="e.g., Introduction to Computer Science"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Course Code
+                  Course Code (optional)
                 </label>
                 <input
                   type="text"
-                  required
+                  value={newCourseCode}
+                  onChange={(e) => setNewCourseCode(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
                   placeholder="e.g., CS101"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Semester
+                  Semester (optional)
                 </label>
-                <select className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500">
-                  <option>Fall 2025</option>
-                  <option>Spring 2026</option>
-                  <option>Summer 2026</option>
+                <select
+                  value={newSemester}
+                  onChange={(e) => setNewSemester(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="Spring 2026">Spring 2026</option>
+                  <option value="Fall 2025">Fall 2025</option>
+                  <option value="Summer 2026">Summer 2026</option>
                 </select>
               </div>
               <div className="flex gap-3 pt-2">
@@ -365,9 +391,10 @@ export default function InstructorDashboard() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+                  disabled={isCreating}
+                  className="flex-1 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50"
                 >
-                  Create List
+                  {isCreating ? 'Creating...' : 'Create List'}
                 </button>
               </div>
             </form>
