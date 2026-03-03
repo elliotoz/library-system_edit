@@ -270,6 +270,14 @@ cd apps/api && npm run start:prod
 cd apps/web && npm start
 ```
 
+### Build Commands (Monorepo)
+
+```bash
+npm run build                          # both apps
+cd apps/api && npx nest build          # API only
+cd apps/web && npx next build          # web only
+```
+
 ### Test from Another Device on the Same Network (LAN)
 
 The dev server binds to `0.0.0.0` so any device on your local network can connect.
