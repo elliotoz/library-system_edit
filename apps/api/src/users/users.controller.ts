@@ -7,10 +7,16 @@ import {
   Patch,
   Body,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiConsumes } from '@nestjs/swagger';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import { randomUUID } from 'crypto';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -18,6 +24,18 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+
+const avatarStorage = diskStorage({
+  destination: './uploads/avatars',
+  filename: (
+    req: Express.Request,
+    file: Express.Multer.File,
+    callback: (error: Error | null, filename: string) => void,
+  ) => {
+    const uniqueName = `${randomUUID()}${extname(file.originalname)}`;
+    callback(null, uniqueName);
+  },
+});
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -64,11 +82,34 @@ export class UsersController {
 
   @Patch('profile')
   @ApiOperation({ summary: 'Update current user profile' })
+  @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 200, description: 'Profile updated' })
+  @UseInterceptors(
+    FileInterceptor('avatar', {
+      storage: avatarStorage,
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (
+        req: Express.Request,
+        file: Express.Multer.File,
+        callback: (error: Error | null, acceptFile: boolean) => void,
+      ) => {
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (allowedTypes.includes(file.mimetype)) {
+          callback(null, true);
+        } else {
+          callback(new Error('Only JPEG, PNG, and WebP images are allowed'), false);
+        }
+      },
+    }),
+  )
   async updateMyProfile(
     @CurrentUser('id') userId: string,
     @Body() dto: UpdateProfileDto,
+    @UploadedFile() file?: Express.Multer.File,
   ) {
+    if (file) {
+      dto.avatarUrl = `/uploads/avatars/${file.filename}`;
+    }
     return this.usersService.updateProfile(userId, dto);
   }
 

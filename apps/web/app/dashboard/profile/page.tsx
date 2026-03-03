@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { User, Mail, Building, BookOpen, Tag, Save, X, Pencil } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { User, Mail, Building, BookOpen, Tag, Save, X, Pencil, Camera } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
 import toast from 'react-hot-toast';
 
 interface UserProfile {
@@ -27,6 +28,7 @@ const roleColors = {
 };
 
 export default function ProfilePage() {
+  const { refreshUser } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -35,8 +37,10 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editName, setEditName] = useState('');
-  const [editAvatarUrl, setEditAvatarUrl] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -93,9 +97,21 @@ export default function ProfilePage() {
   const handleEditProfile = () => {
     if (profile) {
       setEditName(profile.name);
-      setEditAvatarUrl(profile.avatarUrl || '');
+      setAvatarFile(null);
+      setAvatarPreview(null);
       setIsEditingProfile(true);
     }
+  };
+
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
   };
 
   const handleSaveProfile = async () => {
@@ -103,31 +119,35 @@ export default function ProfilePage() {
       toast.error('Name must be at least 2 characters');
       return;
     }
+
+    const nameChanged = editName.trim() !== profile?.name;
+    if (!nameChanged && !avatarFile) {
+      setIsEditingProfile(false);
+      return;
+    }
+
     setIsSavingProfile(true);
     try {
-      const payload: { name?: string; avatarUrl?: string } = {};
-      if (editName.trim() !== profile?.name) payload.name = editName.trim();
-      const trimmedUrl = editAvatarUrl.trim();
-      if (trimmedUrl !== (profile?.avatarUrl || '')) {
-        payload.avatarUrl = trimmedUrl || undefined;
-      }
-
-      if (Object.keys(payload).length === 0) {
-        setIsEditingProfile(false);
-        return;
-      }
+      const formData = new FormData();
+      if (nameChanged) formData.append('name', editName.trim());
+      if (avatarFile) formData.append('avatar', avatarFile);
 
       const response = await fetch('/api/users/profile', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(payload),
+        body: formData,
       });
       if (response.ok) {
         const updated = await response.json();
         setProfile((prev) => prev ? { ...prev, name: updated.name, avatarUrl: updated.avatarUrl } : null);
+        await refreshUser();
         toast.success('Profile updated');
         setIsEditingProfile(false);
+        if (avatarPreview) {
+          URL.revokeObjectURL(avatarPreview);
+          setAvatarPreview(null);
+        }
+        setAvatarFile(null);
       } else {
         toast.error('Failed to update profile');
       }
@@ -184,6 +204,34 @@ export default function ProfilePage() {
               {isEditingProfile ? (
                 <div className="flex-1 space-y-3">
                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Avatar</label>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleAvatarSelect}
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-3">
+                      {avatarPreview ? (
+                        <img src={avatarPreview} alt="Preview" className="w-16 h-16 rounded-full object-cover" />
+                      ) : profile.avatarUrl ? (
+                        <img src={profile.avatarUrl} alt={profile.name} className="w-16 h-16 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center text-gray-400">
+                          <Camera className="w-6 h-6" />
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+                      >
+                        {avatarPreview || profile.avatarUrl ? 'Change image' : 'Upload image'}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
                     <input
                       type="text"
@@ -192,18 +240,8 @@ export default function ProfilePage() {
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-400"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Avatar URL</label>
-                    <input
-                      type="text"
-                      value={editAvatarUrl}
-                      onChange={(e) => setEditAvatarUrl(e.target.value)}
-                      placeholder="https://example.com/avatar.jpg"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-400"
-                    />
-                  </div>
                   <div className="flex gap-2">
-                    <button onClick={() => setIsEditingProfile(false)} className="text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
+                    <button onClick={() => { setIsEditingProfile(false); if (avatarPreview) URL.revokeObjectURL(avatarPreview); setAvatarPreview(null); setAvatarFile(null); }} className="text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
                     <button onClick={handleSaveProfile} disabled={isSavingProfile} className="flex items-center gap-1 px-3 py-1 bg-primary-500 text-white rounded-lg text-sm hover:bg-primary-600 disabled:opacity-50">
                       <Save className="w-4 h-4" />{isSavingProfile ? 'Saving...' : 'Save'}
                     </button>
