@@ -1,5 +1,6 @@
-import { IsNotEmpty, IsString, IsOptional } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 export class CreateReadingListDto {
   @ApiProperty({ example: 'Software Engineering Fundamentals' })
@@ -11,4 +12,54 @@ export class CreateReadingListDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @ApiPropertyOptional({ example: 'SE101' })
+  @IsOptional()
+  @IsString()
+  courseCode?: string;
+
+  @ApiPropertyOptional({ example: '2025-2026 Spring' })
+  @IsOptional()
+  @IsString()
+  semester?: string;
+}
+
+export class UpdateReadingListDto {
+  @ApiPropertyOptional({ example: 'Updated Reading List Title' })
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @ApiPropertyOptional({ example: 'Updated description' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ example: 'SE102' })
+  @IsOptional()
+  @IsString()
+  courseCode?: string;
+
+  @ApiPropertyOptional({ example: '2025-2026 Fall' })
+  @IsOptional()
+  @IsString()
+  semester?: string;
+
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  isActive?: boolean;
+}
+
+export class AddReadingListItemDto {
+  @ApiProperty({ example: 'clxxxxxxxxxxxxxxxxx' })
+  @IsString()
+  @IsNotEmpty({ message: 'Book ID is required' })
+  bookId: string;
+
+  @ApiPropertyOptional({ example: 'Chapter 1-5 recommended' })
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }
