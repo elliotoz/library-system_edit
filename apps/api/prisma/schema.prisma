@@ -121,6 +121,7 @@ model User {
   uploadedBooks     Book[]         @relation("UploadedBy")
   uploadedMaterials Material[]     @relation("MaterialUploader")
   notifications     Notification[]
+  readingLists      ReadingList[]
 
   @@map("users")
 }
@@ -237,7 +238,8 @@ model Book {
   updatedAt DateTime @updatedAt
 
   // Relations
-  copies BookCopy[]
+  copies           BookCopy[]
+  readingListItems ReadingListItem[]
 
   @@index([title])
   @@index([mainFacultyId])
@@ -432,4 +434,49 @@ model Notification {
   @@index([read])
   @@index([createdAt])
   @@map("notifications")
+}
+
+// ============================================
+// READING LISTS (Instructor-curated)
+// ============================================
+
+model ReadingList {
+  id          String  @id @default(cuid())
+  title       String
+  description String?
+
+  // Owner (Instructor or Admin)
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id])
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  items ReadingListItem[]
+
+  @@index([ownerId])
+  @@map("reading_lists")
+}
+
+model ReadingListItem {
+  id    String @id @default(cuid())
+  order Int    @default(0)
+  notes String?
+
+  // Parent list
+  readingListId String
+  readingList   ReadingList @relation(fields: [readingListId], references: [id], onDelete: Cascade)
+
+  // Book reference
+  bookId String
+  book   Book   @relation(fields: [bookId], references: [id])
+
+  // Timestamps
+  createdAt DateTime @default(now())
+
+  @@unique([readingListId, bookId])
+  @@index([readingListId])
+  @@map("reading_list_items")
 }
