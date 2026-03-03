@@ -61,6 +61,18 @@ enum AuthProvider {
   GOOGLE
 }
 
+enum ReadingListVisibility {
+  PUBLIC
+  FOLLOWERS_ONLY
+  PRIVATE
+}
+
+enum ReadingListStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 enum NotificationType {
   RESERVATION_CREATED
   RESERVATION_APPROVED
@@ -71,6 +83,8 @@ enum NotificationType {
   BORROW_DUE_SOON
   BORROW_OVERDUE
   BOOK_AVAILABLE
+  READING_LIST_PUBLISHED
+  READING_LIST_UPDATED
   SYSTEM
 }
 
@@ -449,6 +463,9 @@ model ReadingList {
   courseCode   String?
   semester    String?
   isActive    Boolean @default(true)
+
+  visibility ReadingListVisibility @default(PUBLIC)
+  status     ReadingListStatus     @default(DRAFT)
 
   // Owner (Instructor or Admin)
   ownerId String

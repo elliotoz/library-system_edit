@@ -15,20 +15,14 @@ import { Role } from '@prisma/client';
 export class ReadingListsController {
   constructor(private readonly readingListsService: ReadingListsService) {}
 
+  // ── Owner endpoints ───────────────────────────────────────────
+
   @Get('my')
   @Roles(Role.INSTRUCTOR, Role.ADMIN)
   @ApiOperation({ summary: 'Get my reading lists' })
   @ApiResponse({ status: 200, description: 'Reading lists retrieved' })
   async findMyLists(@CurrentUser('id') userId: string) {
     return this.readingListsService.findMyLists(userId);
-  }
-
-  @Get(':id')
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
-  @ApiOperation({ summary: 'Get a reading list by ID' })
-  @ApiResponse({ status: 200, description: 'Reading list retrieved' })
-  async findOne(@Param('id') id: string) {
-    return this.readingListsService.findOne(id);
   }
 
   @Post()
@@ -44,25 +38,27 @@ export class ReadingListsController {
 
   @Patch(':id')
   @Roles(Role.INSTRUCTOR, Role.ADMIN)
-  @ApiOperation({ summary: 'Update a reading list' })
+  @ApiOperation({ summary: 'Update a reading list (owner or admin)' })
   @ApiResponse({ status: 200, description: 'Reading list updated' })
   async update(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
+    @CurrentUser('role') userRole: Role,
     @Body() dto: UpdateReadingListDto,
   ) {
-    return this.readingListsService.update(id, userId, dto);
+    return this.readingListsService.update(id, userId, dto, userRole);
   }
 
   @Delete(':id')
   @Roles(Role.INSTRUCTOR, Role.ADMIN)
-  @ApiOperation({ summary: 'Delete a reading list' })
+  @ApiOperation({ summary: 'Delete a reading list (owner or admin)' })
   @ApiResponse({ status: 200, description: 'Reading list deleted' })
   async remove(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
+    @CurrentUser('role') userRole: Role,
   ) {
-    return this.readingListsService.remove(id, userId);
+    return this.readingListsService.remove(id, userId, userRole);
   }
 
   @Post(':id/items')
@@ -87,5 +83,39 @@ export class ReadingListsController {
     @CurrentUser('id') userId: string,
   ) {
     return this.readingListsService.removeItem(listId, itemId, userId);
+  }
+
+  // ── Discovery endpoints (any logged-in user) ─────────────────
+
+  @Get('feed')
+  @ApiOperation({ summary: 'Global feed of visible reading lists' })
+  @ApiResponse({ status: 200, description: 'Reading lists feed' })
+  async feed(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') userRole: Role,
+  ) {
+    return this.readingListsService.findGlobalFeed(userId, userRole);
+  }
+
+  @Get('instructor/:instructorId')
+  @ApiOperation({ summary: 'Get instructor profile with reading lists' })
+  @ApiResponse({ status: 200, description: 'Instructor profile with lists' })
+  async instructorProfile(
+    @Param('instructorId') instructorId: string,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') userRole: Role,
+  ) {
+    return this.readingListsService.findByInstructor(instructorId, userId, userRole);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a reading list by ID (visibility enforced)' })
+  @ApiResponse({ status: 200, description: 'Reading list retrieved' })
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') userRole: Role,
+  ) {
+    return this.readingListsService.findOneForUser(id, userId, userRole);
   }
 }

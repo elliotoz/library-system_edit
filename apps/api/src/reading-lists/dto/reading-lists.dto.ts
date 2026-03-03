@@ -1,6 +1,7 @@
-import { IsNotEmpty, IsString, IsOptional, IsBoolean } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsEnum } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { ReadingListVisibility, ReadingListStatus } from '@prisma/client';
 
 export class CreateReadingListDto {
   @ApiProperty({ example: 'Software Engineering Fundamentals' })
@@ -22,6 +23,11 @@ export class CreateReadingListDto {
   @IsOptional()
   @IsString()
   semester?: string;
+
+  @ApiPropertyOptional({ enum: ReadingListVisibility, example: 'PUBLIC' })
+  @IsOptional()
+  @IsEnum(ReadingListVisibility)
+  visibility?: ReadingListVisibility;
 }
 
 export class UpdateReadingListDto {
@@ -50,6 +56,16 @@ export class UpdateReadingListDto {
   @IsBoolean()
   @Type(() => Boolean)
   isActive?: boolean;
+
+  @ApiPropertyOptional({ enum: ReadingListVisibility, example: 'FOLLOWERS_ONLY' })
+  @IsOptional()
+  @IsEnum(ReadingListVisibility)
+  visibility?: ReadingListVisibility;
+
+  @ApiPropertyOptional({ enum: ReadingListStatus, example: 'PUBLISHED' })
+  @IsOptional()
+  @IsEnum(ReadingListStatus)
+  status?: ReadingListStatus;
 }
 
 export class AddReadingListItemDto {
