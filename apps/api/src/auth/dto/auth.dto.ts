@@ -94,3 +94,23 @@ export class ResendVerificationDto {
   @IsNotEmpty()
   email: string;
 }
+
+export class ForgotPasswordDto {
+  @ApiProperty({ example: 'user@university.edu.tr' })
+  @IsEmail({}, { message: 'Please provide a valid email address' })
+  @IsNotEmpty({ message: 'Email is required' })
+  email: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty({ description: 'Reset token received via email' })
+  @IsString()
+  @IsNotEmpty({ message: 'Reset token is required' })
+  token: string;
+
+  @ApiProperty({ example: 'newPassword123', description: 'New password (min 6 chars)' })
+  @IsString()
+  @IsNotEmpty({ message: 'New password is required' })
+  @MinLength(6, { message: 'Password must be at least 6 characters' })
+  password: string;
+}

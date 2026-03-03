@@ -5,7 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { randomInt, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
-import { LoginDto, AuthResponseDto, TokenPayloadDto, RegisterDto, VerifyEmailDto, ResendVerificationDto } from './dto/auth.dto';
+import { LoginDto, AuthResponseDto, TokenPayloadDto, RegisterDto, VerifyEmailDto, ResendVerificationDto, ForgotPasswordDto, ResetPasswordDto } from './dto/auth.dto';
 
 @Injectable()
 export class AuthService {
@@ -344,6 +344,77 @@ export class AuthService {
         avatarUrl: user.avatarUrl,
       },
     };
+  }
+
+  /**
+   * Request password reset — always returns generic message
+   */
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const genericMessage = 'If an account exists with this email, a password reset link has been sent.';
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email.toLowerCase() },
+    });
+
+    if (!user || !user.emailVerifiedAt || user.authProvider !== 'LOCAL') {
+      return { message: genericMessage };
+    }
+
+    // Rate limit: don't regenerate if token was sent less than 60s ago
+    if (user.passwordResetExpiry) {
+      const sentAt = user.passwordResetExpiry.getTime() - 60 * 60 * 1000;
+      if (Date.now() - sentAt < 60 * 1000) {
+        return { message: genericMessage };
+      }
+    }
+
+    const resetToken = randomBytes(32).toString('hex');
+    const resetExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetToken: resetToken,
+        passwordResetExpiry: resetExpiry,
+      },
+    });
+
+    // TODO: Send email with reset link
+    if (process.env.NODE_ENV !== 'production') {
+      const frontendUrl = this.configService.get<string>('CORS_ORIGIN') || 'http://localhost:3000';
+      console.log(`[DEV] Password reset link for ${user.email}: ${frontendUrl}/reset-password?token=${resetToken}`);
+    }
+
+    return { message: genericMessage };
+  }
+
+  /**
+   * Reset password with token
+   */
+  async resetPassword(dto: ResetPasswordDto) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        passwordResetToken: dto.token,
+        passwordResetExpiry: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        passwordResetToken: null,
+        passwordResetExpiry: null,
+      },
+    });
+
+    return { message: 'Password reset successfully. You can now log in with your new password.' };
   }
 
   /**

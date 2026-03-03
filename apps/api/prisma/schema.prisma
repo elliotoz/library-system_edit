@@ -91,6 +91,10 @@ model User {
   emailVerificationToken  String?
   emailVerificationExpiry DateTime?
 
+  // Password reset
+  passwordResetToken  String?
+  passwordResetExpiry DateTime?
+
   // Student/Staff identifiers
   studentId String? @unique
   staffId   String? @unique
