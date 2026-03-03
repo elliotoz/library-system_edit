@@ -49,6 +49,21 @@ export const authApi = {
     const response = await api.get('/auth/health');
     return response.data;
   },
+
+  register: async (data: { name: string; email: string; password: string; studentId?: string }): Promise<{ message: string; email: string }> => {
+    const response = await api.post('/auth/register', data);
+    return response.data;
+  },
+
+  verifyEmail: async (data: { email: string; code: string }): Promise<{ message: string }> => {
+    const response = await api.post('/auth/verify-email', data);
+    return response.data;
+  },
+
+  resendVerification: async (data: { email: string }): Promise<{ message: string }> => {
+    const response = await api.post('/auth/resend-verification', data);
+    return response.data;
+  },
 };
 
 // Users API
