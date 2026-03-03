@@ -1,6 +1,6 @@
 // lib/api.ts
 import axios, { AxiosError, AxiosInstance } from 'axios';
-import { User, LoginCredentials, UserProfile, ApiError, ReadingList, FollowedInstructor, FollowersCount, FollowingStatus } from '@/types';
+import { User, LoginCredentials, UserProfile, ApiError, ReadingList, FollowedInstructor, FollowersCount, FollowingStatus, InstructorProfile, ReadingListVisibility } from '@/types';
 
 // Always use the same-origin /api path so requests go through the Next.js
 // rewrite proxy. This ensures LAN devices don't try to reach localhost:3001.
@@ -126,10 +126,19 @@ export const readingListsApi = {
   getMyLists: async (): Promise<ReadingList[]> =>
     (await api.get<ReadingList[]>('/reading-lists/my')).data,
 
-  create: async (data: { title: string; description?: string; courseCode?: string; semester?: string }): Promise<ReadingList> =>
+  getFeed: async (): Promise<ReadingList[]> =>
+    (await api.get<ReadingList[]>('/reading-lists/feed')).data,
+
+  getInstructorProfile: async (instructorId: string): Promise<InstructorProfile> =>
+    (await api.get<InstructorProfile>(`/reading-lists/instructor/${instructorId}`)).data,
+
+  getById: async (id: string): Promise<ReadingList> =>
+    (await api.get<ReadingList>(`/reading-lists/${id}`)).data,
+
+  create: async (data: { title: string; description?: string; courseCode?: string; semester?: string; visibility?: ReadingListVisibility }): Promise<ReadingList> =>
     (await api.post<ReadingList>('/reading-lists', data)).data,
 
-  update: async (id: string, data: { title?: string; description?: string; courseCode?: string; semester?: string; isActive?: boolean }): Promise<ReadingList> =>
+  update: async (id: string, data: { title?: string; description?: string; courseCode?: string; semester?: string; isActive?: boolean; visibility?: ReadingListVisibility; status?: string }): Promise<ReadingList> =>
     (await api.patch<ReadingList>(`/reading-lists/${id}`, data)).data,
 
   remove: async (id: string): Promise<void> => {

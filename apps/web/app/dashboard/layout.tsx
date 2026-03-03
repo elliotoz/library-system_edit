@@ -22,6 +22,7 @@ import {
   FileText,
   History,
   BarChart3,
+  ListChecks,
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import { cn, getInitials } from '@/lib/utils';
@@ -114,6 +115,7 @@ export default function DashboardLayout({
       },
       { label: 'Book Catalog', href: '/dashboard/catalog', icon: BookOpen },
       { label: 'Materials', href: '/dashboard/materials', icon: FileText },
+      { label: 'Reading Lists', href: '/dashboard/reading-lists', icon: ListChecks },
       {
         label: 'My Borrowed Books',
         href: '/dashboard/borrowed',

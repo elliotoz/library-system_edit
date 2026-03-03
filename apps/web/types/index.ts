@@ -147,6 +147,9 @@ export interface ReadingListItem {
   };
 }
 
+export type ReadingListVisibility = 'PUBLIC' | 'FOLLOWERS_ONLY' | 'PRIVATE';
+export type ReadingListStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+
 export interface ReadingList {
   id: string;
   title: string;
@@ -154,11 +157,33 @@ export interface ReadingList {
   courseCode: string | null;
   semester: string | null;
   isActive: boolean;
+  visibility: ReadingListVisibility;
+  status: ReadingListStatus;
   ownerId: string;
   createdAt: string;
   updatedAt: string;
   items: ReadingListItem[];
   _count: { items: number };
+  owner?: {
+    id: string;
+    name: string;
+    email: string;
+    avatarUrl: string | null;
+  };
+  locked?: boolean;
+}
+
+export interface InstructorProfile {
+  instructor: {
+    id: string;
+    name: string;
+    email: string;
+    avatarUrl: string | null;
+    role: string;
+  };
+  followersCount: number;
+  isFollowing: boolean;
+  readingLists: ReadingList[];
 }
 
 // Instructor Followers

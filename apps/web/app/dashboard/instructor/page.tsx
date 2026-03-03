@@ -254,16 +254,32 @@ export default function InstructorDashboard() {
                         {list.courseCode ? ` • ${list.courseCode}` : ''}
                       </p>
                     </div>
-                    <span
-                      className={cn(
-                        'px-2 py-1 text-xs rounded-full font-medium',
-                        list.isActive
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                      )}
-                    >
-                      {list.isActive ? 'Active' : 'Inactive'}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span
+                        className={cn(
+                          'px-2 py-0.5 text-xs rounded-full font-medium',
+                          list.status === 'PUBLISHED'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : list.status === 'DRAFT'
+                            ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                            : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                        )}
+                      >
+                        {list.status || 'DRAFT'}
+                      </span>
+                      <span
+                        className={cn(
+                          'px-2 py-0.5 text-xs rounded-full font-medium',
+                          list.visibility === 'PUBLIC'
+                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                            : list.visibility === 'FOLLOWERS_ONLY'
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                            : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                        )}
+                      >
+                        {list.visibility === 'FOLLOWERS_ONLY' ? 'Followers' : list.visibility || 'PUBLIC'}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-4 mt-3 text-sm text-gray-500 dark:text-gray-400">
                     <Link
