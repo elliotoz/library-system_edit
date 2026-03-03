@@ -340,9 +340,13 @@ export default function DashboardLayout({
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-500 text-white">
-                {getInitials(user.name)}
-              </div>
+              {user.avatarUrl ? (
+                <img src={user.avatarUrl} alt={user.name} className="h-8 w-8 rounded-full object-cover" />
+              ) : (
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-500 text-white">
+                  {getInitials(user.name)}
+                </div>
+              )}
               <span
                 className={cn(
                   'rounded-full px-2 py-0.5 text-xs',
