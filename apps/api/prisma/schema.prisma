@@ -56,6 +56,11 @@ enum AccessLevel {
   COURSE_STUDENTS
 }
 
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
 enum NotificationType {
   RESERVATION_CREATED
   RESERVATION_APPROVED
@@ -79,6 +84,12 @@ model User {
   password String
   name     String
   role     Role   @default(STUDENT)
+
+  // Authentication provider
+  authProvider            AuthProvider @default(LOCAL)
+  emailVerifiedAt         DateTime?
+  emailVerificationToken  String?
+  emailVerificationExpiry DateTime?
 
   // Student/Staff identifiers
   studentId String? @unique
