@@ -161,6 +161,31 @@ export interface ReadingList {
   _count: { items: number };
 }
 
+// Instructor Followers
+export interface FollowedInstructor {
+  id: string;
+  followerId: string;
+  instructorId: string;
+  createdAt: string;
+  instructor: {
+    id: string;
+    name: string;
+    email: string;
+    avatarUrl: string | null;
+    role: string;
+  };
+}
+
+export interface FollowersCount {
+  instructorId: string;
+  count: number;
+}
+
+export interface FollowingStatus {
+  instructorId: string;
+  isFollowing: boolean;
+}
+
 export interface BookDetail {
   id: string;
   title: string;

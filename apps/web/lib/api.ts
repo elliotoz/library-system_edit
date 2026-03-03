@@ -1,6 +1,6 @@
 // lib/api.ts
 import axios, { AxiosError, AxiosInstance } from 'axios';
-import { User, LoginCredentials, UserProfile, ApiError, ReadingList } from '@/types';
+import { User, LoginCredentials, UserProfile, ApiError, ReadingList, FollowedInstructor, FollowersCount, FollowingStatus } from '@/types';
 
 // Always use the same-origin /api path so requests go through the Next.js
 // rewrite proxy. This ensures LAN devices don't try to reach localhost:3001.
@@ -142,6 +142,24 @@ export const readingListsApi = {
   removeItem: async (listId: string, itemId: string): Promise<void> => {
     await api.delete(`/reading-lists/${listId}/items/${itemId}`);
   },
+};
+
+// Instructor Followers API
+export const followersApi = {
+  getMyFollowing: async (): Promise<FollowedInstructor[]> =>
+    (await api.get<FollowedInstructor[]>('/instructor-followers/my-following')).data,
+
+  follow: async (instructorId: string) =>
+    (await api.post(`/instructor-followers/${instructorId}/follow`)).data,
+
+  unfollow: async (instructorId: string) =>
+    (await api.delete(`/instructor-followers/${instructorId}/unfollow`)).data,
+
+  getFollowersCount: async (instructorId: string): Promise<FollowersCount> =>
+    (await api.get<FollowersCount>(`/instructor-followers/${instructorId}/followers-count`)).data,
+
+  isFollowing: async (instructorId: string): Promise<FollowingStatus> =>
+    (await api.get<FollowingStatus>(`/instructor-followers/${instructorId}/is-following`)).data,
 };
 
 export default api;

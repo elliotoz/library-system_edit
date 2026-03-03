@@ -18,8 +18,8 @@ import {
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { readingListsApi } from '@/lib/api';
-import { ReadingList } from '@/types';
+import { readingListsApi, followersApi } from '@/lib/api';
+import { ReadingList, FollowedInstructor } from '@/types';
 
 interface InstructorStats {
   borrowedBooks: number;
@@ -35,6 +35,7 @@ export default function InstructorDashboard() {
   const [showNewListModal, setShowNewListModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [followingCount, setFollowingCount] = useState(0);
 
   // Form state for new list
   const [newTitle, setNewTitle] = useState('');
@@ -61,6 +62,14 @@ export default function InstructorDashboard() {
         }
 
         await fetchReadingLists();
+
+        // Fetch following count
+        try {
+          const followingData = await followersApi.getMyFollowing();
+          setFollowingCount(followingData.length);
+        } catch {
+          // Non-critical — leave count at 0
+        }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -176,19 +185,19 @@ export default function InstructorDashboard() {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm">
+        <Link href="/dashboard/instructor/following" className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm hover:border-purple-200 dark:hover:border-purple-800 transition-colors">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-purple-50 dark:bg-purple-900/30 rounded-xl flex items-center justify-center">
-              <BookOpen className="w-6 h-6 text-purple-500" />
+              <Users className="w-6 h-6 text-purple-500" />
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {readingLists.reduce((acc, list) => acc + list._count.items, 0)}
+                {followingCount}
               </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Total Books in Lists</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Following</p>
             </div>
           </div>
-        </div>
+        </Link>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm">
           <div className="flex items-center gap-4">
@@ -299,7 +308,7 @@ export default function InstructorDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Link
           href="/dashboard/catalog"
           className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm hover:border-primary-200 dark:hover:border-primary-800 hover:shadow-md transition-all group"
@@ -331,6 +340,17 @@ export default function InstructorDashboard() {
             Manage Reading Lists
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Update course materials</p>
+        </Link>
+
+        <Link
+          href="/dashboard/instructor/following"
+          className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm hover:border-amber-200 dark:hover:border-amber-800 hover:shadow-md transition-all group"
+        >
+          <Users className="w-8 h-8 text-amber-500 mb-3" />
+          <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400">
+            Following
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Instructors you follow</p>
         </Link>
       </div>
 
