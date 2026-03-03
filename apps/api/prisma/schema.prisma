@@ -122,6 +122,8 @@ model User {
   uploadedMaterials Material[]     @relation("MaterialUploader")
   notifications     Notification[]
   readingLists      ReadingList[]
+  following         InstructorFollower[] @relation("Follower")
+  followers         InstructorFollower[] @relation("Instructor")
 
   @@map("users")
 }
@@ -444,6 +446,9 @@ model ReadingList {
   id          String  @id @default(cuid())
   title       String
   description String?
+  courseCode   String?
+  semester    String?
+  isActive    Boolean @default(true)
 
   // Owner (Instructor or Admin)
   ownerId String
@@ -461,9 +466,9 @@ model ReadingList {
 }
 
 model ReadingListItem {
-  id    String @id @default(cuid())
-  order Int    @default(0)
-  notes String?
+  id         String @id @default(cuid())
+  orderIndex Int    @default(0)
+  notes      String?
 
   // Parent list
   readingListId String
@@ -479,4 +484,28 @@ model ReadingListItem {
   @@unique([readingListId, bookId])
   @@index([readingListId])
   @@map("reading_list_items")
+}
+
+// ============================================
+// INSTRUCTOR FOLLOWERS
+// ============================================
+
+model InstructorFollower {
+  id String @id @default(cuid())
+
+  // The user who follows
+  followerId String
+  follower   User   @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+
+  // The instructor being followed
+  instructorId String
+  instructor   User   @relation("Instructor", fields: [instructorId], references: [id], onDelete: Cascade)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+
+  @@unique([followerId, instructorId])
+  @@index([followerId])
+  @@index([instructorId])
+  @@map("instructor_followers")
 }
