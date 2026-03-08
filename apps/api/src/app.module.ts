@@ -11,6 +11,7 @@ import { NotificationsModule } from "./notifications/notifications.module";
 import { MaterialsModule } from "./materials/materials.module";
 import { ReadingListsModule } from "./reading-lists/reading-lists.module";
 import { InstructorFollowersModule } from "./instructor-followers/instructor-followers.module";
+import { AiModule } from "./ai/ai.module";
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { InstructorFollowersModule } from "./instructor-followers/instructor-fol
     MaterialsModule,
     ReadingListsModule,
     InstructorFollowersModule,
+    AiModule,
   ],
 })
 export class AppModule {}

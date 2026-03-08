@@ -135,8 +135,11 @@ export const readingListsApi = {
   getById: async (id: string): Promise<ReadingList> =>
     (await api.get<ReadingList>(`/reading-lists/${id}`)).data,
 
-  create: async (data: { title: string; description?: string; courseCode?: string; semester?: string; visibility?: ReadingListVisibility }): Promise<ReadingList> =>
+  create: async (data: { title: string; description?: string; courseCode?: string; semester?: string; visibility?: ReadingListVisibility; status?: string }): Promise<ReadingList> =>
     (await api.post<ReadingList>('/reading-lists', data)).data,
+
+  getAllForModeration: async (): Promise<ReadingList[]> =>
+    (await api.get<ReadingList[]>('/reading-lists/admin/all')).data,
 
   update: async (id: string, data: { title?: string; description?: string; courseCode?: string; semester?: string; isActive?: boolean; visibility?: ReadingListVisibility; status?: string }): Promise<ReadingList> =>
     (await api.patch<ReadingList>(`/reading-lists/${id}`, data)).data,
@@ -169,6 +172,12 @@ export const followersApi = {
 
   isFollowing: async (instructorId: string): Promise<FollowingStatus> =>
     (await api.get<FollowingStatus>(`/instructor-followers/${instructorId}/is-following`)).data,
+};
+
+// AI Assistant API
+export const aiApi = {
+  chat: async (data: { message: string }): Promise<{ reply: string; sources?: string[] }> =>
+    (await api.post<{ reply: string; sources?: string[] }>('/ai/chat', data)).data,
 };
 
 export default api;

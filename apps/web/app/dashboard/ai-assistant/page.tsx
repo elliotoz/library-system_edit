@@ -3,19 +3,21 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, User, Bot, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { aiApi } from '@/lib/api';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  sources?: string[];
 }
 
 const suggestedQuestions = [
   "What books do you recommend for learning algorithms?",
   "Can you help me find books about psychology?",
-  "What's available in the Computer Science section?",
-  "Suggest books for my thesis on machine learning",
+  "How do I borrow or reserve a book?",
+  "Tell me about reading lists",
 ];
 
 export default function AIAssistantPage() {
@@ -29,36 +31,29 @@ export default function AIAssistantPage() {
   const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); };
   useEffect(() => { scrollToBottom(); }, [messages]);
 
-  const generateResponse = async (userMessage: string): Promise<string> => {
-    const lowerMessage = userMessage.toLowerCase();
-    await new Promise((resolve) => setTimeout(resolve, 1000 + Math.random() * 1000));
-
-    if (lowerMessage.includes('algorithm') || lowerMessage.includes('programming') || lowerMessage.includes('computer')) {
-      return `Based on your interest in programming and algorithms, I recommend:\n\n📚 **Introduction to Algorithms** by Cormen et al. - The definitive guide to algorithms.\n\n📚 **Clean Code** by Robert C. Martin - Essential reading for writing maintainable code.\n\n📚 **Design Patterns** by Gang of Four - Classic patterns every developer should know.\n\nWould you like me to check availability or recommend more books?`;
-    }
-    if (lowerMessage.includes('psychology') || lowerMessage.includes('behavior') || lowerMessage.includes('mind')) {
-      return `For psychology, I'd suggest:\n\n📚 **Introduction to Psychology** - Comprehensive overview available in Health Sciences.\n\n📚 **Thinking, Fast and Slow** by Daniel Kahneman - Fascinating insights into decision making.\n\nWould you like me to reserve any of these?`;
-    }
-    if (lowerMessage.includes('recommend') || lowerMessage.includes('suggest')) {
-      return `I'd be happy to give personalized recommendations! Could you tell me:\n\n1. **What subject or topic** are you interested in?\n2. **What's your purpose** - coursework, research, or personal interest?\n3. **Any specific authors** you've enjoyed before?`;
-    }
-    if (lowerMessage.includes('borrow') || lowerMessage.includes('reserve') || lowerMessage.includes('how')) {
-      return `Here's how the library system works:\n\n📖 **Borrowing:**\n1. Find a book in the catalog\n2. Check availability at your campus\n3. Click "Reserve" to hold the book\n4. Pick it up within 7 days\n\n⏰ **Borrow Limits:**\n- Students: 5 books for 14 days\n- Instructors: 10 books for 30 days\n\n🔄 **Extensions:** You can extend from "My Borrowed Books" page.`;
-    }
-    return `I'm here to help you with:\n\n📚 **Book Recommendations** - Personalized suggestions\n🔍 **Catalog Search** - Find specific books\n📖 **Library Information** - Borrowing rules, locations\n🎓 **Academic Help** - Research resources\n\nWhat would you like to know more about?`;
-  };
-
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
     const userMessage: Message = { id: Date.now().toString(), role: 'user', content: input.trim(), timestamp: new Date() };
     setMessages((prev) => [...prev, userMessage]);
+    const text = input.trim();
     setInput('');
     setIsLoading(true);
     try {
-      const response = await generateResponse(input.trim());
-      setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: response, timestamp: new Date() }]);
-    } catch (error) {
-      console.error('Error generating response:', error);
+      const data = await aiApi.chat({ message: text });
+      setMessages((prev) => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: data.reply,
+        sources: data.sources,
+        timestamp: new Date(),
+      }]);
+    } catch {
+      setMessages((prev) => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: 'Sorry, something went wrong. Please try again.',
+        timestamp: new Date(),
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -85,6 +80,19 @@ export default function AIAssistantPage() {
               </div>
               <div className={cn('max-w-[80%] rounded-2xl px-4 py-3', message.role === 'user' ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-800')}>
                 <div className="whitespace-pre-wrap text-sm">{message.content}</div>
+                {message.sources && message.sources.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {message.sources.map((src) => (
+                      <a
+                        key={src}
+                        href={src}
+                        className="inline-block px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs hover:bg-purple-200 transition-colors"
+                      >
+                        {src.split('/').pop()}
+                      </a>
+                    ))}
+                  </div>
+                )}
                 <p className={cn('text-xs mt-1', message.role === 'user' ? 'text-primary-100' : 'text-gray-400')}>
                   {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </p>
