@@ -169,6 +169,9 @@ export interface ReadingList {
     name: string;
     email: string;
     avatarUrl: string | null;
+    bio?: string | null;
+    department?: string | null;
+    courses?: string[];
   };
   locked?: boolean;
 }
@@ -180,6 +183,9 @@ export interface InstructorProfile {
     email: string;
     avatarUrl: string | null;
     role: string;
+    bio?: string | null;
+    department?: string | null;
+    courses?: string[];
   };
   followersCount: number;
   isFollowing: boolean;

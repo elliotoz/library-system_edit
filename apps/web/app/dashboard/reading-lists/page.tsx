@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { BookOpen, Lock, Users, FileText } from 'lucide-react';
+import { BookOpen, Lock, Users, FileText, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { readingListsApi } from '@/lib/api';
 import { ReadingList } from '@/types';
@@ -59,7 +59,7 @@ export default function ReadingListsFeedPage() {
                   >
                     {list.title}
                   </Link>
-                  {list.description && (
+                  {!list.locked && list.description && (
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
                       {list.description}
                     </p>
@@ -86,20 +86,28 @@ export default function ReadingListsFeedPage() {
 
               <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
                 {list.owner && (
-                  <Link
-                    href={`/dashboard/instructors/${list.ownerId}`}
-                    className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400"
-                  >
-                    <Users className="w-3.5 h-3.5" />
-                    {list.owner.name}
-                  </Link>
+                  <>
+                    <Link
+                      href={`/dashboard/instructors/${list.ownerId}`}
+                      className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400"
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                      {list.owner.name}
+                    </Link>
+                    <Link
+                      href={`/dashboard/instructors/${list.ownerId}`}
+                      className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+                    >
+                      View Profile <ArrowRight className="w-3 h-3" />
+                    </Link>
+                  </>
                 )}
                 <span className="flex items-center gap-1">
                   <BookOpen className="w-3.5 h-3.5" />
                   {list._count.items} book{list._count.items !== 1 ? 's' : ''}
                 </span>
-                {list.courseCode && <span>{list.courseCode}</span>}
-                {list.semester && <span>{list.semester}</span>}
+                {!list.locked && list.courseCode && <span>{list.courseCode}</span>}
+                {!list.locked && list.semester && <span>{list.semester}</span>}
               </div>
 
               {!list.locked && list.items.length > 0 && (

@@ -18,6 +18,9 @@ interface UserProfile {
   faculty?: { id: string; name: string; code: string };
   isActive: boolean;
   createdAt: string;
+  bio?: string;
+  department?: string;
+  courses?: string[];
 }
 
 const roleColors = {
@@ -40,6 +43,10 @@ export default function ProfilePage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [editBio, setEditBio] = useState('');
+  const [editDepartment, setEditDepartment] = useState('');
+  const [editCourses, setEditCourses] = useState<string[]>([]);
+  const [newCourse, setNewCourse] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -99,6 +106,10 @@ export default function ProfilePage() {
       setEditName(profile.name);
       setAvatarFile(null);
       setAvatarPreview(null);
+      setEditBio(profile.bio || '');
+      setEditDepartment(profile.department || '');
+      setEditCourses(profile.courses || []);
+      setNewCourse('');
       setIsEditingProfile(true);
     }
   };
@@ -121,7 +132,12 @@ export default function ProfilePage() {
     }
 
     const nameChanged = editName.trim() !== profile?.name;
-    if (!nameChanged && !avatarFile) {
+    const isInstructor = profile?.role === 'INSTRUCTOR';
+    const bioChanged = isInstructor && editBio !== (profile?.bio || '');
+    const deptChanged = isInstructor && editDepartment !== (profile?.department || '');
+    const coursesChanged = isInstructor && JSON.stringify(editCourses) !== JSON.stringify(profile?.courses || []);
+
+    if (!nameChanged && !avatarFile && !bioChanged && !deptChanged && !coursesChanged) {
       setIsEditingProfile(false);
       return;
     }
@@ -131,6 +147,9 @@ export default function ProfilePage() {
       const formData = new FormData();
       if (nameChanged) formData.append('name', editName.trim());
       if (avatarFile) formData.append('avatar', avatarFile);
+      if (bioChanged) formData.append('bio', editBio);
+      if (deptChanged) formData.append('department', editDepartment);
+      if (coursesChanged) formData.append('courses', JSON.stringify(editCourses));
 
       const response = await fetch('/api/users/profile', {
         method: 'PATCH',
@@ -139,7 +158,7 @@ export default function ProfilePage() {
       });
       if (response.ok) {
         const updated = await response.json();
-        setProfile((prev) => prev ? { ...prev, name: updated.name, avatarUrl: updated.avatarUrl } : null);
+        setProfile((prev) => prev ? { ...prev, name: updated.name, avatarUrl: updated.avatarUrl, bio: updated.bio, department: updated.department, courses: updated.courses } : null);
         await refreshUser();
         toast.success('Profile updated');
         setIsEditingProfile(false);
@@ -240,6 +259,82 @@ export default function ProfilePage() {
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-400"
                     />
                   </div>
+                  {profile.role === 'INSTRUCTOR' && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
+                        <textarea
+                          value={editBio}
+                          onChange={(e) => setEditBio(e.target.value)}
+                          maxLength={500}
+                          rows={3}
+                          placeholder="Tell students about yourself..."
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-400 resize-none"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">{editBio.length}/500</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                        <input
+                          type="text"
+                          value={editDepartment}
+                          onChange={(e) => setEditDepartment(e.target.value)}
+                          placeholder="e.g. Software Engineering"
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Courses</label>
+                        <div className="flex gap-2 mb-2">
+                          <input
+                            type="text"
+                            value={newCourse}
+                            onChange={(e) => setNewCourse(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (newCourse.trim() && !editCourses.includes(newCourse.trim())) {
+                                  setEditCourses([...editCourses, newCourse.trim()]);
+                                  setNewCourse('');
+                                }
+                              }
+                            }}
+                            placeholder="Add a course..."
+                            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (newCourse.trim() && !editCourses.includes(newCourse.trim())) {
+                                setEditCourses([...editCourses, newCourse.trim()]);
+                                setNewCourse('');
+                              }
+                            }}
+                            className="px-3 py-2 bg-primary-500 text-white rounded-lg text-sm hover:bg-primary-600"
+                          >
+                            Add
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {editCourses.map((course) => (
+                            <span
+                              key={course}
+                              className="inline-flex items-center gap-1 px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-sm"
+                            >
+                              {course}
+                              <button
+                                type="button"
+                                onClick={() => setEditCourses(editCourses.filter((c) => c !== course))}
+                                className="hover:text-purple-900"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
                   <div className="flex gap-2">
                     <button onClick={() => { setIsEditingProfile(false); if (avatarPreview) URL.revokeObjectURL(avatarPreview); setAvatarPreview(null); setAvatarFile(null); }} className="text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
                     <button onClick={handleSaveProfile} disabled={isSavingProfile} className="flex items-center gap-1 px-3 py-1 bg-primary-500 text-white rounded-lg text-sm hover:bg-primary-600 disabled:opacity-50">

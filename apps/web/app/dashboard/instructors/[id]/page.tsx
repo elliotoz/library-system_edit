@@ -130,6 +130,39 @@ export default function InstructorProfilePage() {
         )}
       </div>
 
+      {/* Bio, Department, Courses */}
+      {(instructor.bio || instructor.department || (instructor.courses && instructor.courses.length > 0)) && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6 space-y-4">
+          {instructor.bio && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">About</h3>
+              <p className="text-gray-900 dark:text-white">{instructor.bio}</p>
+            </div>
+          )}
+          {instructor.department && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Department</h3>
+              <p className="text-gray-900 dark:text-white">{instructor.department}</p>
+            </div>
+          )}
+          {instructor.courses && instructor.courses.length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Courses</h3>
+              <div className="flex flex-wrap gap-2">
+                {instructor.courses.map((course) => (
+                  <span
+                    key={course}
+                    className="px-3 py-1 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-full text-sm"
+                  >
+                    {course}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Reading lists */}
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Reading Lists</h2>
@@ -158,13 +191,13 @@ export default function InstructorProfilePage() {
                     </span>
                   )}
                 </div>
-                {list.description && (
+                {!list.locked && list.description && (
                   <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mb-2">{list.description}</p>
                 )}
                 <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
                   <span>{list._count.items} book{list._count.items !== 1 ? 's' : ''}</span>
-                  {list.courseCode && <span>{list.courseCode}</span>}
-                  {list.semester && <span>{list.semester}</span>}
+                  {!list.locked && list.courseCode && <span>{list.courseCode}</span>}
+                  {!list.locked && list.semester && <span>{list.semester}</span>}
                 </div>
                 {list.locked && (
                   <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
