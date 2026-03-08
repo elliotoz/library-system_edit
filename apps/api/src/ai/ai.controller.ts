@@ -1,8 +1,10 @@
 import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AiService } from './ai.service';
 import { ChatDto } from './dto/chat.dto';
+import { Role } from '@prisma/client';
 
 @ApiTags('ai')
 @ApiBearerAuth()
@@ -15,7 +17,11 @@ export class AiController {
   @ApiOperation({ summary: 'Send a message to the AI assistant' })
   @ApiResponse({ status: 200, description: 'AI reply returned' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  chat(@Body() dto: ChatDto) {
-    return this.aiService.chat(dto.message);
+  chat(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') userRole: Role,
+    @Body() dto: ChatDto,
+  ) {
+    return this.aiService.chat(userId, userRole, dto.message);
   }
 }
