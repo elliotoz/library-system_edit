@@ -168,7 +168,9 @@ export default function ProfilePage() {
         }
         setAvatarFile(null);
       } else {
-        toast.error('Failed to update profile');
+        const err = await response.json().catch(() => null);
+        const msg = err?.message;
+        toast.error(Array.isArray(msg) ? msg[0] : msg || 'Failed to update profile');
       }
     } catch {
       toast.error('Failed to update profile');

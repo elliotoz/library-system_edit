@@ -1,4 +1,5 @@
 import { IsOptional, IsString, MinLength, MaxLength, IsArray } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateProfileDto {
@@ -26,6 +27,13 @@ export class UpdateProfileDto {
 
   @ApiPropertyOptional({ description: 'Courses taught' })
   @IsOptional()
+  @Transform(({ value }) => {
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') {
+      try { return JSON.parse(value); } catch { return []; }
+    }
+    return value;
+  })
   @IsArray()
   @IsString({ each: true })
   courses?: string[];
