@@ -18,6 +18,7 @@ export class RoleResponseService {
           '- Manage your **Borrowed Books** and **Reservations**\n' +
           '- Explore **Reading Lists** from instructors\n\n' +
           'If you need help with something specific, feel free to ask!',
+        modelUsed: 'rule-based',
         sources: ['/dashboard/catalog'],
       };
     }
@@ -57,7 +58,7 @@ export class RoleResponseService {
         });
       }
 
-      return { reply, sources: ['/dashboard/borrowed'] };
+      return { reply, modelUsed: 'rule-based', sources: ['/dashboard/borrowed'] };
     }
 
     if (this.matches(lower, ['reserve', 'reservation', 'pick up', 'pickup'])) {
@@ -70,7 +71,7 @@ export class RoleResponseService {
         reply += `- **${reservations.pending}** pending confirmation\n`;
       }
       reply += `\nYou can check status and pick-up details on the **Reservations** page.`;
-      return { reply, sources: ['/dashboard/reservations'] };
+      return { reply, modelUsed: 'rule-based', sources: ['/dashboard/reservations'] };
     }
 
     if (this.matches(lower, ['recommend', 'suggest', 'what should i read', 'good book', 'find book'])) {
@@ -88,7 +89,7 @@ export class RoleResponseService {
       if (ctx.readingLists.publishedCount > 0) {
         reply += `📋 There are **${ctx.readingLists.publishedCount}** published reading lists from instructors — great for finding curated selections.`;
       }
-      return { reply, sources: ['/dashboard/catalog', '/dashboard/reading-lists'] };
+      return { reply, modelUsed: 'rule-based', sources: ['/dashboard/catalog', '/dashboard/reading-lists'] };
     }
 
     if (this.matches(lower, ['reading list', 'course material', 'syllabus'])) {
@@ -96,7 +97,7 @@ export class RoleResponseService {
         `- **${ctx.readingLists.publishedCount}** published lists available\n` +
         `- You follow **${ctx.readingLists.followedInstructors}** instructor(s)\n\n` +
         'Browse reading lists or follow instructors to get notified about new lists.';
-      return { reply, sources: ['/dashboard/reading-lists'] };
+      return { reply, modelUsed: 'rule-based', sources: ['/dashboard/reading-lists'] };
     }
 
     if (this.matches(lower, ['borrow', 'return', 'renew', 'extend', 'overdue', 'due'])) {
@@ -110,7 +111,7 @@ export class RoleResponseService {
       } else {
         reply += ' You\'ve reached your limit — return a book to borrow more.';
       }
-      return { reply, sources: ['/dashboard/borrowed'] };
+      return { reply, modelUsed: 'rule-based', sources: ['/dashboard/borrowed'] };
     }
 
     return this.genericResponse(ctx, lower);
@@ -130,6 +131,7 @@ export class RoleResponseService {
           `- Remaining: **${remaining}**\n` +
           `- Duration: **${bp.maxBorrowDays} days** per book\n` +
           `- Extensions: **${bp.maxExtensions}** × ${bp.extensionDays} days`,
+        modelUsed: 'rule-based',
         sources: ['/dashboard/borrowed'],
       };
     }
@@ -142,6 +144,7 @@ export class RoleResponseService {
           `- **${readingLists.publishedCount}** total published lists in the system\n\n` +
           'You can create, manage, and publish reading lists from your instructor dashboard. ' +
           'Students who follow you will be notified when you publish.',
+        modelUsed: 'rule-based',
         sources: ['/dashboard/instructor/reading-lists'],
       };
     }
@@ -156,7 +159,7 @@ export class RoleResponseService {
         reply += `Top categories: ${catalog.topCategories.map((c) => `**${c}**`).join(', ')}\n\n`;
       }
       reply += 'Use the **Catalog** to find books, then add them to your **Reading Lists** for students.';
-      return { reply, sources: ['/dashboard/catalog', '/dashboard/instructor/reading-lists'] };
+      return { reply, modelUsed: 'rule-based', sources: ['/dashboard/catalog', '/dashboard/instructor/reading-lists'] };
     }
 
     if (this.matches(lower, ['material', 'publication', 'research', 'submit', 'thesis'])) {
@@ -168,6 +171,7 @@ export class RoleResponseService {
           '2. Upload the file and fill in metadata\n' +
           '3. It will be reviewed before publishing\n\n' +
           'Your published materials are visible to students.',
+        modelUsed: 'rule-based',
         sources: ['/dashboard/instructor/submit-material'],
       };
     }
@@ -180,6 +184,7 @@ export class RoleResponseService {
           `- Duration: **${bp.maxBorrowDays} days**\n` +
           `- Extensions: **${bp.maxExtensions}** × ${bp.extensionDays} days\n\n` +
           `Currently borrowing **${activeBorrows.count}** book(s), **${remaining}** slots available.`,
+        modelUsed: 'rule-based',
         sources: ['/dashboard/borrowed'],
       };
     }
@@ -194,13 +199,14 @@ export class RoleResponseService {
     if (ctx.user.interests.length === 0) {
       // Check if this message looks like interest input
       if (this.looksLikeInterests(originalMessage)) {
-        return { reply: '__SAVE_INTERESTS__', sources: [] };
+        return { reply: '__SAVE_INTERESTS__', modelUsed: 'rule-based', sources: [] };
       }
       return {
         reply:
           `Hi ${ctx.user.name}! To give you personalized recommendations, I need to know your interests.\n\n` +
           '📝 Please tell me your areas of interest (e.g., "finance, technology, history").\n\n' +
           'Just type them as a comma-separated list and I\'ll save them for you!',
+        modelUsed: 'rule-based',
       };
     }
 
@@ -214,6 +220,7 @@ export class RoleResponseService {
           'Try searching the **Catalog** with your interest keywords. ' +
           'You can also explore **Reading Lists** from instructors for curated selections.\n\n' +
           'Want to update your interests? Just tell me your new interests!',
+        modelUsed: 'rule-based',
         sources: ['/dashboard/catalog', '/dashboard/reading-lists'],
       };
     }
@@ -227,13 +234,14 @@ export class RoleResponseService {
           `- Active: **${activeBorrows.count}** / ${bp.maxActiveBorrows}\n` +
           `- Remaining: **${remaining}**\n` +
           `- Duration: **${bp.maxBorrowDays} days** • Extensions: **${bp.maxExtensions}** × ${bp.extensionDays} days`,
+        modelUsed: 'rule-based',
         sources: ['/dashboard/borrowed'],
       };
     }
 
     // Check if updating interests
     if (this.looksLikeInterests(originalMessage)) {
-      return { reply: '__SAVE_INTERESTS__', sources: [] };
+      return { reply: '__SAVE_INTERESTS__', modelUsed: 'rule-based', sources: [] };
     }
 
     return this.genericResponse(ctx, lower);
@@ -252,6 +260,7 @@ export class RoleResponseService {
           `- Active loans: **${admin.activeLoans}**\n` +
           `- Overdue loans: **${admin.overdueLoans}**\n\n` +
           'You can manage reservations from the admin dashboard.',
+        modelUsed: 'rule-based',
         sources: ['/dashboard/admin/reservations'],
       };
     }
@@ -267,6 +276,7 @@ export class RoleResponseService {
           `- Books in catalog: **${ctx.catalog.totalBooks}**\n` +
           `- Available copies: **${ctx.catalog.availableCopies}**\n` +
           `- Published reading lists: **${ctx.readingLists.publishedCount}**`,
+        modelUsed: 'rule-based',
         sources: ['/dashboard/admin/statistics', '/dashboard/admin'],
       };
     }
@@ -277,6 +287,7 @@ export class RoleResponseService {
           `⚠️ **Overdue Loans:**\n` +
           `There are currently **${admin.overdueLoans}** overdue loan(s).\n\n` +
           'View details in the **Borrows** management page.',
+        modelUsed: 'rule-based',
         sources: ['/dashboard/admin/borrows'],
       };
     }
@@ -287,6 +298,7 @@ export class RoleResponseService {
           `👥 **User Management:**\n` +
           `- Total active users: **${admin.totalUsers}**\n\n` +
           'You can search, activate/deactivate users, and view profiles from the **Users** page.',
+        modelUsed: 'rule-based',
         sources: ['/dashboard/admin/users'],
       };
     }
@@ -299,6 +311,7 @@ export class RoleResponseService {
           `- Overdue: **${admin.overdueLoans}**\n` +
           `- Pending reservations: **${admin.pendingReservations}**\n\n` +
           'Manage all borrows from the admin **Borrows** page.',
+        modelUsed: 'rule-based',
         sources: ['/dashboard/admin/borrows'],
       };
     }
@@ -310,6 +323,7 @@ export class RoleResponseService {
           `- Published lists: **${ctx.readingLists.publishedCount}**\n` +
           `- Your lists: **${ctx.readingLists.ownListCount}**\n\n` +
           'Moderate all reading lists from the admin **Reading Lists** page.',
+        modelUsed: 'rule-based',
         sources: ['/dashboard/admin/reading-lists'],
       };
     }
@@ -331,6 +345,7 @@ export class RoleResponseService {
           '🔍 **Catalog search** — find specific books\n' +
           '📄 **Academic materials** — research and publications\n\n' +
           'What would you like to know?',
+        modelUsed: 'rule-based',
       };
     }
 
@@ -344,6 +359,7 @@ export class RoleResponseService {
             ? `- **${ctx.catalog.facultyBooks}** books in your faculty (${ctx.user.facultyName})\n`
             : '') +
           '\nSearch by title, author, ISBN, or subject on the **Catalog** page.',
+        modelUsed: 'rule-based',
         sources: ['/dashboard/catalog'],
       };
     }
@@ -357,10 +373,11 @@ export class RoleResponseService {
         '📋 **Reading lists**\n' +
         '🔍 **Catalog search**\n\n' +
         'What would you like to know?',
+      modelUsed: 'rule-based',
     };
   }
 
-  private isAdminAction(text: string): boolean {
+  isAdminAction(text: string): boolean {
     return this.matches(text, [
       'delete user', 'deactivate user', 'activate user',
       'approve material', 'reject material',

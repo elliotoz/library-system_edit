@@ -84,6 +84,7 @@ export class CatalogSearchService {
           '- "Do you have any psychology books available?"\n' +
           '- "Books on software engineering"\n' +
           '- "Show me reading lists about data science"',
+        modelUsed: 'search',
         sources: ['/dashboard/catalog'],
       };
     }
@@ -239,7 +240,7 @@ export class CatalogSearchService {
       reply += `\n💡 You can also browse books specific to your faculty (**${facultyName}**) in the catalog.`;
     }
 
-    return { reply, sources };
+    return { reply, modelUsed: 'search', sources };
   }
 
   private extractCategory(text: string): string | null {

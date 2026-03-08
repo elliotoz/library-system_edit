@@ -176,8 +176,8 @@ export const followersApi = {
 
 // AI Assistant API
 export const aiApi = {
-  chat: async (data: { message: string }): Promise<{ reply: string; sources?: string[] }> =>
-    (await api.post<{ reply: string; sources?: string[] }>('/ai/chat', data)).data,
+  chat: async (data: { message: string }): Promise<{ reply: string; modelUsed: string; sources?: string[] }> =>
+    (await api.post<{ reply: string; modelUsed: string; sources?: string[] }>('/ai/chat', data)).data,
 };
 
 export default api;

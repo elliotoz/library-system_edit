@@ -10,6 +10,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  modelUsed?: string;
   sources?: string[];
 }
 
@@ -44,6 +45,7 @@ export default function AIAssistantPage() {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: data.reply,
+        modelUsed: data.modelUsed,
         sources: data.sources,
         timestamp: new Date(),
       }]);
@@ -93,9 +95,14 @@ export default function AIAssistantPage() {
                     ))}
                   </div>
                 )}
-                <p className={cn('text-xs mt-1', message.role === 'user' ? 'text-primary-100' : 'text-gray-400')}>
-                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
+                <div className={cn('flex items-center gap-2 mt-1', message.role === 'user' ? 'text-primary-100' : 'text-gray-400')}>
+                  <span className="text-xs">
+                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  {message.role === 'assistant' && (
+                    <span className="text-[10px]">{message.modelUsed || 'unknown'}</span>
+                  )}
+                </div>
               </div>
             </div>
           ))}
