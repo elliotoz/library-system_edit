@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChatResponse } from './ai.service';
 import { Role } from '@prisma/client';
+import { SemanticSearchService, RankedBookResult } from './semantic-search.service';
 
 export interface SearchIntent {
   keywords: string[];
@@ -10,20 +11,6 @@ export interface SearchIntent {
   category: string | null;
   audienceLevel: 'introductory' | 'advanced' | null;
   facultyHint: string | null;
-}
-
-interface RankedBookResult {
-  id: string;
-  title: string;
-  authors: string[];
-  category: string | null;
-  subjectTags: string[];
-  availableCopies: number;
-  totalCopies: number;
-  readingListCount: number;
-  facultyMatch: boolean;
-  score: number;
-  reasons: string[];
 }
 
 interface ReadingListResult {
@@ -35,7 +22,10 @@ interface ReadingListResult {
 
 @Injectable()
 export class CatalogSearchService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly semanticSearch: SemanticSearchService,
+  ) {}
 
   isSearchQuery(message: string): boolean {
     const lower = message.toLowerCase();
@@ -85,195 +75,17 @@ export class CatalogSearchService {
     }
 
     const effectiveFaculty = intent.facultyHint || facultyName;
+    const context = { facultyName: effectiveFaculty };
 
-    const [books, readingLists] = await Promise.all([
-      this.searchAndRank(intent, effectiveFaculty),
+    const [candidates, readingLists] = await Promise.all([
+      this.semanticSearch.searchBooks(intent, context),
       intent.wantsReadingLists ? this.searchReadingLists(intent.keywords.join(' ')) : Promise.resolve([]),
     ]);
 
+    const books = this.semanticSearch.rankBooks(candidates, intent, context);
     const searchTerm = intent.keywords.join(' ');
+
     return this.formatResults(books, readingLists, intent, searchTerm, userRole, effectiveFaculty);
-  }
-
-  // ── Search + Rank ────────────────────────────────────────────
-
-  private async searchAndRank(
-    intent: SearchIntent,
-    facultyName: string | null,
-  ): Promise<RankedBookResult[]> {
-    const searchTerm = intent.keywords.join(' ');
-    const where: any = { isActive: true };
-
-    // Build broad OR query across all text fields + individual keywords
-    const orClauses: any[] = [];
-    if (searchTerm) {
-      orClauses.push(
-        { title: { contains: searchTerm, mode: 'insensitive' } },
-        { description: { contains: searchTerm, mode: 'insensitive' } },
-        { category: { contains: searchTerm, mode: 'insensitive' } },
-      );
-      // Per-keyword matches for better recall
-      for (const kw of intent.keywords) {
-        orClauses.push(
-          { title: { contains: kw, mode: 'insensitive' } },
-          { subjectTags: { has: kw } },
-          { authors: { has: kw } },
-        );
-      }
-    }
-    if (intent.category) {
-      orClauses.push({ category: { contains: intent.category, mode: 'insensitive' } });
-    }
-    if (orClauses.length > 0) {
-      where.OR = orClauses;
-    }
-
-    const books = await this.prisma.book.findMany({
-      where,
-      select: {
-        id: true,
-        title: true,
-        authors: true,
-        category: true,
-        description: true,
-        subjectTags: true,
-        mainFaculty: { select: { name: true } },
-        copies: { select: { status: true } },
-        _count: { select: { readingListItems: true } },
-      },
-      take: 20, // fetch more, rank, then trim
-      orderBy: { title: 'asc' },
-    });
-
-    const ranked: RankedBookResult[] = books.map((b) => {
-      const availableCopies = b.copies.filter((c) => c.status === 'AVAILABLE').length;
-      const totalCopies = b.copies.length;
-      const facultyMatch = facultyName ? (b.mainFaculty?.name === facultyName) : false;
-      const readingListCount = b._count.readingListItems;
-
-      const { score, reasons } = this.computeScore(b, intent, facultyName, availableCopies, readingListCount);
-
-      return {
-        id: b.id,
-        title: b.title,
-        authors: b.authors,
-        category: b.category,
-        subjectTags: b.subjectTags,
-        availableCopies,
-        totalCopies,
-        readingListCount,
-        facultyMatch,
-        score,
-        reasons,
-      };
-    });
-
-    // Filter by availability if requested
-    let filtered = intent.wantsAvailable ? ranked.filter((b) => b.availableCopies > 0) : ranked;
-
-    // Sort by score descending
-    filtered.sort((a, b) => b.score - a.score);
-
-    return filtered.slice(0, 8);
-  }
-
-  private computeScore(
-    book: { title: string; authors: string[]; category: string | null; description: string | null; subjectTags: string[]; mainFaculty: { name: string } | null },
-    intent: SearchIntent,
-    facultyName: string | null,
-    availableCopies: number,
-    readingListCount: number,
-  ): { score: number; reasons: string[] } {
-    let score = 0;
-    const reasons: string[] = [];
-    const searchTerm = intent.keywords.join(' ').toLowerCase();
-    const titleLower = book.title.toLowerCase();
-    const descLower = (book.description || '').toLowerCase();
-
-    // Title exact-phrase match (strongest signal)
-    if (searchTerm && titleLower.includes(searchTerm)) {
-      score += 10;
-      reasons.push('Title match');
-    }
-
-    // Per-keyword title matches
-    for (const kw of intent.keywords) {
-      if (titleLower.includes(kw.toLowerCase())) {
-        score += 3;
-      }
-    }
-
-    // Author match
-    for (const kw of intent.keywords) {
-      if (book.authors.some((a) => a.toLowerCase().includes(kw.toLowerCase()))) {
-        score += 4;
-        reasons.push('Author match');
-        break;
-      }
-    }
-
-    // Category match
-    if (intent.category && book.category?.toLowerCase().includes(intent.category.toLowerCase())) {
-      score += 5;
-      reasons.push('Category match');
-    }
-
-    // Subject tag match
-    const matchedTags = book.subjectTags.filter((tag) =>
-      intent.keywords.some((kw) => tag.toLowerCase().includes(kw.toLowerCase())),
-    );
-    if (matchedTags.length > 0) {
-      score += 3 * matchedTags.length;
-      reasons.push('Subject tag match');
-    }
-
-    // Description match
-    if (searchTerm && descLower.includes(searchTerm)) {
-      score += 2;
-      reasons.push('Description match');
-    }
-
-    // Availability boost
-    if (availableCopies > 0) {
-      score += 3;
-      if (intent.wantsAvailable) {
-        score += 2; // extra boost when user explicitly wants available
-      }
-      reasons.push('Available now');
-    }
-
-    // Faculty relevance boost
-    if (facultyName && book.mainFaculty?.name === facultyName) {
-      score += 4;
-      reasons.push('Faculty match');
-    }
-
-    // Reading list popularity boost
-    if (readingListCount > 0) {
-      score += Math.min(readingListCount, 5); // cap at 5
-      reasons.push(`In ${readingListCount} reading list${readingListCount !== 1 ? 's' : ''}`);
-    }
-
-    // Audience-level heuristic (keyword-based)
-    if (intent.audienceLevel) {
-      const combined = titleLower + ' ' + descLower;
-      if (intent.audienceLevel === 'advanced') {
-        if (this.has(combined, ['advanced', 'graduate', 'research', 'comprehensive', 'in-depth'])) {
-          score += 3;
-          reasons.push('Advanced level');
-        }
-      } else if (intent.audienceLevel === 'introductory') {
-        if (this.has(combined, ['introduction', 'introductory', 'beginner', 'fundamentals', 'primer', 'essentials'])) {
-          score += 3;
-          reasons.push('Introductory level');
-        }
-      }
-    }
-
-    // Dedupe reasons
-    const uniqueReasons = [...new Set(reasons)];
-
-    return { score, reasons: uniqueReasons };
   }
 
   // ── Reading lists ────────────────────────────────────────────
