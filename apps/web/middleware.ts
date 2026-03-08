@@ -20,6 +20,8 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/dashboard/profile': ['STUDENT', 'INSTRUCTOR', 'STAFF', 'ADMIN'],
   '/dashboard/settings': ['STUDENT', 'INSTRUCTOR', 'STAFF', 'ADMIN'],
   '/dashboard/notifications': ['STUDENT', 'INSTRUCTOR', 'STAFF', 'ADMIN'],
+  '/dashboard/reading-lists': ['STUDENT', 'INSTRUCTOR', 'STAFF', 'ADMIN'],
+  '/dashboard/instructors': ['STUDENT', 'INSTRUCTOR', 'STAFF', 'ADMIN'],
 };
 
 // Map roles to their default dashboards
@@ -70,9 +72,9 @@ export function middleware(request: NextRequest) {
 
   const userRole = payload.role;
 
-  // Find the most specific matching route permission
+  // Find the most specific matching route permission (boundary-safe)
   const matchedRoute = Object.keys(ROUTE_PERMISSIONS)
-    .filter((route) => pathname.startsWith(route))
+    .filter((route) => pathname === route || pathname.startsWith(route + '/'))
     .sort((a, b) => b.length - a.length)[0]; // Longest match first
 
   if (matchedRoute) {

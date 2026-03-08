@@ -14,6 +14,7 @@ import {
   ListChecks,
   Mail,
   Trash2,
+  UserCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -36,6 +37,7 @@ export default function InstructorDashboard() {
   const [showContactModal, setShowContactModal] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [followingCount, setFollowingCount] = useState(0);
+  const [hasProfile, setHasProfile] = useState(false);
 
   // Form state for new list
   const [newTitle, setNewTitle] = useState('');
@@ -70,6 +72,19 @@ export default function InstructorDashboard() {
         } catch {
           // Non-critical — leave count at 0
         }
+
+        // Check if instructor public profile fields are filled
+        if (user?.id) {
+          try {
+            const profileRes = await fetch(`/api/users/${user.id}`, { credentials: 'include' });
+            if (profileRes.ok) {
+              const profileData = await profileRes.json();
+              setHasProfile(!!(profileData.bio || profileData.department || (profileData.courses && profileData.courses.length > 0)));
+            }
+          } catch {
+            // Non-critical
+          }
+        }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -97,17 +112,21 @@ export default function InstructorDashboard() {
     setShowContactModal(false);
   };
 
-  const handleCreateList = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isCreating) return;
+  const handleCreateList = async (status: 'DRAFT' | 'PUBLISHED') => {
+    if (isCreating || !newTitle.trim()) return;
+    if (status === 'PUBLISHED') {
+      toast.error('Cannot publish a reading list with no books. Add books first, then publish from the manage page.');
+      return;
+    }
     setIsCreating(true);
     try {
       await readingListsApi.create({
         title: newTitle,
         courseCode: newCourseCode || undefined,
         semester: newSemester || undefined,
+        status,
       });
-      toast.success('Reading list created!');
+      toast.success('Reading list created as draft!');
       setShowNewListModal(false);
       setNewTitle('');
       setNewCourseCode('');
@@ -368,6 +387,19 @@ export default function InstructorDashboard() {
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Instructors you follow</p>
         </Link>
+
+        <Link
+          href="/dashboard/profile"
+          className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm hover:border-indigo-200 dark:hover:border-indigo-800 hover:shadow-md transition-all group"
+        >
+          <UserCircle className="w-8 h-8 text-indigo-500 mb-3" />
+          <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+            {hasProfile ? 'Manage Profile' : 'Create Profile'}
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            {hasProfile ? 'Update your public profile' : 'Add bio, department & courses'}
+          </p>
+        </Link>
       </div>
 
       {/* Create New List Modal */}
@@ -377,7 +409,7 @@ export default function InstructorDashboard() {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Create New Reading List
             </h3>
-            <form onSubmit={handleCreateList} className="space-y-4">
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   List Title
@@ -421,16 +453,26 @@ export default function InstructorDashboard() {
                 <button
                   type="button"
                   onClick={() => setShowNewListModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
-                  type="submit"
-                  disabled={isCreating}
+                  type="button"
+                  disabled={isCreating || !newTitle.trim()}
+                  onClick={() => handleCreateList('DRAFT')}
                   className="flex-1 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50"
                 >
-                  {isCreating ? 'Creating...' : 'Create List'}
+                  {isCreating ? 'Creating...' : 'Save Draft'}
+                </button>
+                <button
+                  type="button"
+                  disabled={isCreating || !newTitle.trim()}
+                  onClick={() => handleCreateList('PUBLISHED')}
+                  className="px-4 py-2 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-400 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors disabled:opacity-50 text-sm"
+                  title="Add books first, then publish"
+                >
+                  Publish Now
                 </button>
               </div>
             </form>
