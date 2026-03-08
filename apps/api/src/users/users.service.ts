@@ -129,6 +129,9 @@ export class UsersService {
     const data: Record<string, unknown> = {};
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.avatarUrl !== undefined) data.avatarUrl = dto.avatarUrl;
+    if (dto.bio !== undefined) data.bio = dto.bio;
+    if (dto.department !== undefined) data.department = dto.department;
+    if (dto.courses !== undefined) data.courses = dto.courses;
 
     const updated = await this.prisma.user.update({
       where: { id: userId },

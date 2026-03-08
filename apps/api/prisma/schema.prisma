@@ -121,7 +121,10 @@ model User {
   interests String[] @default([])
 
   // Profile
-  avatarUrl String?
+  bio        String?
+  department String?
+  courses    String[] @default([])
+  avatarUrl  String?
   isActive  Boolean @default(true)
 
   // Timestamps

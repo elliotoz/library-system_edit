@@ -110,6 +110,14 @@ export class UsersController {
     if (file) {
       dto.avatarUrl = `/uploads/avatars/${file.filename}`;
     }
+    // FormData sends arrays as JSON strings — parse courses if needed
+    if (typeof dto.courses === 'string') {
+      try {
+        dto.courses = JSON.parse(dto.courses as unknown as string);
+      } catch {
+        dto.courses = [];
+      }
+    }
     return this.usersService.updateProfile(userId, dto);
   }
 

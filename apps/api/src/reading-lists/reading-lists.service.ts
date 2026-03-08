@@ -1,11 +1,11 @@
-import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateReadingListDto, UpdateReadingListDto, AddReadingListItemDto } from './dto/reading-lists.dto';
 import { ReadingListVisibility, ReadingListStatus, NotificationType, Role } from '@prisma/client';
 
 const listInclude = {
-  owner: { select: { id: true, name: true, email: true, avatarUrl: true } },
+  owner: { select: { id: true, name: true, email: true, avatarUrl: true, bio: true, department: true, courses: true } },
   items: {
     include: {
       book: {
@@ -17,10 +17,22 @@ const listInclude = {
   _count: { select: { items: true } },
 };
 
-const metadataOnly = {
-  owner: { select: { id: true, name: true, email: true, avatarUrl: true } },
-  _count: { select: { items: true } },
-};
+/** Minimal locked response for FOLLOWERS_ONLY lists seen by non-followers */
+function lockedPreview(list: any) {
+  return {
+    id: list.id,
+    title: list.title,
+    visibility: list.visibility,
+    status: list.status,
+    ownerId: list.ownerId,
+    owner: list.owner,
+    createdAt: list.createdAt,
+    updatedAt: list.updatedAt,
+    _count: list._count,
+    items: [],
+    locked: true,
+  };
+}
 
 @Injectable()
 export class ReadingListsService {
@@ -29,7 +41,7 @@ export class ReadingListsService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  // ── Owner endpoints (existing) ────────────────────────────────
+  // ── Owner endpoints ───────────────────────────────────────────
 
   async findMyLists(userId: string) {
     return this.prisma.readingList.findMany({
@@ -47,6 +59,7 @@ export class ReadingListsService {
         courseCode: dto.courseCode,
         semester: dto.semester,
         visibility: dto.visibility ?? ReadingListVisibility.PUBLIC,
+        status: dto.status ?? ReadingListStatus.DRAFT,
         ownerId,
       },
       include: {
@@ -57,13 +70,21 @@ export class ReadingListsService {
   }
 
   async update(id: string, userId: string, dto: UpdateReadingListDto, userRole?: Role) {
-    const list = await this.prisma.readingList.findUnique({ where: { id } });
+    const list = await this.prisma.readingList.findUnique({
+      where: { id },
+      include: { _count: { select: { items: true } } },
+    });
     if (!list) {
       throw new NotFoundException('Reading list not found');
     }
     const isAdmin = userRole === Role.ADMIN;
     if (list.ownerId !== userId && !isAdmin) {
       throw new ForbiddenException('You can only edit your own reading lists');
+    }
+
+    // Publish guard: cannot publish with 0 items
+    if (dto.status === ReadingListStatus.PUBLISHED && list._count.items === 0) {
+      throw new BadRequestException('Cannot publish a reading list with no books. Add at least one book first.');
     }
 
     const previousStatus = list.status;
@@ -82,7 +103,7 @@ export class ReadingListsService {
       include: listInclude,
     });
 
-    // Notify followers on publish or content update
+    // Notify followers on publish transition
     if (
       dto.status === ReadingListStatus.PUBLISHED &&
       previousStatus !== ReadingListStatus.PUBLISHED
@@ -182,10 +203,15 @@ export class ReadingListsService {
       data: { updatedAt: new Date() },
     });
 
+    // Notify followers if published list was updated
+    if (list.status === ReadingListStatus.PUBLISHED) {
+      await this.notifyFollowers(list.ownerId, list.title, NotificationType.READING_LIST_UPDATED);
+    }
+
     return { message: 'Item removed from reading list' };
   }
 
-  // ── Discovery endpoints (new) ──────────────────────────────────
+  // ── Discovery endpoints ───────────────────────────────────────
 
   async findOneForUser(id: string, userId: string, userRole: Role) {
     const list = await this.prisma.readingList.findUnique({
@@ -199,15 +225,23 @@ export class ReadingListsService {
     const isOwner = list.ownerId === userId;
     const isAdmin = userRole === Role.ADMIN;
 
-    // Owner and admin always get full access
-    if (isOwner || isAdmin) return list;
+    // Owner always gets full access
+    if (isOwner) return list;
+
+    // ARCHIVED: owner-only
+    if (list.status === ReadingListStatus.ARCHIVED) {
+      throw new NotFoundException('Reading list not found');
+    }
+
+    // Admin sees non-archived
+    if (isAdmin) return list;
 
     // PRIVATE: not visible to others
     if (list.visibility === ReadingListVisibility.PRIVATE) {
       throw new NotFoundException('Reading list not found');
     }
 
-    // Only PUBLISHED lists are discoverable
+    // Only PUBLISHED lists are discoverable for regular users
     if (list.status !== ReadingListStatus.PUBLISHED) {
       throw new NotFoundException('Reading list not found');
     }
@@ -221,66 +255,37 @@ export class ReadingListsService {
         where: { followerId_instructorId: { followerId: userId, instructorId: list.ownerId } },
       });
       if (isFollower) return list;
-
-      // Non-follower: return metadata only with lock flag
-      return {
-        id: list.id,
-        title: list.title,
-        description: list.description,
-        courseCode: list.courseCode,
-        semester: list.semester,
-        isActive: list.isActive,
-        visibility: list.visibility,
-        status: list.status,
-        ownerId: list.ownerId,
-        owner: list.owner,
-        createdAt: list.createdAt,
-        updatedAt: list.updatedAt,
-        _count: list._count,
-        items: [],
-        locked: true,
-      };
+      return lockedPreview(list);
     }
 
     return list;
   }
 
   async findGlobalFeed(userId: string, userRole: Role) {
-    // Get IDs of instructors the user follows
     const followRecords = await this.prisma.instructorFollower.findMany({
       where: { followerId: userId },
       select: { instructorId: true },
     });
     const followedIds = new Set(followRecords.map((f) => f.instructorId));
 
-    const isAdmin = userRole === Role.ADMIN;
-
-    // Fetch all published, non-private lists (admins see everything)
+    // Feed: only PUBLISHED, exclude PRIVATE and ARCHIVED
     const lists = await this.prisma.readingList.findMany({
-      where: isAdmin
-        ? {}
-        : {
-            status: ReadingListStatus.PUBLISHED,
-            visibility: { not: ReadingListVisibility.PRIVATE },
-          },
+      where: {
+        status: ReadingListStatus.PUBLISHED,
+        visibility: { not: ReadingListVisibility.PRIVATE },
+      },
       include: listInclude,
       orderBy: { updatedAt: 'desc' },
       take: 50,
     });
 
-    // Apply visibility: strip items from FOLLOWERS_ONLY if not following
     return lists.map((list) => {
-      if (isAdmin || list.ownerId === userId) return list;
-
+      if (list.ownerId === userId) return list;
       if (
         list.visibility === ReadingListVisibility.FOLLOWERS_ONLY &&
         !followedIds.has(list.ownerId)
       ) {
-        return {
-          ...list,
-          items: [],
-          locked: true,
-        };
+        return lockedPreview(list);
       }
       return list;
     });
@@ -289,7 +294,7 @@ export class ReadingListsService {
   async findByInstructor(instructorId: string, userId: string, userRole: Role) {
     const instructor = await this.prisma.user.findUnique({
       where: { id: instructorId },
-      select: { id: true, name: true, email: true, avatarUrl: true, role: true },
+      select: { id: true, name: true, email: true, avatarUrl: true, role: true, bio: true, department: true, courses: true },
     });
     if (!instructor || instructor.role !== Role.INSTRUCTOR) {
       throw new NotFoundException('Instructor not found');
@@ -308,10 +313,19 @@ export class ReadingListsService {
       where: { instructorId },
     });
 
-    // Owner/admin see all; others see only published non-private
-    const where = isOwner || isAdmin
-      ? { ownerId: instructorId }
-      : { ownerId: instructorId, status: ReadingListStatus.PUBLISHED, visibility: { not: ReadingListVisibility.PRIVATE } };
+    // Owner sees all; admin sees non-archived; others see only PUBLISHED, non-PRIVATE, non-ARCHIVED
+    let where: any;
+    if (isOwner) {
+      where = { ownerId: instructorId };
+    } else if (isAdmin) {
+      where = { ownerId: instructorId, status: { not: ReadingListStatus.ARCHIVED } };
+    } else {
+      where = {
+        ownerId: instructorId,
+        status: ReadingListStatus.PUBLISHED,
+        visibility: { not: ReadingListVisibility.PRIVATE },
+      };
+    }
 
     const lists = await this.prisma.readingList.findMany({
       where,
@@ -322,7 +336,7 @@ export class ReadingListsService {
     const processedLists = lists.map((list) => {
       if (isOwner || isAdmin) return list;
       if (list.visibility === ReadingListVisibility.FOLLOWERS_ONLY && !isFollower) {
-        return { ...list, items: [], locked: true };
+        return lockedPreview(list);
       }
       return list;
     });
@@ -335,7 +349,17 @@ export class ReadingListsService {
     };
   }
 
-  // ── Helpers ────────────────────────────────────────────────────
+  // ── Admin moderation ──────────────────────────────────────────
+
+  async findAllForModeration() {
+    return this.prisma.readingList.findMany({
+      where: { status: { not: ReadingListStatus.ARCHIVED } },
+      include: listInclude,
+      orderBy: { updatedAt: 'desc' },
+    });
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────
 
   private async notifyFollowers(instructorId: string, listTitle: string, type: NotificationType) {
     const followers = await this.prisma.instructorFollower.findMany({
