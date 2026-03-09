@@ -28,6 +28,11 @@ export class CreateReadingListDto {
   @IsOptional()
   @IsEnum(ReadingListVisibility)
   visibility?: ReadingListVisibility;
+
+  @ApiPropertyOptional({ enum: ReadingListStatus, example: 'DRAFT' })
+  @IsOptional()
+  @IsEnum(ReadingListStatus)
+  status?: ReadingListStatus;
 }
 
 export class UpdateReadingListDto {

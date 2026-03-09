@@ -85,6 +85,16 @@ export class ReadingListsController {
     return this.readingListsService.removeItem(listId, itemId, userId);
   }
 
+  // ── Admin moderation ─────────────────────────────────────────
+
+  @Get('admin/all')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Get all reading lists for moderation (admin only)' })
+  @ApiResponse({ status: 200, description: 'All non-archived reading lists' })
+  async findAllForModeration() {
+    return this.readingListsService.findAllForModeration();
+  }
+
   // ── Discovery endpoints (any logged-in user) ─────────────────
 
   @Get('feed')

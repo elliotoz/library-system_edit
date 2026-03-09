@@ -45,7 +45,7 @@ The **AI-Integrated University Library Management System** is a comprehensive we
 - 📚 **Research Materials Hub** - Instructors can share publications and course materials
 - 📊 **Analytics Dashboard** - Real-time statistics and borrowing trends
 - 🌙 **Dark Mode Support** - Eye-friendly interface for extended use
-- 🤖 **AI Assistant Ready** - Foundation for intelligent book recommendations (Phase 2)
+- 🤖 **Role-Aware AI Assistant** - Personalized responses by role, faculty, policy, and live library context
 
 ---
 
@@ -58,7 +58,7 @@ The **AI-Integrated University Library Management System** is a comprehensive we
 - View borrowed books and due dates
 - Access research materials and e-books
 - Receive notifications for due dates and reservation updates
-- AI-powered study assistance (coming soon)
+- Role-aware AI study assistance with personalized guidance
 
 ### For Instructors
 
@@ -71,7 +71,7 @@ The **AI-Integrated University Library Management System** is a comprehensive we
 ### For Staff
 
 - All student features plus:
-- Personalized book recommendations based on interests
+- Interest-based AI recommendations (with onboarding prompt if interests are missing)
 - Extended borrowing limits
 
 ### For Administrators
@@ -469,6 +469,43 @@ Authorization: Cookie (access_token)
 
 ---
 
+## 🤖 AI Assistant Workflow (Implemented)
+
+The assistant is not generic. It builds a live context per request and responds differently by role.
+
+### Context Built Per Request
+
+- User identity and role
+- Faculty and interests
+- Borrow policy (limits, duration, extensions)
+- Active borrows and reservation status
+- Catalog snapshot and availability
+- Reading list stats
+- Admin operational stats (admin role only)
+
+### Role-Aware Behavior
+
+- **Student**: Borrow/reservation help, faculty-relevant recommendations, due-date guidance
+- **Instructor**: Course-oriented and advanced recommendations, reading-list workflow guidance
+- **Staff**: Interest bootstrap flow (collect/store interests first, then personalize)
+- **Admin**: Operational insights (pending reservations, overdue loans, active users, policy-aware responses)
+
+### Permission Safety
+
+- AI guidance respects backend permissions.
+- Non-admin users are refused admin-only action requests with safe alternatives.
+
+### Build Steps Used
+
+1. Added context builder service for live user/library context.
+2. Added role response service for role-specific strategy logic.
+3. Updated AI orchestrator to use context + role strategy.
+4. Wired controller to authenticated `userId` and `role`.
+5. Implemented staff interest bootstrap and persistence.
+6. Verified with role-based manual test matrix and full builds.
+
+---
+
 ## 🗺 Roadmap
 
 ### ✅ Phase 1: Core System (Completed)
@@ -482,20 +519,22 @@ Authorization: Cookie (access_token)
 - [x] Admin Statistics Dashboard
 - [x] Dark Mode
 
-### 🔄 Phase 2: User Features (In Progress)
+### ✅ Phase 2: User Features (Completed)
 
 - [x] Secure User Onboarding (Google Sign-In + Verified Email/Password Signup)
 - [x] Password Reset via Email
 - [x] Edit User Profile
-- [ ] Instructor Follower System
-- [ ] Reading Lists CRUD
+- [x] Instructor Follower System
+- [x] Reading Lists CRUD (visibility/status/discovery/moderation)
 
-### 📋 Phase 3: AI Integration (Planned)
+### 🔄 Phase 3: AI Integration (In Progress)
 
-- [ ] AI Chatbot for Study Assistance
-- [ ] Intelligent Book Recommendations
+- [x] AI Chatbot for Study Assistance
+- [x] Role-Aware Context-Driven Recommendations
 - [ ] Natural Language Search
 - [ ] Personalized Learning Paths
+- [ ] Research Guide Generator
+- [ ] Book Summary/Tutoring Helpers
 
 ### 📋 Phase 4: Production Readiness (Planned)
 

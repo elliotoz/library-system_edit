@@ -198,6 +198,11 @@ export default function DashboardLayout({
               icon: FileText,
             },
             {
+              label: 'Reading Lists',
+              href: '/dashboard/admin/reading-lists',
+              icon: ListChecks,
+            },
+            {
               label: 'System Settings',
               href: '/dashboard/admin/settings',
               icon: Settings,
