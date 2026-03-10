@@ -27,6 +27,7 @@ A modern, full-stack university library management system with role-based access
 - [API Documentation](#-api-documentation)
 - [User Roles & Permissions](#-user-roles--permissions)
 - [Database Schema](#-database-schema)
+- [AI Assistant](#-ai-assistant)
 - [Screenshots](#-screenshots)
 - [Roadmap](#-roadmap)
 - [Contributing](#-contributing)
@@ -40,12 +41,13 @@ The **AI-Integrated University Library Management System** is a comprehensive we
 
 ### Key Highlights
 
-- 🔐 **Role-Based Access Control** - Four distinct user roles with tailored experiences
-- 📖 **Complete Borrowing Lifecycle** - From reservation to return with automated fine calculation
-- 📚 **Research Materials Hub** - Instructors can share publications and course materials
-- 📊 **Analytics Dashboard** - Real-time statistics and borrowing trends
-- 🌙 **Dark Mode Support** - Eye-friendly interface for extended use
-- 🤖 **Role-Aware AI Assistant** - Personalized responses by role, faculty, policy, and live library context
+- 🔐 **Role-Based Access Control** — Four distinct user roles with tailored experiences
+- 📖 **Complete Borrowing Lifecycle** — From reservation to return with automated fine calculation
+- 📚 **Research Materials Hub** — Instructors can share publications and course materials
+- 📋 **Reading Lists** — Instructor-curated collections with visibility control and student discovery
+- 📊 **Analytics Dashboard** — Real-time statistics and borrowing trends
+- 🌙 **Dark Mode Support** — Eye-friendly interface for extended use
+- 🤖 **Role-Aware AI Assistant** — Natural language search, personalized learning paths, research guidance, and context-driven recommendations powered by Ollama
 
 ---
 
@@ -58,13 +60,14 @@ The **AI-Integrated University Library Management System** is a comprehensive we
 - View borrowed books and due dates
 - Access research materials and e-books
 - Receive notifications for due dates and reservation updates
-- Role-aware AI study assistance with personalized guidance
+- Follow instructors and discover their reading lists
+- AI assistant with personalized study guidance, learning paths, and research help
 
 ### For Instructors
 
 - All student features plus:
 - Submit research materials for library approval
-- Create and manage course reading lists
+- Create and manage course reading lists (with visibility and status controls)
 - Track material submission status
 - Extended borrowing periods (30 days)
 
@@ -81,6 +84,7 @@ The **AI-Integrated University Library Management System** is a comprehensive we
 - **Reservation Processing**: Approve, reject, and manage pickup workflows
 - **Borrow Management**: Process returns, calculate fines, track overdue items
 - **Materials Approval**: Review and approve instructor submissions
+- **Reading List Moderation**: View and manage all reading lists
 - **Statistics Dashboard**: View borrowing trends, popular books, and system metrics
 - **System Configuration**: Manage branches, policies, and settings
 
@@ -105,9 +109,10 @@ The **AI-Integrated University Library Management System** is a comprehensive we
 | **NestJS 10**       | Node.js framework with decorators and DI |
 | **TypeScript**      | Type-safe backend code                   |
 | **Prisma ORM**      | Database access and migrations           |
-| **Passport.js**     | Authentication strategies                |
-| **JWT**             | Stateless authentication tokens          |
+| **Passport.js**     | Authentication strategies (JWT + Google) |
+| **JWT**             | Stateless authentication via HttpOnly cookies |
 | **class-validator** | Request validation                       |
+| **Ollama**          | Local LLM inference for AI assistant     |
 
 ### Database & Infrastructure
 
@@ -126,14 +131,26 @@ library-system/
 ├── apps/
 │   ├── api/                    # NestJS Backend
 │   │   ├── src/
-│   │   │   ├── auth/           # Authentication module
+│   │   │   ├── ai/             # AI assistant module
+│   │   │   │   ├── ai.controller.ts
+│   │   │   │   ├── ai.service.ts            # Chat orchestrator
+│   │   │   │   ├── context-builder.service.ts  # Live user/library context
+│   │   │   │   ├── role-response.service.ts    # Role-specific strategies
+│   │   │   │   ├── catalog-search.service.ts   # Natural language search
+│   │   │   │   ├── semantic-search.service.ts  # Book ranking & scoring
+│   │   │   │   ├── learning-path.service.ts    # Learning path generation
+│   │   │   │   ├── research-assistant.service.ts # Research guidance
+│   │   │   │   └── ollama.service.ts           # LLM integration
+│   │   │   ├── auth/           # Authentication (JWT + Google OAuth)
 │   │   │   ├── users/          # User management
 │   │   │   ├── books/          # Book catalog & copies
 │   │   │   ├── reservations/   # Reservation workflows
 │   │   │   ├── borrows/        # Borrow management & fines
 │   │   │   ├── materials/      # Research materials
+│   │   │   ├── reading-lists/  # Instructor reading lists
+│   │   │   ├── instructor-followers/ # Instructor follow system
+│   │   │   ├── dashboard/      # Statistics & analytics
 │   │   │   ├── notifications/  # Notification system
-│   │   │   ├── branches/       # Library branches
 │   │   │   ├── prisma/         # Database client
 │   │   │   └── main.ts         # Application entry
 │   │   ├── prisma/
@@ -143,11 +160,21 @@ library-system/
 │   │
 │   └── web/                    # Next.js Frontend
 │       ├── app/
-│       │   ├── (auth)/         # Auth pages (login)
+│       │   ├── (auth)/         # Auth pages (login, register)
 │       │   ├── dashboard/      # Protected dashboard routes
 │       │   │   ├── admin/      # Admin-only pages
 │       │   │   ├── instructor/ # Instructor pages
-│       │   │   └── ...         # Shared pages
+│       │   │   ├── ai-assistant/ # AI chat interface
+│       │   │   ├── catalog/    # Book catalog
+│       │   │   ├── borrowed/   # Active borrows
+│       │   │   ├── reservations/ # Reservations
+│       │   │   ├── reading-lists/ # Reading list discovery
+│       │   │   ├── instructors/  # Instructor discovery
+│       │   │   ├── materials/  # Research materials
+│       │   │   ├── history/    # Borrow history
+│       │   │   ├── profile/    # User profile
+│       │   │   ├── settings/   # User settings
+│       │   │   └── notifications/ # Notifications
 │       │   ├── layout.tsx      # Root layout
 │       │   └── page.tsx        # Landing page
 │       ├── components/         # Reusable components
@@ -169,6 +196,7 @@ library-system/
 - **npm** >= 9.x
 - **Docker** & **Docker Compose**
 - **Git**
+- **Ollama** (optional, for AI LLM features)
 
 ### Step 1: Clone the Repository
 
@@ -237,6 +265,14 @@ NODE_ENV=development
 # File Upload
 MAX_FILE_SIZE=52428800  # 50MB in bytes
 UPLOAD_DIR="./uploads"
+
+# Google OAuth (optional)
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+GOOGLE_CALLBACK_URL="http://localhost:3001/auth/google/callback"
+
+# Ollama (optional — AI chat falls back to rule-based without it)
+OLLAMA_BASE_URL="http://localhost:11434"
 ```
 
 ### Frontend (`apps/web/.env`)
@@ -355,16 +391,19 @@ All protected endpoints require a JWT token sent via HttpOnly cookie.
 
 ### Endpoints Overview
 
-| Module            | Endpoints | Description                           |
-| ----------------- | --------- | ------------------------------------- |
-| **Auth**          | 4         | Login, logout, refresh, current user  |
-| **Users**         | 6         | CRUD, activate/deactivate             |
-| **Books**         | 8         | Catalog, search, copies management    |
-| **Reservations**  | 7         | Create, approve, reject, collect      |
-| **Borrows**       | 10        | Checkout, return, history, statistics |
-| **Materials**     | 6         | Upload, approve, list                 |
-| **Notifications** | 4         | List, mark read                       |
-| **Branches**      | 2         | List branches                         |
+| Module                   | Endpoints | Description                                    |
+| ------------------------ | --------- | ---------------------------------------------- |
+| **Auth**                 | 10        | Login, register, Google OAuth, password reset, email verification, logout |
+| **Users**                | 6         | CRUD, activate/deactivate, interests           |
+| **Books**                | 8         | Catalog, search, copies management             |
+| **Reservations**         | 7         | Create, approve, reject, collect               |
+| **Borrows**              | 10        | Checkout, return, history, statistics           |
+| **Materials**            | 6         | Upload, approve, list                          |
+| **Reading Lists**        | 10        | CRUD, items, feed, instructor lists, admin moderation |
+| **Instructor Followers** | 3         | Follow, unfollow, list followed                |
+| **Dashboard**            | 3         | Statistics, analytics                          |
+| **AI**                   | 3         | Chat, update interests, get context            |
+| **Notifications**        | 4         | List, mark read                                |
 
 ### Example Requests
 
@@ -400,22 +439,38 @@ Authorization: Cookie (access_token)
 }
 ```
 
+#### AI Chat
+
+```bash
+POST /api/ai/chat
+Content-Type: application/json
+Authorization: Cookie (access_token)
+
+{
+  "message": "Create a learning path for machine learning"
+}
+```
+
 ---
 
 ## 👥 User Roles & Permissions
 
-| Permission           | Student | Instructor | Staff | Admin |
-| -------------------- | ------- | ---------- | ----- | ----- |
-| Browse Catalog       | ✅      | ✅         | ✅    | ✅    |
-| Create Reservations  | ✅      | ✅         | ✅    | ✅    |
-| View Own Borrows     | ✅      | ✅         | ✅    | ✅    |
-| Submit Materials     | ❌      | ✅         | ❌    | ✅    |
-| Create Reading Lists | ❌      | ✅         | ❌    | ❌    |
-| Approve Reservations | ❌      | ❌         | ❌    | ✅    |
-| Process Returns      | ❌      | ❌         | ❌    | ✅    |
-| Manage Books         | ❌      | ❌         | ❌    | ✅    |
-| Manage Users         | ❌      | ❌         | ❌    | ✅    |
-| View Statistics      | ❌      | ❌         | ❌    | ✅    |
+| Permission              | Student | Instructor | Staff | Admin |
+| ------------------------ | ------- | ---------- | ----- | ----- |
+| Browse Catalog           | ✅      | ✅         | ✅    | ✅    |
+| Create Reservations      | ✅      | ✅         | ✅    | ✅    |
+| View Own Borrows         | ✅      | ✅         | ✅    | ✅    |
+| AI Chat Assistant        | ✅      | ✅         | ✅    | ✅    |
+| Follow Instructors       | ✅      | ✅         | ✅    | ❌    |
+| Discover Reading Lists   | ✅      | ✅         | ✅    | ✅    |
+| Submit Materials         | ❌      | ✅         | ❌    | ✅    |
+| Create Reading Lists     | ❌      | ✅         | ❌    | ❌    |
+| Approve Reservations     | ❌      | ❌         | ❌    | ✅    |
+| Process Returns          | ❌      | ❌         | ❌    | ✅    |
+| Manage Books             | ❌      | ❌         | ❌    | ✅    |
+| Manage Users             | ❌      | ❌         | ❌    | ✅    |
+| Moderate Reading Lists   | ❌      | ❌         | ❌    | ✅    |
+| View Statistics          | ❌      | ❌         | ❌    | ✅    |
 
 ### Borrow Limits by Role
 
@@ -443,6 +498,7 @@ Authorization: Cookie (access_token)
 │ role         │     │ category     │     └──────────────┘
 │ studentId    │     │ faculty      │            │
 │ faculty      │     │ ebookUrl     │            │
+│ interests    │     │ subjectTags  │            │
 └──────────────┘     └──────────────┘            │
        │                    │                    │
        │              ┌─────┴───────────┐        │
@@ -463,46 +519,96 @@ Authorization: Cookie (access_token)
 
 ### Additional Entities
 
-- **Material** : Research papers, publications, course materials
+- **Material**: Research papers, publications, course materials
 - **Notification**: User notifications for system events
-- **ReadingList** : Instructor-curated book collections
+- **ReadingList**: Instructor-curated book collections with visibility and status controls
+- **ReadingListItem**: Books within a reading list
+- **InstructorFollower**: Student-to-instructor follow relationships
+- **BorrowPolicy**: Role-specific borrowing limits and rules
 
 ---
 
-## 🤖 AI Assistant Workflow (Implemented)
+## 🤖 AI Assistant
 
-The assistant is not generic. It builds a live context per request and responds differently by role.
+The AI assistant is not a generic chatbot. It builds a live context per request and responds differently by role, leveraging the full library system state.
+
+### Architecture
+
+```
+User Message
+     │
+     ▼
+┌─────────────────────┐
+│   Intent Router     │  ← ai.service.ts
+├─────────────────────┤
+│ 1. Staff interest   │
+│    bootstrap        │
+│ 2. Interest update  │
+│ 3. Admin gate       │
+│ 4. Catalog search   │  ← catalog-search.service.ts + semantic-search.service.ts
+│ 5. Learning path    │  ← learning-path.service.ts
+│ 6. Research assist  │  ← research-assistant.service.ts
+│ 7. Ollama / fallback│  ← ollama.service.ts + role-response.service.ts
+└─────────────────────┘
+```
 
 ### Context Built Per Request
 
-- User identity and role
-- Faculty and interests
-- Borrow policy (limits, duration, extensions)
-- Active borrows and reservation status
-- Catalog snapshot and availability
-- Reading list stats
-- Admin operational stats (admin role only)
+| Data                  | Source                      |
+| --------------------- | --------------------------- |
+| User identity & role  | JWT token + Users table     |
+| Faculty & interests   | User profile                |
+| Borrow policy         | BorrowPolicy table          |
+| Active borrows        | Borrow table (ACTIVE)       |
+| Borrow history        | Borrow table (RETURNED)     |
+| Reservation status    | Reservation table           |
+| Catalog snapshot      | Books + BookCopy aggregates |
+| Reading list stats    | ReadingList aggregates      |
+| Admin operational data| System-wide aggregates      |
 
-### Role-Aware Behavior
+### Capabilities
 
-- **Student**: Borrow/reservation help, faculty-relevant recommendations, due-date guidance
-- **Instructor**: Course-oriented and advanced recommendations, reading-list workflow guidance
-- **Staff**: Interest bootstrap flow (collect/store interests first, then personalize)
-- **Admin**: Operational insights (pending reservations, overdue loans, active users, policy-aware responses)
+**Natural Language Catalog Search** — Users can search with phrases like "find books about machine learning" or "available psychology books". The system parses intent (keywords, category, audience level, availability), runs semantic search with multi-factor scoring, and returns ranked results with availability.
+
+**Personalized Learning Paths** — Triggered by phrases like "learning path for data science" or "what should I read to learn algorithms". Groups library books into three stages (Foundations → Core → Advanced) based on title/description analysis. Enriched with borrow history for personalization. Optionally enhanced by Ollama for stage descriptions.
+
+**Research Assistant** — Triggered by phrases like "research on neural networks" or "help with my thesis on machine learning". Searches both books and reading lists, provides role-specific next steps (students get different guidance than instructors), and optionally generates a literature landscape summary via Ollama.
+
+**Role-Aware Chat** — All other messages are handled by Ollama with role-specific system prompts that include live library context. Falls back to rule-based responses when Ollama is unavailable.
+
+### Role-Specific Behavior
+
+| Role       | Behavior                                                                       |
+| ---------- | ------------------------------------------------------------------------------ |
+| Student    | Borrow/reservation help, faculty-relevant recommendations, due-date guidance   |
+| Instructor | Course-oriented recommendations, reading-list workflow guidance                |
+| Staff      | Interest bootstrap flow (collect/store interests first, then personalize)      |
+| Admin      | Operational insights (pending reservations, overdue loans, system stats)       |
 
 ### Permission Safety
 
-- AI guidance respects backend permissions.
-- Non-admin users are refused admin-only action requests with safe alternatives.
+- AI guidance respects backend permissions
+- Non-admin users are refused admin-only action requests with safe alternatives
+- The AI informs but never executes actions
 
-### Build Steps Used
+### LLM Integration (Ollama)
 
-1. Added context builder service for live user/library context.
-2. Added role response service for role-specific strategy logic.
-3. Updated AI orchestrator to use context + role strategy.
-4. Wired controller to authenticated `userId` and `role`.
-5. Implemented staff interest bootstrap and persistence.
-6. Verified with role-based manual test matrix and full builds.
+The system uses Ollama for local LLM inference with role-based model selection:
+
+| Role       | Default Model | Deep Reasoning |
+| ---------- | ------------- | -------------- |
+| Staff      | phi3          | llama3         |
+| Student    | qwen2.5       | llama3         |
+| Instructor | qwen2.5       | llama3         |
+| Admin      | llama3        | llama3         |
+
+When Ollama is not available, all AI features gracefully fall back to rule-based responses.
+
+---
+
+## 📸 Screenshots
+
+*Screenshots coming soon*
 
 ---
 
@@ -510,7 +616,8 @@ The assistant is not generic. It builds a live context per request and responds 
 
 ### ✅ Phase 1: Core System (Completed)
 
-- [x] Authentication & Authorization
+- [x] Authentication & Authorization (JWT + Google OAuth)
+- [x] Email Verification & Password Reset
 - [x] Book Catalog with Search & Filters
 - [x] Reservation System
 - [x] Borrow Management with Fine Calculation
@@ -522,19 +629,18 @@ The assistant is not generic. It builds a live context per request and responds 
 ### ✅ Phase 2: User Features (Completed)
 
 - [x] Secure User Onboarding (Google Sign-In + Verified Email/Password Signup)
-- [x] Password Reset via Email
 - [x] Edit User Profile
 - [x] Instructor Follower System
 - [x] Reading Lists CRUD (visibility/status/discovery/moderation)
 
-### 🔄 Phase 3: AI Integration (In Progress)
+### ✅ Phase 3: AI Integration (Completed)
 
 - [x] AI Chatbot for Study Assistance
 - [x] Role-Aware Context-Driven Recommendations
-- [ ] Natural Language Search
-- [ ] Personalized Learning Paths
-- [ ] Research Guide Generator
-- [ ] Book Summary/Tutoring Helpers
+- [x] Natural Language Catalog Search with Semantic Scoring
+- [x] Personalized Learning Path Generation
+- [x] Research Assistant with Literature Guidance
+- [x] Ollama LLM Integration with Rule-Based Fallback
 
 ### 📋 Phase 4: Production Readiness (Planned)
 
