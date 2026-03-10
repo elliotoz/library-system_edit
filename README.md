@@ -641,6 +641,7 @@ When Ollama is not available, all AI features gracefully fall back to rule-based
 - [x] Personalized Learning Path Generation
 - [x] Research Assistant with Literature Guidance
 - [x] Ollama LLM Integration with Rule-Based Fallback
+- [x] Embeddings-Ready Semantic Search Abstraction (keyword/hybrid/embedding strategy with shared types)
 
 ### 📋 Phase 4: Production Readiness (Planned)
 
