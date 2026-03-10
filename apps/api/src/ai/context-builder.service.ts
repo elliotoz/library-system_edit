@@ -36,6 +36,10 @@ export interface AiContext {
     followedInstructors: number;
     ownListCount: number;
   };
+  borrowHistory: {
+    recentBooks: { title: string; category: string | null; returnedAt: Date }[];
+    totalBorrowed: number;
+  };
   admin?: {
     pendingReservations: number;
     activeLoans: number;
@@ -73,12 +77,14 @@ export class ContextBuilderService {
       reservations,
       catalogStats,
       readingListStats,
+      borrowHistory,
     ] = await Promise.all([
       this.getBorrowPolicy(userRole),
       this.getActiveBorrows(userId),
       this.getReservations(userId),
       this.getCatalogSnapshot(user.faculty?.name ?? null),
       this.getReadingListSnapshot(userId, userRole),
+      this.getBorrowHistory(userId),
     ]);
 
     const ctx: AiContext = {
@@ -94,6 +100,7 @@ export class ContextBuilderService {
       reservations,
       catalog: catalogStats,
       readingLists: readingListStats,
+      borrowHistory,
     };
 
     if (userRole === Role.ADMIN) {
@@ -185,6 +192,32 @@ export class ContextBuilderService {
         : Promise.resolve(0),
     ]);
     return { publishedCount, followedInstructors, ownListCount };
+  }
+
+  private async getBorrowHistory(userId: string) {
+    const [recentReturns, totalBorrowed] = await Promise.all([
+      this.prisma.borrow.findMany({
+        where: { userId, status: BorrowStatus.RETURNED },
+        select: {
+          returnedAt: true,
+          bookCopy: { select: { book: { select: { title: true, category: true } } } },
+        },
+        orderBy: { returnedAt: 'desc' },
+        take: 10,
+      }),
+      this.prisma.borrow.count({
+        where: { userId, status: BorrowStatus.RETURNED },
+      }),
+    ]);
+
+    return {
+      recentBooks: recentReturns.map((b) => ({
+        title: b.bookCopy.book.title,
+        category: b.bookCopy.book.category,
+        returnedAt: b.returnedAt!,
+      })),
+      totalBorrowed,
+    };
   }
 
   private async getAdminStats() {

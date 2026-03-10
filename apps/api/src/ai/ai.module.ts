@@ -5,6 +5,8 @@ import { ContextBuilderService } from './context-builder.service';
 import { RoleResponseService } from './role-response.service';
 import { CatalogSearchService } from './catalog-search.service';
 import { SemanticSearchService } from './semantic-search.service';
+import { LearningPathService } from './learning-path.service';
+import { ResearchAssistantService } from './research-assistant.service';
 import { OllamaService } from './ollama.service';
 import { UsersModule } from '../users/users.module';
 
@@ -17,6 +19,8 @@ import { UsersModule } from '../users/users.module';
     RoleResponseService,
     CatalogSearchService,
     SemanticSearchService,
+    LearningPathService,
+    ResearchAssistantService,
     OllamaService,
   ],
 })

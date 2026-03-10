@@ -90,7 +90,7 @@ export class CatalogSearchService {
 
   // ── Reading lists ────────────────────────────────────────────
 
-  private async searchReadingLists(searchTerm: string): Promise<ReadingListResult[]> {
+  async searchReadingLists(searchTerm: string): Promise<ReadingListResult[]> {
     const lists = await this.prisma.readingList.findMany({
       where: {
         status: 'PUBLISHED',

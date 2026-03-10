@@ -3,6 +3,8 @@ import { Role } from '@prisma/client';
 import { ContextBuilderService, AiContext } from './context-builder.service';
 import { RoleResponseService } from './role-response.service';
 import { CatalogSearchService } from './catalog-search.service';
+import { LearningPathService } from './learning-path.service';
+import { ResearchAssistantService } from './research-assistant.service';
 import { OllamaService } from './ollama.service';
 import { UsersService } from '../users/users.service';
 
@@ -20,6 +22,8 @@ export class AiService {
     private readonly contextBuilder: ContextBuilderService,
     private readonly roleResponse: RoleResponseService,
     private readonly catalogSearch: CatalogSearchService,
+    private readonly learningPath: LearningPathService,
+    private readonly researchAssistant: ResearchAssistantService,
     private readonly ollama: OllamaService,
     private readonly usersService: UsersService,
   ) {}
@@ -49,6 +53,16 @@ export class AiService {
     // Natural-language catalog/reading-list search
     if (this.catalogSearch.isSearchQuery(message)) {
       return this.catalogSearch.search(message, userRole, ctx.user.facultyName);
+    }
+
+    // Personalized learning path generation
+    if (this.learningPath.isLearningPathQuery(message)) {
+      return this.learningPath.generatePath(ctx, message);
+    }
+
+    // Research assistant
+    if (this.researchAssistant.isResearchQuery(message)) {
+      return this.researchAssistant.assist(ctx, message);
     }
 
     // Try Ollama-powered response, fallback to rule-based on failure
