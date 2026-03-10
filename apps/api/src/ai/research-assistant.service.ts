@@ -3,7 +3,8 @@ import { Role } from '@prisma/client';
 import { AiContext } from './context-builder.service';
 import { ChatResponse } from './ai.service';
 import { SemanticSearchService, RankedBookResult } from './semantic-search.service';
-import { CatalogSearchService, SearchIntent } from './catalog-search.service';
+import { SearchIntent } from './types/search.types';
+import { CatalogSearchService } from './catalog-search.service';
 import { OllamaService } from './ollama.service';
 
 const RESEARCH_SIGNALS = [

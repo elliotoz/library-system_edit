@@ -3,22 +3,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ChatResponse } from './ai.service';
 import { Role } from '@prisma/client';
 import { SemanticSearchService, RankedBookResult } from './semantic-search.service';
+import { SearchIntent, ReadingListResult } from './types/search.types';
 
-export interface SearchIntent {
-  keywords: string[];
-  wantsAvailable: boolean;
-  wantsReadingLists: boolean;
-  category: string | null;
-  audienceLevel: 'introductory' | 'advanced' | null;
-  facultyHint: string | null;
-}
-
-interface ReadingListResult {
-  id: string;
-  title: string;
-  ownerName: string;
-  itemCount: number;
-}
+// Re-export for backward compatibility
+export { SearchIntent } from './types/search.types';
 
 @Injectable()
 export class CatalogSearchService {

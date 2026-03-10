@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { AiContext } from './context-builder.service';
 import { ChatResponse } from './ai.service';
 import { SemanticSearchService, RankedBookResult } from './semantic-search.service';
-import { SearchIntent } from './catalog-search.service';
+import { SearchIntent } from './types/search.types';
 import { OllamaService } from './ollama.service';
 
 const INTENT_SIGNALS = [

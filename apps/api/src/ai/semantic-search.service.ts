@@ -1,46 +1,105 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { SearchIntent } from './catalog-search.service';
+import {
+  SearchIntent,
+  BookCandidate,
+  RankedBookResult,
+  SearchContext,
+} from './types/search.types';
 
-export interface BookCandidate {
-  id: string;
-  title: string;
-  authors: string[];
-  category: string | null;
-  description: string | null;
-  subjectTags: string[];
-  mainFaculty: { name: string } | null;
-  copies: { status: string }[];
-  _count: { readingListItems: number };
-}
+// Re-export for backward compatibility
+export { BookCandidate, RankedBookResult, SearchContext } from './types/search.types';
 
-export interface RankedBookResult {
-  id: string;
-  title: string;
-  authors: string[];
-  category: string | null;
-  subjectTags: string[];
-  availableCopies: number;
-  totalCopies: number;
-  readingListCount: number;
-  facultyMatch: boolean;
-  score: number;
-  reasons: string[];
-}
-
-export interface SearchContext {
-  facultyName: string | null;
-}
+type SemanticMode = 'keyword' | 'hybrid' | 'embedding';
 
 @Injectable()
 export class SemanticSearchService {
-  private readonly mode: string;
+  private readonly logger = new Logger(SemanticSearchService.name);
+  private readonly mode: SemanticMode;
 
   constructor(private readonly prisma: PrismaService) {
-    this.mode = process.env.AI_SEMANTIC_MODE || 'hybrid';
+    const raw = process.env.AI_SEMANTIC_MODE || 'hybrid';
+    this.mode = this.parseMode(raw);
+    this.logger.log(`Semantic search mode: ${this.mode}`);
   }
 
-  async searchBooks(intent: SearchIntent, context: SearchContext): Promise<BookCandidate[]> {
+  // ── Public API ─────────────────────────────────────────────────
+
+  async searchBooks(
+    intent: SearchIntent,
+    context: SearchContext,
+  ): Promise<BookCandidate[]> {
+    switch (this.mode) {
+      case 'embedding':
+        return this.embeddingSearch(intent, context);
+      case 'hybrid':
+        return this.hybridSearch(intent, context);
+      case 'keyword':
+      default:
+        return this.keywordSearch(intent, context);
+    }
+  }
+
+  rankBooks(
+    candidates: BookCandidate[],
+    intent: SearchIntent,
+    context: SearchContext,
+    similarityScores?: Map<string, number>,
+  ): RankedBookResult[] {
+    const ranked = candidates.map((b) => {
+      const availableCopies = b.copies.filter((c) => c.status === 'AVAILABLE').length;
+      const totalCopies = b.copies.length;
+      const facultyMatch = context.facultyName
+        ? b.mainFaculty?.name === context.facultyName
+        : false;
+      const readingListCount = b._count.readingListItems;
+
+      const { score, reasons } = this.computeScore(
+        b,
+        intent,
+        context.facultyName,
+        availableCopies,
+        readingListCount,
+        similarityScores?.get(b.id),
+      );
+
+      return {
+        id: b.id,
+        title: b.title,
+        authors: b.authors,
+        category: b.category,
+        subjectTags: b.subjectTags,
+        availableCopies,
+        totalCopies,
+        readingListCount,
+        facultyMatch,
+        score,
+        reasons,
+      };
+    });
+
+    let filtered = intent.wantsAvailable
+      ? ranked.filter((b) => b.availableCopies > 0)
+      : ranked;
+    filtered.sort((a, b) => b.score - a.score);
+
+    return filtered.slice(0, 8);
+  }
+
+  getMode(): SemanticMode {
+    return this.mode;
+  }
+
+  // ── Search strategies ──────────────────────────────────────────
+
+  /**
+   * Pure keyword search using Prisma text filters.
+   * This is the current production path.
+   */
+  private async keywordSearch(
+    intent: SearchIntent,
+    _context: SearchContext,
+  ): Promise<BookCandidate[]> {
     const searchTerm = intent.keywords.join(' ');
     const where: any = { isActive: true };
 
@@ -60,7 +119,9 @@ export class SemanticSearchService {
       }
     }
     if (intent.category) {
-      orClauses.push({ category: { contains: intent.category, mode: 'insensitive' } });
+      orClauses.push({
+        category: { contains: intent.category, mode: 'insensitive' },
+      });
     }
     if (orClauses.length > 0) {
       where.OR = orClauses;
@@ -68,61 +129,98 @@ export class SemanticSearchService {
 
     return this.prisma.book.findMany({
       where,
-      select: {
-        id: true,
-        title: true,
-        authors: true,
-        category: true,
-        description: true,
-        subjectTags: true,
-        mainFaculty: { select: { name: true } },
-        copies: { select: { status: true } },
-        _count: { select: { readingListItems: true } },
-      },
+      select: this.bookCandidateSelect(),
       take: 20,
       orderBy: { title: 'asc' },
     });
   }
 
-  rankBooks(
-    candidates: BookCandidate[],
+  /**
+   * Embedding-based search.
+   * Placeholder: falls back to keyword search until embedding
+   * infrastructure (vector column + generation pipeline) is in place.
+   *
+   * Future implementation will:
+   * 1. Call generateEmbedding() on the query
+   * 2. Query a pgvector index for nearest neighbors
+   * 3. Return candidates ordered by cosine similarity
+   */
+  private async embeddingSearch(
     intent: SearchIntent,
     context: SearchContext,
-  ): RankedBookResult[] {
-    const ranked = candidates.map((b) => {
-      const availableCopies = b.copies.filter((c) => c.status === 'AVAILABLE').length;
-      const totalCopies = b.copies.length;
-      const facultyMatch = context.facultyName ? (b.mainFaculty?.name === context.facultyName) : false;
-      const readingListCount = b._count.readingListItems;
-
-      const { score, reasons } = this.computeScore(b, intent, context.facultyName, availableCopies, readingListCount);
-
-      return {
-        id: b.id,
-        title: b.title,
-        authors: b.authors,
-        category: b.category,
-        subjectTags: b.subjectTags,
-        availableCopies,
-        totalCopies,
-        readingListCount,
-        facultyMatch,
-        score,
-        reasons,
-      };
-    });
-
-    let filtered = intent.wantsAvailable ? ranked.filter((b) => b.availableCopies > 0) : ranked;
-    filtered.sort((a, b) => b.score - a.score);
-
-    return filtered.slice(0, 8);
+  ): Promise<BookCandidate[]> {
+    // TODO: replace with vector query once Book.embedding column exists
+    this.logger.debug(
+      'Embedding search not yet available, falling back to keyword search',
+    );
+    return this.keywordSearch(intent, context);
   }
 
-  getMode(): string {
-    return this.mode;
+  /**
+   * Hybrid search: keyword results merged with embedding results.
+   * Currently behaves identically to keyword-only search.
+   *
+   * Future implementation will:
+   * 1. Run keyword and embedding searches in parallel
+   * 2. Merge and deduplicate candidates
+   * 3. Pass similarity scores into rankBooks() for blended scoring
+   */
+  private async hybridSearch(
+    intent: SearchIntent,
+    context: SearchContext,
+  ): Promise<BookCandidate[]> {
+    // TODO: merge keyword + embedding results once vectors are available
+    return this.keywordSearch(intent, context);
   }
 
-  // ── Scoring ──────────────────────────────────────────────────
+  // ── Embedding utilities (stubs) ────────────────────────────────
+
+  /**
+   * Generate an embedding vector for the given text.
+   * Returns null until an embedding provider is configured.
+   *
+   * Future: call Ollama /api/embeddings or an external API.
+   */
+  async generateEmbedding(_text: string): Promise<number[] | null> {
+    // TODO: integrate with Ollama embeddings or external API
+    return null;
+  }
+
+  /**
+   * Cosine similarity between two vectors.
+   * Ready for use once embeddings are generated.
+   */
+  cosineSimilarity(a: number[], b: number[]): number {
+    if (a.length !== b.length || a.length === 0) return 0;
+    let dot = 0;
+    let normA = 0;
+    let normB = 0;
+    for (let i = 0; i < a.length; i++) {
+      dot += a[i] * b[i];
+      normA += a[i] * a[i];
+      normB += b[i] * b[i];
+    }
+    const denom = Math.sqrt(normA) * Math.sqrt(normB);
+    return denom === 0 ? 0 : dot / denom;
+  }
+
+  // ── Shared helpers ─────────────────────────────────────────────
+
+  private bookCandidateSelect() {
+    return {
+      id: true,
+      title: true,
+      authors: true,
+      category: true,
+      description: true,
+      subjectTags: true,
+      mainFaculty: { select: { name: true } },
+      copies: { select: { status: true } },
+      _count: { select: { readingListItems: true } },
+    } as const;
+  }
+
+  // ── Scoring ────────────────────────────────────────────────────
 
   private computeScore(
     book: BookCandidate,
@@ -130,12 +228,22 @@ export class SemanticSearchService {
     facultyName: string | null,
     availableCopies: number,
     readingListCount: number,
+    embeddingSimilarity?: number,
   ): { score: number; reasons: string[] } {
     let score = 0;
     const reasons: string[] = [];
     const searchTerm = intent.keywords.join(' ').toLowerCase();
     const titleLower = book.title.toLowerCase();
     const descLower = (book.description || '').toLowerCase();
+
+    // Embedding similarity boost (when available)
+    if (embeddingSimilarity !== undefined && embeddingSimilarity > 0) {
+      const boost = Math.round(embeddingSimilarity * 15);
+      score += boost;
+      if (embeddingSimilarity >= 0.8) {
+        reasons.push('Semantic match');
+      }
+    }
 
     if (searchTerm && titleLower.includes(searchTerm)) {
       score += 10;
@@ -149,20 +257,29 @@ export class SemanticSearchService {
     }
 
     for (const kw of intent.keywords) {
-      if (book.authors.some((a) => a.toLowerCase().includes(kw.toLowerCase()))) {
+      if (
+        book.authors.some((a) =>
+          a.toLowerCase().includes(kw.toLowerCase()),
+        )
+      ) {
         score += 4;
         reasons.push('Author match');
         break;
       }
     }
 
-    if (intent.category && book.category?.toLowerCase().includes(intent.category.toLowerCase())) {
+    if (
+      intent.category &&
+      book.category?.toLowerCase().includes(intent.category.toLowerCase())
+    ) {
       score += 5;
       reasons.push('Category match');
     }
 
     const matchedTags = book.subjectTags.filter((tag) =>
-      intent.keywords.some((kw) => tag.toLowerCase().includes(kw.toLowerCase())),
+      intent.keywords.some((kw) =>
+        tag.toLowerCase().includes(kw.toLowerCase()),
+      ),
     );
     if (matchedTags.length > 0) {
       score += 3 * matchedTags.length;
@@ -189,18 +306,33 @@ export class SemanticSearchService {
 
     if (readingListCount > 0) {
       score += Math.min(readingListCount, 5);
-      reasons.push(`In ${readingListCount} reading list${readingListCount !== 1 ? 's' : ''}`);
+      reasons.push(
+        `In ${readingListCount} reading list${readingListCount !== 1 ? 's' : ''}`,
+      );
     }
 
     if (intent.audienceLevel) {
       const combined = titleLower + ' ' + descLower;
       if (intent.audienceLevel === 'advanced') {
-        if (['advanced', 'graduate', 'research', 'comprehensive', 'in-depth'].some((w) => combined.includes(w))) {
+        if (
+          ['advanced', 'graduate', 'research', 'comprehensive', 'in-depth'].some(
+            (w) => combined.includes(w),
+          )
+        ) {
           score += 3;
           reasons.push('Advanced level');
         }
       } else if (intent.audienceLevel === 'introductory') {
-        if (['introduction', 'introductory', 'beginner', 'fundamentals', 'primer', 'essentials'].some((w) => combined.includes(w))) {
+        if (
+          [
+            'introduction',
+            'introductory',
+            'beginner',
+            'fundamentals',
+            'primer',
+            'essentials',
+          ].some((w) => combined.includes(w))
+        ) {
           score += 3;
           reasons.push('Introductory level');
         }
@@ -208,5 +340,11 @@ export class SemanticSearchService {
     }
 
     return { score, reasons: [...new Set(reasons)] };
+  }
+
+  private parseMode(raw: string): SemanticMode {
+    const valid: SemanticMode[] = ['keyword', 'hybrid', 'embedding'];
+    const normalized = raw.toLowerCase().trim() as SemanticMode;
+    return valid.includes(normalized) ? normalized : 'hybrid';
   }
 }
