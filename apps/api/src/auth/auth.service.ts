@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { randomInt, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 import { LoginDto, AuthResponseDto, TokenPayloadDto, RegisterDto, VerifyEmailDto, ResendVerificationDto, ForgotPasswordDto, ResetPasswordDto } from './dto/auth.dto';
 
 @Injectable()
@@ -13,6 +14,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private mailService: MailService,
   ) {}
 
   /**
@@ -170,11 +172,7 @@ export class AuthService {
       throw error;
     }
 
-    // TODO: Send verification email with code (Slice 2/3)
-    // For now, log the code in development
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(`[DEV] Verification code for ${user.email}: ${verificationCode}`);
-    }
+    await this.mailService.sendVerificationEmail(user.email, verificationCode);
 
     return {
       message: 'Registration successful. Please check your email for the verification code.',
@@ -252,10 +250,7 @@ export class AuthService {
       },
     });
 
-    // TODO: Send verification email (Slice 2/3)
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(`[DEV] New verification code for ${user.email}: ${verificationCode}`);
-    }
+    await this.mailService.sendVerificationEmail(user.email, verificationCode);
 
     return { message: genericMessage };
   }
@@ -379,11 +374,7 @@ export class AuthService {
       },
     });
 
-    // TODO: Send email with reset link
-    if (process.env.NODE_ENV !== 'production') {
-      const frontendUrl = this.configService.get<string>('CORS_ORIGIN') || 'http://localhost:3000';
-      console.log(`[DEV] Password reset link for ${user.email}: ${frontendUrl}/reset-password?token=${resetToken}`);
-    }
+    await this.mailService.sendPasswordResetEmail(user.email, resetToken);
 
     return { message: genericMessage };
   }

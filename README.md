@@ -273,7 +273,16 @@ GOOGLE_CALLBACK_URL="http://localhost:3001/auth/google/callback"
 
 # Ollama (optional — AI chat falls back to rule-based without it)
 OLLAMA_BASE_URL="http://localhost:11434"
+
+# SMTP Email (optional — falls back to console logging if not configured)
+SMTP_HOST="smtp.example.com"
+SMTP_PORT="587"
+SMTP_USER="your-smtp-user"
+SMTP_PASS="your-smtp-password"
+SMTP_FROM="noreply@library.uskudar.edu.tr"
 ```
+
+> **SMTP Note:** When `SMTP_HOST` is not set, verification codes and password reset links are logged to the server console instead of emailed. This is the default for local development — no SMTP server required.
 
 ### Frontend (`apps/web/.env`)
 
@@ -643,9 +652,9 @@ When Ollama is not available, all AI features gracefully fall back to rule-based
 - [x] Ollama LLM Integration with Rule-Based Fallback
 - [x] Embeddings-Ready Semantic Search Abstraction (keyword/hybrid/embedding strategy with shared types)
 
-### 📋 Phase 4: Production Readiness (Planned)
+### 🔄 Phase 4: Production Readiness (In Progress)
 
-- [ ] Email Service (SMTP)
+- [x] Email Service (SMTP with nodemailer, feature-flagged fallback)
 - [ ] Cloud File Storage (AWS S3)
 - [ ] Error Logging & Monitoring
 - [ ] Security Hardening
