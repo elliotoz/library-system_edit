@@ -4,6 +4,161 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-10 — Phase 4 Slice 2: Error Logging & Monitoring Baseline
+
+**Goal**: Add structured logging, request correlation IDs, and a global exception filter to the API.
+
+**Changes**:
+- Created `apps/api/src/common/middleware/request-id.middleware.ts` — generates/forwards `x-request-id` UUID per request
+- Created `apps/api/src/common/middleware/request-logger.middleware.ts` — structured request/response logging (method, path, status, duration, requestId), gated by `ENABLE_REQUEST_LOGGING` env
+- Created `apps/api/src/common/filters/global-exception.filter.ts` — normalizes error payloads, logs full stack server-side, never leaks internals to clients
+- Updated `apps/api/src/app.module.ts` — registered both middleware via `NestModule.configure()`
+- Updated `apps/api/src/main.ts` — registered `GlobalExceptionFilter` globally, added `LOG_LEVEL` env support, replaced `console.log` banner with `Logger`
+- Updated `apps/api/.env.example` — added `LOG_LEVEL` and `ENABLE_REQUEST_LOGGING`
+- Updated `README.md` — added Logging & Troubleshooting section
+
+**Files**: `request-id.middleware.ts`, `request-logger.middleware.ts`, `global-exception.filter.ts`, `app.module.ts`, `main.ts`, `.env.example`, `README.md`
+
+**Commands**: `npx nest build` ✅, `npx next build` ✅
+
+**Result**: Both builds pass. API now has request correlation, structured logging, and safe error responses.
+
+**Next**: Phase 4 Slice 3 (TBD)
+
+---
+
+## 2026-03-10 — Phase 4 Slice 1: SMTP Email Service
+
+**Goal:** Replace console-only email delivery with real SMTP transport, feature-flagged with dev fallback.
+
+**Changes:**
+1. `mail/mail.service.ts` — **NEW** — Nodemailer-based MailService:
+   - `sendVerificationEmail(email, code)` — HTML + text email with 6-digit code
+   - `sendPasswordResetEmail(email, token)` — HTML + text email with reset link button
+   - Feature-flagged: if `SMTP_HOST` not set, logs to console via `logFallback()`
+   - On SMTP verify failure, falls back gracefully (no crash)
+   - Styled HTML templates with library branding
+2. `mail/mail.module.ts` — **NEW** — Global module exporting MailService
+3. `app.module.ts` — Registered MailModule before AuthModule
+4. `auth/auth.service.ts` — Injected MailService, replaced 3 console.log blocks:
+   - `register()`: `console.log` → `mailService.sendVerificationEmail()`
+   - `resendVerification()`: `console.log` → `mailService.sendVerificationEmail()`
+   - `forgotPassword()`: `console.log` → `mailService.sendPasswordResetEmail()`
+5. `.env.example` — Added SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
+6. `README.md` — Added SMTP env vars to setup docs with fallback note, marked Email Service as completed in Phase 4 roadmap
+
+**Dependencies added:** `nodemailer`, `@types/nodemailer` (devDep)
+
+**Files:** `apps/api/src/mail/{mail.service.ts,mail.module.ts}` (new), `apps/api/src/{app.module,auth/auth.service}.ts`, `apps/api/.env.example`, `README.md`
+
+**Commands:** `npx nest build` ✅, `npx next build` ✅
+
+**Result:** SMTP email works when configured. When not configured, all auth flows continue working with console-logged codes/links. API contracts unchanged.
+
+---
+
+## 2026-03-09 — Learning Path + Research Assistant Hardening
+
+**Goal:** Improve deterministic output quality, guardrails, and role-aware context usage in both services. No schema changes.
+
+**LearningPathService changes:**
+- Topic extraction fallback chain: parsed words → user interests → faculty name → "general topics"
+- Topic length sanitized to 120 chars (anti-prompt-injection)
+- `buildSearchIntent` enriches vague queries with borrow history categories as secondary signals
+- `groupByDifficulty` now checks `category` field in addition to title + tags
+- Added `roleIntro()` — role-specific introduction line (student/instructor/staff/admin)
+- Added `personalContext()` — flags books user is currently reading with encouragement
+- Added `roleTip()` — actionable role-specific tip (borrow slots remaining, create reading list, update interests)
+- `emptyResult()` suggests user interests when no books found
+- LLM prompt hardened: "Only reference books from the list above", "Do not recommend external resources"
+- LLM output now includes role intro and role tip (matching rule-based output structure)
+
+**ResearchAssistantService changes:**
+- `audienceLevel` now role-aware: `advanced` for instructors/admins, `null` (all levels) for students/staff
+- Topic length sanitized to 120 chars
+- Added `priorReadingNote()` — cross-references results with borrow history, flags already-read books
+- `nextSteps()` now uses live context:
+  - Student: shows followed instructor count, remaining borrow slots
+  - Instructor: shows own reading list count, suggests adding to existing lists
+  - Admin: warns if available copies are low
+- LLM prompt hardened: "Only reference books from the list", "Do not recommend external resources"
+- LLM output now includes prior reading note (matching rule-based output)
+
+**Files:** `apps/api/src/ai/{learning-path,research-assistant}.service.ts`
+
+**Commands:** `npx nest build` ✅, `npx next build` ✅
+
+**Result:** Both services now produce richer, role-aware deterministic output with LLM guardrails. Response schema unchanged: `{ reply, modelUsed, sources? }`.
+
+---
+
+## 2026-03-09 — Post-Refactor Verification + Docs Sync
+
+**Goal:** Validate semantic search refactor preserved ChatResponse schema, run builds, update README.
+
+**Verification:**
+1. Schema check — traced all return points across 5 services (`ai`, `catalog-search`, `learning-path`, `research-assistant`, `role-response`). Every path returns `{ reply: string, modelUsed: string, sources?: string[] }` matching `ChatResponse`.
+2. `npx nest build` ✅
+3. `npx next build` ✅
+
+**Changes:**
+- `README.md` — Added "Embeddings-Ready Semantic Search Abstraction" to Phase 3 completed items
+
+**Files:** `README.md`
+
+---
+
+## 2026-03-09 — AI Slice 5: Embeddings-Ready Semantic Search Abstraction
+
+**Goal:** Extract semantic search logic into a clean abstraction with extension points for future embeddings, keeping current behavior unchanged.
+
+**Changes:**
+1. `types/search.types.ts` — **NEW** — Extracted `SearchIntent`, `BookCandidate`, `RankedBookResult`, `SearchContext`, `ReadingListResult` into a shared types file, breaking circular import between `catalog-search` → `semantic-search`
+2. `semantic-search.service.ts` — Refactored with strategy pattern:
+   - Three search paths: `keywordSearch()` (current production), `embeddingSearch()` (stub → falls back to keyword), `hybridSearch()` (stub → falls back to keyword)
+   - Routes based on `AI_SEMANTIC_MODE` env var (`keyword` | `hybrid` | `embedding`)
+   - Added `generateEmbedding()` stub returning null (future: Ollama /api/embeddings)
+   - Added `cosineSimilarity()` utility ready for use
+   - `rankBooks()` now accepts optional `similarityScores` map for embedding boost
+   - `computeScore()` adds up to 15-point boost for high embedding similarity
+   - Extracted `bookCandidateSelect()` helper to avoid duplication
+   - `getMode()` now returns typed `SemanticMode`
+3. `catalog-search.service.ts` — Removed local `SearchIntent` and `ReadingListResult` definitions, imports from types file, re-exports `SearchIntent` for backward compatibility
+4. `learning-path.service.ts` — Updated import: `SearchIntent` from `types/search.types`
+5. `research-assistant.service.ts` — Updated import: `SearchIntent` from `types/search.types`
+
+**Files:** `apps/api/src/ai/types/search.types.ts` (new), `apps/api/src/ai/{semantic-search,catalog-search,learning-path,research-assistant}.service.ts`
+
+**Commands:** `npx nest build` ✅, `npx next build` ✅
+
+**Result:** Zero behavior change. All search paths still use keyword search. When embeddings are added later, only `generateEmbedding()`, `embeddingSearch()`, and `hybridSearch()` need implementation — no caller changes required.
+
+---
+
+## 2026-03-09 — README Update to Current State
+
+**Goal:** Bring README.md up to date with all implemented features through Phase 3.
+
+**Changes:**
+- Updated Roadmap: Phase 3 (AI Integration) marked as completed — Natural Language Search, Learning Paths, Research Assistant all checked off
+- Added AI Assistant section with architecture diagram, capabilities table, context data sources, and Ollama model mapping
+- Updated Project Structure to include all 13 modules (ai, reading-lists, instructor-followers, dashboard, etc.)
+- Updated Endpoints table (Auth: 4→10, added Reading Lists, Instructor Followers, Dashboard, AI modules)
+- Added AI chat example request
+- Updated Features lists (reading list discovery, AI features for all roles)
+- Updated Permissions table (added AI Chat, Follow Instructors, Discover Reading Lists, Moderate Reading Lists)
+- Added Google OAuth, Ollama to env variables section
+- Added Ollama to tech stack
+- Updated Database schema section (interests, subjectTags, BorrowPolicy, ReadingListItem, InstructorFollower)
+
+**Files:** `README.md`
+
+**Commands:** `npx nest build` ✅, `npx next build` ✅
+
+**Result:** README now accurately reflects the full implemented system. Committed as `9794f7c`.
+
+---
+
 ## 2026-03-09 — Phase 3.5: Learning Path + Research Assistant Services
 
 **Goal:** Add personalized learning path generation and research assistant as new AI chat intents.

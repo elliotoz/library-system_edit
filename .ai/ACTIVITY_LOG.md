@@ -800,3 +800,45 @@ Files / .ai/ACTIVITY_LOG.md
 Commands run / none
 Result / Single-repo workflow defined for cross-OS practice (Kali primary, Windows pull-only)
 Next / Remove nested clone folder on Windows, then use ff-only pull routine before testing
+Goal / Identify next development phase after latest sync and AI slices
+Changes / No code edits; confirmed current roadmap state and selected next executable slice
+Files / .ai/ACTIVITY_LOG.md
+Commands run / none
+Result / Next phase confirmed as Phase 3 completion, starting with AI Slice 5 embeddings-ready abstraction
+Next / Implement Slice 5 backend extraction, verify API/Web builds, then update README checklist
+Goal / Verify AI Slice 5 refactor commit and set next step
+Changes / No code edits; verified commit 032c30c contains semantic-search abstraction extraction and shared type consolidation across AI services
+Files / .ai/ACTIVITY_LOG.md
+Commands run / git show --name-only --oneline 032c30c ; git show --stat 032c30c
+Result / Commit scope matches intended embeddings-ready refactor with no immediate behavior-contract red flags
+Next / Run API/Web builds + targeted semantic search smoke tests, then update README roadmap for Slice 5 completion
+Goal / Confirm post-Slice5 validation and docs sync completion
+Changes / No code edits by me; user confirmed schema contract validation across AI services, API/Web builds passing, and README Phase 3 update committed as eb42e1a
+Files / .ai/ACTIVITY_LOG.md
+Commands run / none
+Result / Slice 5 verification and roadmap doc update completed
+Next / Push latest commits and start next Phase 3 slice: Research Assistant + Learning Path behavior hardening
+Goal / Confirm Phase 3 hardening slice completion for learning path + research assistant
+Changes / No code edits by me; verified commit e00f652 reported and captured completed hardening scope (role-aware behavior, topic bounds, borrow-history enrichment, guardrails)
+Files / .ai/ACTIVITY_LOG.md
+Commands run / git show --name-only --oneline e00f652
+Result / Phase 3 hardening slice confirmed complete with schema unchanged
+Next / Push latest commits and start final Phase 3 slice (natural language search UX + evaluation checklist) before Phase 4 production readiness
+Goal / Catch up from latest Claude hardening commit and define next roadmap phase
+Changes / No code edits; reviewed recent commits and README roadmap state. Confirmed Phase 3 completion and prepared Phase 4 production-readiness execution plan.
+Files / .ai/ACTIVITY_LOG.md
+Commands run / git log --oneline -8 ; git status -sb ; tail .ai/CLAUDE_LOG.md ; rg roadmap in README
+Result / Next phase is Phase 4 (Production Readiness)
+Next / Start Phase 4 Slice 1: Email service integration (SMTP) for verification/reset/alerts
+Goal / Advance from Phase 4 Slice 1 completion to next production-readiness step
+Changes / No code edits; selected next slice and prepared execution prompt
+Files / .ai/ACTIVITY_LOG.md
+Commands run / none
+Result / Next step set: Phase 4 Slice 2 (Error Logging & Monitoring baseline)
+Next / Implement structured error handling, request correlation IDs, and health/readiness observability
+Goal / Check all commits and push latest changes to GitHub
+Changes / No code edits; audited branch/commit state, pushed main to origin, and verified local/remote SHA sync
+Files / .ai/ACTIVITY_LOG.md
+Commands run / git status -sb ; git log --oneline --decorate -15 ; git remote -v ; git push origin main ; git rev-parse main origin/main
+Result / Push successful: origin/main updated from e00f652 to 7d0ccfe and local main matches remote
+Next / Decide whether to commit remaining local changes (.ai logs and apps/api/src/common/) or keep them as in-progress work

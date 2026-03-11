@@ -1,5 +1,7 @@
-import { Module } from "@nestjs/common";
+import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
+import { RequestLoggerMiddleware } from "./common/middleware/request-logger.middleware";
 import { PrismaModule } from "./prisma/prisma.module";
 import { MailModule } from "./mail/mail.module";
 import { AuthModule } from "./auth/auth.module";
@@ -35,4 +37,10 @@ import { AiModule } from "./ai/ai.module";
     AiModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(RequestIdMiddleware, RequestLoggerMiddleware)
+      .forRoutes("*");
+  }
+}

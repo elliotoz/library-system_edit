@@ -669,6 +669,46 @@ When Ollama is not available, all AI features gracefully fall back to rule-based
 
 ---
 
+## 🔍 Logging & Troubleshooting
+
+The API includes structured logging and error handling out of the box.
+
+### Request Correlation
+
+Every response includes an `x-request-id` header. If a client sends `x-request-id`, that value is preserved; otherwise a UUID is generated. Include this ID when reporting issues.
+
+### Request Logging
+
+All requests (except `/uploads/` static files) are logged with method, path, status, duration, and request ID:
+
+```
+[RequestLogger] GET /api/books 200 12ms [req=abc-123]
+```
+
+Disable per-request logging by setting `ENABLE_REQUEST_LOGGING=false` in `.env`.
+
+### Error Responses
+
+All errors return a consistent JSON shape with `requestId` and `timestamp`:
+
+```json
+{
+  "statusCode": 500,
+  "message": "Internal server error",
+  "error": "Internal Server Error",
+  "requestId": "abc-123",
+  "timestamp": "2026-03-10T12:00:00.000Z"
+}
+```
+
+Stack traces are logged server-side only and never exposed to clients.
+
+### Log Levels
+
+Set `LOG_LEVEL` in `.env` to control verbosity: `error`, `warn`, `log` (default), `debug`, or `verbose`.
+
+---
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please follow these steps:
