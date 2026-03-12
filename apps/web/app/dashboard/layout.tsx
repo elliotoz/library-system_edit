@@ -214,11 +214,6 @@ export default function DashboardLayout({
               href: '/dashboard/admin/policies',
               icon: ShieldCheck,
             },
-            {
-              label: 'System Settings',
-              href: '/dashboard/admin/settings',
-              icon: Settings,
-            },
           ]
         : [];
 
@@ -381,46 +376,50 @@ export default function DashboardLayout({
         {/* Sidebar */}
         <aside
           className={cn(
-            'fixed top-16 z-40 h-full w-64 bg-white p-4 dark:bg-gray-800',
+            'fixed top-16 z-40 flex h-[calc(100vh-4rem)] w-64 flex-col bg-white dark:bg-gray-800',
             sidebarOpen ? 'left-0' : '-left-64',
             'lg:left-0'
           )}
         >
-          {[
-            navItems.common,
-            navItems.instructor,
-            navItems.account,
-            navItems.admin,
-          ].map(
-            (group, i) =>
-              group.length > 0 && (
-                <div key={i} className="mb-6 space-y-1">
-                  {group.map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm',
-                        isActive(item.href)
-                          ? 'bg-primary-100 text-primary-700'
-                          : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                      )}
-                    >
-                      <item.icon className="h-5 w-5" />
-                      {item.label}
-                    </Link>
-                  ))}
-                </div>
-              )
-          )}
+          <nav className="flex-1 space-y-0 overflow-y-auto p-4">
+            {[
+              navItems.common,
+              navItems.instructor,
+              navItems.account,
+              navItems.admin,
+            ].map(
+              (group, i) =>
+                group.length > 0 && (
+                  <div key={i} className="mb-6 space-y-1">
+                    {group.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          'flex items-center gap-3 rounded-lg px-3 py-2 text-sm',
+                          isActive(item.href)
+                            ? 'bg-primary-100 text-primary-700'
+                            : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                        )}
+                      >
+                        <item.icon className="h-5 w-5" />
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                )
+            )}
+          </nav>
 
-          <button
-            onClick={logout}
-            className="mt-auto flex w-full items-center gap-3 rounded-lg px-3 py-2 text-red-600 hover:bg-red-50"
-          >
-            <LogOut className="h-5 w-5" />
-            Logout
-          </button>
+          <div className="border-t border-gray-200 p-4 dark:border-gray-700">
+            <button
+              onClick={logout}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-red-600 hover:bg-red-50"
+            >
+              <LogOut className="h-5 w-5" />
+              Logout
+            </button>
+          </div>
         </aside>
 
         <main className="pt-16 lg:ml-64">
