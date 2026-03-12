@@ -4,6 +4,27 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-12 — Phase 4 Security Hardening Slice 1
+
+**Goal**: Add baseline production API hardening — Helmet, CORS allowlist, rate limiting on auth + AI endpoints.
+
+**Changes**:
+- Installed `helmet` and `@nestjs/throttler`
+- Updated `apps/api/src/main.ts` — added Helmet middleware (CSP disabled, COEP disabled for Swagger), trimmed CORS origins
+- Updated `apps/api/src/app.module.ts` — registered `ThrottlerModule.forRootAsync()` with env-driven TTL/limit
+- Updated `apps/api/src/auth/auth.controller.ts` — `@Throttle` + `ThrottlerGuard` on login, register, forgot-password (5 req/min)
+- Updated `apps/api/src/ai/ai.controller.ts` — `@Throttle` + `ThrottlerGuard` on chat (15 req/min)
+- Updated `apps/api/.env.example` — added `THROTTLE_TTL`, `THROTTLE_LIMIT`, `THROTTLE_AUTH_LIMIT`, `THROTTLE_AI_LIMIT`
+- Updated `README.md` — Security Hardening section, roadmap item marked complete
+
+**Files**: `main.ts`, `app.module.ts`, `auth.controller.ts`, `ai.controller.ts`, `.env.example`, `README.md`, `package.json`, `package-lock.json`
+
+**Commands**: `npm install helmet @nestjs/throttler` ✅, `npx nest build` (pending), `npx next build` (pending)
+
+**Result**: Pending verification.
+
+---
+
 ## 2026-03-12 — Phase 4 Slice 3: Cloud File Storage (AWS S3)
 
 **Goal**: Add S3 upload support with automatic local-disk fallback, wired into existing avatar and material upload flows.

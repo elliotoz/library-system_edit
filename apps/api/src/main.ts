@@ -8,6 +8,8 @@ import { GlobalExceptionFilter } from "./common/filters/global-exception.filter"
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const cookieParser = require("cookie-parser");
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const helmet = require("helmet");
 
 async function bootstrap() {
   const logLevel = process.env.LOG_LEVEL || "log";
@@ -23,11 +25,20 @@ async function bootstrap() {
     logger: enabledLevels,
   });
 
+  app.use(helmet({
+    contentSecurityPolicy: false, // CSP managed by Next.js frontend
+    crossOriginEmbedderPolicy: false, // allow Swagger UI assets
+  }));
+
   app.use(cookieParser());
 
-  // Enable CORS for frontend
+  // Enable CORS for frontend — env-driven allowlist
+  const corsOrigins = (process.env.CORS_ORIGIN || "http://localhost:3000")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
   app.enableCors({
-    origin: (process.env.CORS_ORIGIN || "http://localhost:3000").split(","),
+    origin: corsOrigins,
     credentials: true,
   });
 

@@ -657,7 +657,7 @@ When Ollama is not available, all AI features gracefully fall back to rule-based
 - [x] Email Service (SMTP with nodemailer, feature-flagged fallback)
 - [x] Cloud File Storage (AWS S3 with local fallback)
 - [ ] Error Logging & Monitoring
-- [ ] Security Hardening
+- [x] Security Hardening (Helmet, CORS allowlist, rate limiting)
 - [ ] Performance Optimization
 
 ### 📋 Phase 5: Admin Enhancements (Planned)
@@ -666,6 +666,39 @@ When Ollama is not available, all AI features gracefully fall back to rule-based
 - [ ] Configurable Borrow Policies
 - [ ] Fine Payment Tracking
 - [ ] Report Generation (PDF/Excel)
+
+---
+
+## 🔒 Security Hardening
+
+### Helmet
+
+All responses include secure HTTP headers (X-Content-Type-Options, X-Frame-Options, Strict-Transport-Security, etc.) via [Helmet](https://helmetjs.github.io/). CSP is disabled (managed by Next.js frontend).
+
+### CORS
+
+Origins are controlled via the `CORS_ORIGIN` env var (comma-separated). Only listed origins can make credentialed requests:
+
+```env
+CORS_ORIGIN="http://localhost:3000,https://library.uskudar.edu.tr"
+```
+
+### Rate Limiting
+
+Powered by `@nestjs/throttler`. Global default: 20 requests per 60-second window.
+
+Stricter limits on sensitive endpoints:
+- **Auth** (`/auth/login`, `/auth/register`, `/auth/forgot-password`): 5 req/min
+- **AI chat** (`/ai/chat`): 15 req/min
+
+Exceeding the limit returns `429 Too Many Requests`. Tune via env vars:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `THROTTLE_TTL` | `60` | Window in seconds |
+| `THROTTLE_LIMIT` | `20` | Global max requests per window |
+| `THROTTLE_AUTH_LIMIT` | `5` | Auth endpoint limit |
+| `THROTTLE_AI_LIMIT` | `15` | AI chat limit |
 
 ---
 

@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
 import { RequestLoggerMiddleware } from "./common/middleware/request-logger.middleware";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -22,6 +23,18 @@ import { StorageModule } from "./storage/storage.module";
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ".env",
+    }),
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        throttlers: [
+          {
+            name: "default",
+            ttl: parseInt(config.get("THROTTLE_TTL", "60"), 10) * 1000,
+            limit: parseInt(config.get("THROTTLE_LIMIT", "20"), 10),
+          },
+        ],
+      }),
     }),
     StorageModule,
     PrismaModule,
