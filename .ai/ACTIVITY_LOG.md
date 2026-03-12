@@ -890,3 +890,39 @@ Files / .ai/ACTIVITY_LOG.md
 Commands run / git status -sb ; git log --oneline --decorate -10 ; rg phase items in README ; rg borrowPolicy references in api/web
 Result / Branch Management is completed (ef4a016). Next pending roadmap item is Configurable Borrow Policies.
 Next / Implement Phase 5 Slice 2: Admin borrow policy management (API + admin UI)
+Goal / Diagnose admin dashboard overflow and unreachable logout, and clarify System Settings menu item
+Changes / No code edits; inspected dashboard layout and admin routes to identify root cause and route availability
+Files / .ai/ACTIVITY_LOG.md
+Commands run / rg for settings/logout/overflow ; sed apps/web/app/dashboard/layout.tsx ; rg --files apps/web/app/dashboard/admin
+Result / Sidebar is fixed with h-full and no vertical overflow handling; logout button is not pinned because container is not flex-col. "System Settings" nav points to /dashboard/admin/settings but that route/page does not exist.
+Next / Apply minimal UI fix: make sidebar scrollable + logout always reachable, and replace dead System Settings link with a real page or remove link
+Goal / Scan full project progress and identify exact remaining roadmap items
+Changes / No code edits; audited git history, README roadmap, and feature implementation footprint across API/web modules
+Files / .ai/ACTIVITY_LOG.md
+Commands run / git status -sb ; git log --oneline --decorate -20 ; rg roadmap/checklist in README ; rg for fine/payment/report features in api/web
+Result / Phases 1-4 are effectively complete; Phase 5 has 2 items remaining: Fine Payment Tracking and Report Generation (PDF/Excel). Also found admin quick action link to /dashboard/admin/reports without corresponding page.
+Next / Implement Phase 5 Slice 3: Fine Payment Tracking (data model + endpoints + admin UI), then Slice 4 report exports
+Goal / Verify post-implementation state after Fine Payment Tracking completion
+Changes / No code edits; validated latest commit and README checklist status
+Files / .ai/ACTIVITY_LOG.md
+Commands run / git status -sb ; git log --oneline --decorate -8 ; rg -n "Phase 5|Fine Payment Tracking|Report Generation" README.md
+Result / Fine Payment Tracking is complete (85d74c1) and the only remaining roadmap item is Report Generation (PDF/Excel)
+Next / Implement Phase 5 Slice 4: Admin report generation with PDF/Excel exports
+Goal / Verify completion after Report Generation implementation
+Changes / No code edits; confirmed latest commit and roadmap checklist state
+Files / .ai/ACTIVITY_LOG.md
+Commands run / git status -sb ; git log --oneline --decorate -10 ; rg -n "Phase 5|Report Generation|\- \[ \]" README.md
+Result / Report Generation completed in commit 9afc9f3; roadmap checklist items appear complete. Local branch ahead by 7 commits with uncommitted package.json and AI logs.
+Next / Commit remaining local file changes if intentional, mark Phase 5 heading as completed if desired, then push main to origin
+Goal / Push all committed changes on main to GitHub
+Changes / No code edits; pushed local commits to origin/main and verified SHA sync
+Files / .ai/ACTIVITY_LOG.md
+Commands run / git status -sb ; git log --oneline --decorate -8 ; git push origin main ; git rev-parse main origin/main
+Result / Push successful: origin/main advanced from a27828b to 9afc9f3, local and remote SHAs match
+Next / Continue remaining feature fixes with uncommitted local files preserved
+Goal / Commit and push pending local workflow docs and package config updates for cross-OS continuity
+Changes / Staged and committed .ai logs plus package.json dependency updates so Windows environment has current agent workflow context and report-export libs
+Files / .ai/ACTIVITY_LOG.md, .ai/CLAUDE_LOG.md, package.json
+Commands run / git status -sb ; git diff --stat ; git add .ai/ACTIVITY_LOG.md .ai/CLAUDE_LOG.md package.json ; git commit ; git push origin main
+Result / Pending local docs/config updates committed and pushed
+Next / Pull latest main on Windows and continue feature testing/presentation prep

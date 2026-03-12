@@ -37,6 +37,11 @@
   "author": "Üsküdar University",
   "license": "MIT",
   "devDependencies": {
+    "@types/pdfkit": "^0.17.5",
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "pdfkit": "^0.17.2"
   }
 }

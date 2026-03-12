@@ -4,6 +4,63 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-12 — Phase 5 Slice 4: Report Generation (PDF/Excel)
+
+**Goal**: Admin can generate/export operational reports in PDF and Excel.
+
+**Changes**:
+- Installed `pdfkit`, `exceljs`, `@types/pdfkit`
+- `apps/api/src/reports/`: New module — service (aggregate queries, top books, users by role), controller (GET /reports/summary, GET /reports/export?format=pdf|excel)
+- PDF: pdfkit text/table summary with metrics, top books, users by role
+- Excel: exceljs workbook with Summary, Top Books, Users by Role sheets
+- `apps/api/src/app.module.ts`: Registered ReportsModule
+- `apps/web/lib/api.ts`: Added `reportsApi` (getSummary, exportUrl helper)
+- `apps/web/app/dashboard/admin/reports/page.tsx`: Date range picker, generate summary, export PDF/Excel buttons, summary cards + top books table + users by role
+- `apps/web/app/dashboard/layout.tsx`: Added "Reports" nav item with FileDown icon
+- `README.md`: Marked Report Generation as complete, added endpoint docs
+
+**Verification**: `npx nest build` ✓, `npx next build` ✓
+
+**Note**: Build error on first attempt — Book model uses `authors` (array) not `author`. Fixed to `.authors.join(', ')`.
+
+---
+
+## 2026-03-12 — Phase 5 Slice 3: Fine Payment Tracking
+
+**Goal**: Track overdue fines and allow admin to mark paid/waived.
+
+**Changes**:
+- `prisma/schema.prisma`: Added `FineStatus` enum, `FinePayment` model with relations to Borrow (unique), User, and admin paidBy
+- Migration: `add_fine_payment_tracking`
+- `apps/api/src/fine-payments/`: New module — controller (GET list, GET totals, GET :id, PATCH :id/pay, PATCH :id/waive), service, DTO
+- `apps/api/src/borrows/borrows.service.ts`: `returnBook()` now creates/upserts a PENDING FinePayment when fine > 0
+- `apps/api/src/app.module.ts`: Registered FinePaymentsModule
+- `apps/web/lib/api.ts`: Added `finePaymentsApi` client
+- `apps/web/app/dashboard/admin/fines/page.tsx`: Admin page with totals cards, status filters, paginated table, pay/waive actions
+- `apps/web/app/dashboard/layout.tsx`: Added "Fine Payments" nav item with DollarSign icon
+- `README.md`: Marked Fine Payment Tracking as complete, added endpoint summary
+
+**Verification**: `prisma migrate dev` ✓, `npx nest build` ✓, `npx next build` ✓
+
+---
+
+## 2026-03-12 — Fix admin sidebar overflow/logout and dead System Settings link
+
+**Goal**: Sidebar nav overflows on short viewports, logout unreachable; System Settings link is a 404.
+
+**Changes**:
+- `apps/web/app/dashboard/layout.tsx`:
+  - Aside: `h-full p-4` → `h-[calc(100vh-4rem)] flex flex-col`, padding moved to inner elements
+  - Nav groups wrapped in `<nav className="flex-1 overflow-y-auto p-4">`
+  - Logout button moved to separate `<div>` with `border-t` outside scroll area
+  - Removed "System Settings" nav item (no page exists at `/dashboard/admin/settings`)
+
+**Verification**: `npx next build` — passes clean.
+
+**Result**: Sidebar scrolls on short viewports, logout always visible at bottom, no 404 link.
+
+---
+
 ## 2026-03-12 — Phase 5 Slice 2: Configurable Borrow Policies
 
 **Goal**: Allow ADMIN to view and update role-based borrow policies from admin dashboard.
