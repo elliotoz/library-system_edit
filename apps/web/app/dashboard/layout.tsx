@@ -24,6 +24,7 @@ import {
   BarChart3,
   ListChecks,
   Building2,
+  ShieldCheck,
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import { cn, getInitials } from '@/lib/utils';
@@ -207,6 +208,11 @@ export default function DashboardLayout({
               label: 'Manage Branches',
               href: '/dashboard/admin/branches',
               icon: Building2,
+            },
+            {
+              label: 'Borrow Policies',
+              href: '/dashboard/admin/policies',
+              icon: ShieldCheck,
             },
             {
               label: 'System Settings',

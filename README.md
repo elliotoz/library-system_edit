@@ -663,7 +663,7 @@ When Ollama is not available, all AI features gracefully fall back to rule-based
 ### 📋 Phase 5: Admin Enhancements (In Progress)
 
 - [x] Branch Management (CRUD + activate/deactivate)
-- [ ] Configurable Borrow Policies
+- [x] Configurable Borrow Policies (admin UI for role-based limits)
 - [ ] Fine Payment Tracking
 - [ ] Report Generation (PDF/Excel)
 

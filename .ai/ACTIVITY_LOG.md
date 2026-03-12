@@ -884,3 +884,9 @@ Files / .ai/ACTIVITY_LOG.md
 Commands run / curl -i http://127.0.0.1:3001/health/live ; curl -i http://127.0.0.1:3001/health/ready
 Result / Both endpoints returned 200 with expected payloads (live=ok, ready with db=up and ollama=skipped)
 Next / Move to Phase 5 Slice 1: Branch Management (admin CRUD + UI)
+Goal / Confirm post-branch-management state and select next implementation slice
+Changes / No code edits; verified roadmap progression, commit history, and existing borrow-policy usage points
+Files / .ai/ACTIVITY_LOG.md
+Commands run / git status -sb ; git log --oneline --decorate -10 ; rg phase items in README ; rg borrowPolicy references in api/web
+Result / Branch Management is completed (ef4a016). Next pending roadmap item is Configurable Borrow Policies.
+Next / Implement Phase 5 Slice 2: Admin borrow policy management (API + admin UI)

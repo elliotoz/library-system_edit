@@ -4,6 +4,26 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-12 — Phase 5 Slice 2: Configurable Borrow Policies
+
+**Goal**: Allow ADMIN to view and update role-based borrow policies from admin dashboard.
+
+**Changes**:
+- Created `apps/api/src/borrow-policies/` — module, controller, service, DTO
+  - `GET /borrow-policies` — list all policies
+  - `PATCH /borrow-policies/:role` — update by role with validation (min/max limits)
+- Updated `apps/api/src/app.module.ts` — imported BorrowPoliciesModule
+- Created `apps/web/app/dashboard/admin/policies/page.tsx` — card grid per role with edit modal
+- Updated `apps/web/lib/api.ts` — added `borrowPoliciesApi`
+- Updated `apps/web/app/dashboard/layout.tsx` — added "Borrow Policies" nav with ShieldCheck icon
+- Updated `README.md` — marked Configurable Borrow Policies complete
+
+**Files**: `update-policy.dto.ts`, `borrow-policies.service.ts`, `borrow-policies.controller.ts`, `borrow-policies.module.ts`, `app.module.ts`, `policies/page.tsx`, `api.ts`, `layout.tsx`, `README.md`
+
+**Commands**: `npx nest build` (pending), `npx next build` (pending)
+
+---
+
 ## 2026-03-12 — Phase 5 Slice 1: Admin Branch Management
 
 **Goal**: Allow ADMIN to manage library branches (CRUD + activate/deactivate) from admin dashboard.

@@ -207,6 +207,21 @@ export const branchesApi = {
     (await api.patch(`/branches/${id}/deactivate`)).data,
 };
 
+// Borrow Policies API (Admin)
+export const borrowPoliciesApi = {
+  getAll: async () => (await api.get('/borrow-policies')).data,
+
+  update: async (
+    role: string,
+    data: {
+      maxActiveBorrows?: number;
+      maxBorrowDays?: number;
+      maxExtensions?: number;
+      extensionDays?: number;
+    },
+  ) => (await api.patch(`/borrow-policies/${role}`, data)).data,
+};
+
 // AI Assistant API
 export const aiApi = {
   chat: async (data: { message: string }): Promise<{ reply: string; modelUsed: string; sources?: string[] }> =>
