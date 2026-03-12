@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { BorrowStatus, BookCopyStatus, Role } from "@prisma/client";
+import { BorrowStatus, BookCopyStatus, FineStatus, Role } from "@prisma/client";
 import { NotificationsService } from "../notifications/notifications.service";
 
 // Fine rate per day (in your currency)
@@ -263,8 +263,8 @@ export class BorrowsService {
       : 0;
     const fine = overdueDays * FINE_RATE_PER_DAY;
 
-    // Use transaction to update both records
-    const [updatedBorrow] = await this.prisma.$transaction([
+    // Use transaction to update borrow, book copy, and create fine if overdue
+    const txOps: any[] = [
       this.prisma.borrow.update({
         where: { id: borrowId },
         data: {
@@ -282,7 +282,27 @@ export class BorrowsService {
         where: { id: borrow.bookCopyId },
         data: { status: BookCopyStatus.AVAILABLE },
       }),
-    ]);
+    ];
+
+    if (fine > 0) {
+      txOps.push(
+        this.prisma.finePayment.upsert({
+          where: { borrowId },
+          create: {
+            borrowId,
+            userId: borrow.user.id,
+            amount: fine,
+            status: FineStatus.PENDING,
+          },
+          update: {
+            amount: fine,
+            status: FineStatus.PENDING,
+          },
+        }),
+      );
+    }
+
+    const [updatedBorrow] = await this.prisma.$transaction(txOps);
 
     // Send notification to user
     await this.notificationsService.create({

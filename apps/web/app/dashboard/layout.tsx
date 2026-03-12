@@ -25,6 +25,7 @@ import {
   ListChecks,
   Building2,
   ShieldCheck,
+  DollarSign,
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import { cn, getInitials } from '@/lib/utils';
@@ -213,6 +214,11 @@ export default function DashboardLayout({
               label: 'Borrow Policies',
               href: '/dashboard/admin/policies',
               icon: ShieldCheck,
+            },
+            {
+              label: 'Fine Payments',
+              href: '/dashboard/admin/fines',
+              icon: DollarSign,
             },
           ]
         : [];

@@ -413,6 +413,9 @@ All protected endpoints require a JWT token sent via HttpOnly cookie.
 | **Dashboard**            | 3         | Statistics, analytics                          |
 | **AI**                   | 3         | Chat, update interests, get context            |
 | **Notifications**        | 4         | List, mark read                                |
+| **Branches**             | 5         | CRUD, activate/deactivate (admin)              |
+| **Borrow Policies**      | 2         | List, update per role (admin)                  |
+| **Fine Payments**        | 5         | List, totals, detail, mark paid, waive (admin) |
 
 ### Example Requests
 
@@ -664,7 +667,7 @@ When Ollama is not available, all AI features gracefully fall back to rule-based
 
 - [x] Branch Management (CRUD + activate/deactivate)
 - [x] Configurable Borrow Policies (admin UI for role-based limits)
-- [ ] Fine Payment Tracking
+- [x] Fine Payment Tracking (auto-create on overdue return, admin pay/waive)
 - [ ] Report Generation (PDF/Excel)
 
 ---

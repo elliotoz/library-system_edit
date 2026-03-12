@@ -222,6 +222,24 @@ export const borrowPoliciesApi = {
   ) => (await api.patch(`/borrow-policies/${role}`, data)).data,
 };
 
+// Fine Payments API (Admin)
+export const finePaymentsApi = {
+  getAll: async (params?: {
+    status?: string;
+    userId?: string;
+    page?: number;
+    pageSize?: number;
+  }) => (await api.get('/fine-payments', { params })).data,
+
+  getTotals: async () => (await api.get('/fine-payments/totals')).data,
+
+  markPaid: async (id: string) =>
+    (await api.patch(`/fine-payments/${id}/pay`)).data,
+
+  waive: async (id: string, note?: string) =>
+    (await api.patch(`/fine-payments/${id}/waive`, { note })).data,
+};
+
 // AI Assistant API
 export const aiApi = {
   chat: async (data: { message: string }): Promise<{ reply: string; modelUsed: string; sources?: string[] }> =>

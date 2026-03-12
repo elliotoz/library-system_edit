@@ -73,6 +73,12 @@ enum ReadingListStatus {
   ARCHIVED
 }
 
+enum FineStatus {
+  PENDING
+  PAID
+  WAIVED
+}
+
 enum NotificationType {
   RESERVATION_CREATED
   RESERVATION_APPROVED
@@ -141,6 +147,8 @@ model User {
   readingLists      ReadingList[]
   following         InstructorFollower[] @relation("Follower")
   followers         InstructorFollower[] @relation("Instructor")
+  finePayments      FinePayment[]
+  processedFines    FinePayment[]        @relation("FineProcessor")
 
   @@map("users")
 }
@@ -372,6 +380,9 @@ model Borrow {
   // Notes
   notes String?
 
+  // Fine
+  finePayment FinePayment?
+
   // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -527,4 +538,38 @@ model InstructorFollower {
   @@index([followerId])
   @@index([instructorId])
   @@map("instructor_followers")
+}
+
+// ============================================
+// FINE PAYMENTS
+// ============================================
+
+model FinePayment {
+  id       String     @id @default(cuid())
+  status   FineStatus @default(PENDING)
+
+  // Linked borrow (one fine per borrow)
+  borrowId String @unique
+  borrow   Borrow @relation(fields: [borrowId], references: [id])
+
+  // User who owes the fine
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  // Amount in local currency
+  amount Decimal @db.Decimal(10, 2)
+
+  // Payment / waiver details
+  paidAt   DateTime?
+  paidById String?
+  paidBy   User?     @relation("FineProcessor", fields: [paidById], references: [id])
+  note     String?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([status])
+  @@map("fine_payments")
 }
