@@ -4,6 +4,25 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-12 — Phase 4 Monitoring Slice: Health Endpoints
+
+**Goal**: Add liveness and readiness health endpoints to close the Error Logging & Monitoring item.
+
+**Changes**:
+- Created `apps/api/src/health/health.controller.ts` — `GET /health/live` (200 always), `GET /health/ready` (DB + optional Ollama checks, 200/503)
+- Created `apps/api/src/health/health.module.ts` — imports PrismaModule
+- Updated `apps/api/src/app.module.ts` — imported HealthModule
+- Updated `apps/api/.env.example` — added `MONITOR_OLLAMA`
+- Updated `README.md` — Health Endpoints section, marked roadmap item complete
+
+**Files**: `health.controller.ts`, `health.module.ts`, `app.module.ts`, `.env.example`, `README.md`
+
+**Commands**: `npx nest build` ✅, `npx next build` ✅
+
+**Result**: Both builds pass.
+
+---
+
 ## 2026-03-12 — Phase 4 Performance Optimization Slice 1
 
 **Goal**: Add pagination, query shaping, and compound indexes to reduce unbounded query risk and improve response efficiency.

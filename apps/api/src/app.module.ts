@@ -17,6 +17,7 @@ import { ReadingListsModule } from "./reading-lists/reading-lists.module";
 import { InstructorFollowersModule } from "./instructor-followers/instructor-followers.module";
 import { AiModule } from "./ai/ai.module";
 import { StorageModule } from "./storage/storage.module";
+import { HealthModule } from "./health/health.module";
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { StorageModule } from "./storage/storage.module";
     ReadingListsModule,
     InstructorFollowersModule,
     AiModule,
+    HealthModule,
   ],
 })
 export class AppModule implements NestModule {

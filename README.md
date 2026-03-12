@@ -656,7 +656,7 @@ When Ollama is not available, all AI features gracefully fall back to rule-based
 
 - [x] Email Service (SMTP with nodemailer, feature-flagged fallback)
 - [x] Cloud File Storage (AWS S3 with local fallback)
-- [ ] Error Logging & Monitoring
+- [x] Error Logging & Monitoring (structured logging, correlation IDs, health endpoints)
 - [x] Security Hardening (Helmet, CORS allowlist, rate limiting)
 - [x] Performance Optimization (query shaping, pagination, compound indexes)
 
@@ -746,6 +746,30 @@ AWS_S3_PUBLIC_BASE_URL=""   # optional override
 ### Local Fallback
 
 When `STORAGE_PROVIDER` is `local` (the default) or S3 credentials are missing, uploads are written to `apps/api/uploads/` and served as static assets — no AWS account needed for development.
+
+---
+
+## 🩺 Health Endpoints
+
+No authentication required. Designed for load balancers and container orchestrators.
+
+| Endpoint | Purpose | Success | Failure |
+|----------|---------|---------|---------|
+| `GET /health/live` | Liveness probe — process is running | `200` | — |
+| `GET /health/ready` | Readiness probe — dependencies healthy | `200` | `503` |
+
+**Readiness checks:**
+- **db**: Runs `SELECT 1` against PostgreSQL
+- **ollama**: Pings Ollama API (only when `MONITOR_OLLAMA=true`)
+
+Example response:
+```json
+{
+  "status": "ready",
+  "checks": { "db": "up", "ollama": "skipped" },
+  "timestamp": "2026-03-12T10:00:00.000Z"
+}
+```
 
 ---
 
