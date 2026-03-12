@@ -21,6 +21,7 @@ import { HealthModule } from "./health/health.module";
 import { BranchesModule } from "./branches/branches.module";
 import { BorrowPoliciesModule } from "./borrow-policies/borrow-policies.module";
 import { FinePaymentsModule } from "./fine-payments/fine-payments.module";
+import { ReportsModule } from "./reports/reports.module";
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { FinePaymentsModule } from "./fine-payments/fine-payments.module";
     BranchesModule,
     BorrowPoliciesModule,
     FinePaymentsModule,
+    ReportsModule,
   ],
 })
 export class AppModule implements NestModule {

@@ -26,6 +26,7 @@ import {
   Building2,
   ShieldCheck,
   DollarSign,
+  FileDown,
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import { cn, getInitials } from '@/lib/utils';
@@ -219,6 +220,11 @@ export default function DashboardLayout({
               label: 'Fine Payments',
               href: '/dashboard/admin/fines',
               icon: DollarSign,
+            },
+            {
+              label: 'Reports',
+              href: '/dashboard/admin/reports',
+              icon: FileDown,
             },
           ]
         : [];

@@ -240,6 +240,15 @@ export const finePaymentsApi = {
     (await api.patch(`/fine-payments/${id}/waive`, { note })).data,
 };
 
+// Reports API (Admin)
+export const reportsApi = {
+  getSummary: async (from: string, to: string) =>
+    (await api.get('/reports/summary', { params: { from, to } })).data,
+
+  exportUrl: (format: 'pdf' | 'excel', from: string, to: string) =>
+    `${API_URL}/reports/export?format=${format}&from=${from}&to=${to}`,
+};
+
 // AI Assistant API
 export const aiApi = {
   chat: async (data: { message: string }): Promise<{ reply: string; modelUsed: string; sources?: string[] }> =>
