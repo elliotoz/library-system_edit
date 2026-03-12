@@ -15,6 +15,7 @@ import { MaterialsModule } from "./materials/materials.module";
 import { ReadingListsModule } from "./reading-lists/reading-lists.module";
 import { InstructorFollowersModule } from "./instructor-followers/instructor-followers.module";
 import { AiModule } from "./ai/ai.module";
+import { StorageModule } from "./storage/storage.module";
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { AiModule } from "./ai/ai.module";
       isGlobal: true,
       envFilePath: ".env",
     }),
+    StorageModule,
     PrismaModule,
     MailModule,
     AuthModule,

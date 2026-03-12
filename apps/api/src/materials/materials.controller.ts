@@ -23,6 +23,7 @@ import { diskStorage } from "multer";
 import { extname } from "path";
 import { randomUUID } from "crypto";
 import { MaterialsService } from "./materials.service";
+import { StorageService } from "../storage/storage.service";
 import {
   CreateMaterialDto,
   UpdateMaterialDto,
@@ -52,7 +53,10 @@ const storage = diskStorage({
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class MaterialsController {
-  constructor(private readonly materialsService: MaterialsService) {}
+  constructor(
+    private readonly materialsService: MaterialsService,
+    private readonly storageService: StorageService,
+  ) {}
 
   // Public: Get all published materials
   @Get()
@@ -151,8 +155,10 @@ export class MaterialsController {
       return { error: "No file uploaded" };
     }
 
+    const fileUrl = await this.storageService.uploadFile(file, "materials");
+
     return {
-      fileUrl: `/uploads/materials/${file.filename}`,
+      fileUrl,
       fileName: file.originalname,
       fileSize: file.size,
     };

@@ -4,6 +4,30 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-12 — Phase 4 Slice 3: Cloud File Storage (AWS S3)
+
+**Goal**: Add S3 upload support with automatic local-disk fallback, wired into existing avatar and material upload flows.
+
+**Changes**:
+- Installed `@aws-sdk/client-s3` dependency
+- Created `apps/api/src/storage/storage.service.ts` — S3/local abstraction with `uploadImage()` and `uploadFile()` methods; reads `STORAGE_PROVIDER` env to decide backend
+- Created `apps/api/src/storage/storage.module.ts` — global module exporting `StorageService`
+- Updated `apps/api/src/app.module.ts` — imported `StorageModule`
+- Updated `apps/api/src/users/users.controller.ts` — injected `StorageService`, replaced hardcoded avatar URL with `storageService.uploadImage()`
+- Updated `apps/api/src/materials/materials.controller.ts` — injected `StorageService`, replaced hardcoded file URL with `storageService.uploadFile()`
+- Updated `apps/api/.env.example` — added `STORAGE_PROVIDER`, AWS S3 env vars
+- Updated `README.md` — added Cloud Storage section, marked roadmap item complete
+
+**Files**: `storage.service.ts`, `storage.module.ts`, `app.module.ts`, `users.controller.ts`, `materials.controller.ts`, `.env.example`, `README.md`
+
+**Commands**: `npm install @aws-sdk/client-s3` ✅, `npx nest build` (pending), `npx next build` (pending)
+
+**Result**: Pending verification.
+
+**Next**: Phase 4 Slice 4 (TBD)
+
+---
+
 ## 2026-03-10 — Phase 4 Slice 2: Error Logging & Monitoring Baseline
 
 **Goal**: Add structured logging, request correlation IDs, and a global exception filter to the API.

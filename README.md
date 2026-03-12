@@ -655,7 +655,7 @@ When Ollama is not available, all AI features gracefully fall back to rule-based
 ### 🔄 Phase 4: Production Readiness (In Progress)
 
 - [x] Email Service (SMTP with nodemailer, feature-flagged fallback)
-- [ ] Cloud File Storage (AWS S3)
+- [x] Cloud File Storage (AWS S3 with local fallback)
 - [ ] Error Logging & Monitoring
 - [ ] Security Hardening
 - [ ] Performance Optimization
@@ -666,6 +666,29 @@ When Ollama is not available, all AI features gracefully fall back to rule-based
 - [ ] Configurable Borrow Policies
 - [ ] Fine Payment Tracking
 - [ ] Report Generation (PDF/Excel)
+
+---
+
+## ☁️ Cloud File Storage
+
+File uploads (avatars, materials) support both local disk and AWS S3.
+
+### Configuration
+
+Set `STORAGE_PROVIDER=s3` in `.env` along with the required AWS credentials:
+
+```env
+STORAGE_PROVIDER="s3"
+AWS_REGION="eu-central-1"
+AWS_S3_BUCKET="my-library-uploads"
+AWS_ACCESS_KEY_ID="AKIA..."
+AWS_SECRET_ACCESS_KEY="..."
+AWS_S3_PUBLIC_BASE_URL=""   # optional override
+```
+
+### Local Fallback
+
+When `STORAGE_PROVIDER` is `local` (the default) or S3 credentials are missing, uploads are written to `apps/api/uploads/` and served as static assets — no AWS account needed for development.
 
 ---
 

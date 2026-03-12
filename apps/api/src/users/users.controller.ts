@@ -18,6 +18,7 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { randomUUID } from 'crypto';
 import { UsersService } from './users.service';
+import { StorageService } from '../storage/storage.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -42,7 +43,10 @@ const avatarStorage = diskStorage({
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly storageService: StorageService,
+  ) {}
 
   @Get()
   @Roles(Role.ADMIN)
@@ -108,7 +112,7 @@ export class UsersController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     if (file) {
-      dto.avatarUrl = `/uploads/avatars/${file.filename}`;
+      dto.avatarUrl = await this.storageService.uploadImage(file, 'avatars');
     }
     return this.usersService.updateProfile(userId, dto);
   }
