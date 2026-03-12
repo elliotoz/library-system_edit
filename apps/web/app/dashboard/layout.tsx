@@ -23,6 +23,7 @@ import {
   History,
   BarChart3,
   ListChecks,
+  Building2,
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import { cn, getInitials } from '@/lib/utils';
@@ -201,6 +202,11 @@ export default function DashboardLayout({
               label: 'Reading Lists',
               href: '/dashboard/admin/reading-lists',
               icon: ListChecks,
+            },
+            {
+              label: 'Manage Branches',
+              href: '/dashboard/admin/branches',
+              icon: Building2,
             },
             {
               label: 'System Settings',

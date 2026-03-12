@@ -660,9 +660,9 @@ When Ollama is not available, all AI features gracefully fall back to rule-based
 - [x] Security Hardening (Helmet, CORS allowlist, rate limiting)
 - [x] Performance Optimization (query shaping, pagination, compound indexes)
 
-### 📋 Phase 5: Admin Enhancements (Planned)
+### 📋 Phase 5: Admin Enhancements (In Progress)
 
-- [ ] Branch Management
+- [x] Branch Management (CRUD + activate/deactivate)
 - [ ] Configurable Borrow Policies
 - [ ] Fine Payment Tracking
 - [ ] Report Generation (PDF/Excel)

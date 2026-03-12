@@ -4,6 +4,29 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-12 — Phase 5 Slice 1: Admin Branch Management
+
+**Goal**: Allow ADMIN to manage library branches (CRUD + activate/deactivate) from admin dashboard.
+
+**Changes**:
+- Created `apps/api/src/branches/dto/branches.dto.ts` — CreateBranchDto, UpdateBranchDto with validation
+- Created `apps/api/src/branches/branches.service.ts` — findAll, create, update, activate, deactivate with 409 for duplicate codes
+- Created `apps/api/src/branches/branches.controller.ts` — ADMIN-guarded endpoints: GET/POST/PATCH /branches
+- Created `apps/api/src/branches/branches.module.ts` — imports PrismaModule
+- Updated `apps/api/src/app.module.ts` — imported BranchesModule
+- Created `apps/web/app/dashboard/admin/branches/page.tsx` — table with create/edit modal, activate/deactivate buttons, toast feedback
+- Updated `apps/web/lib/api.ts` — added `branchesApi` with getAll, create, update, activate, deactivate
+- Updated `apps/web/app/dashboard/layout.tsx` — added "Manage Branches" nav item with Building2 icon
+- Updated `README.md` — Phase 5 progress, Branch Management marked complete
+
+**Files**: `branches.dto.ts`, `branches.service.ts`, `branches.controller.ts`, `branches.module.ts`, `app.module.ts`, `branches/page.tsx`, `api.ts`, `layout.tsx`, `README.md`
+
+**Commands**: `npx nest build` (pending), `npx next build` (pending)
+
+**Result**: Pending verification.
+
+---
+
 ## 2026-03-12 — Phase 4 Monitoring Slice: Health Endpoints
 
 **Goal**: Add liveness and readiness health endpoints to close the Error Logging & Monitoring item.

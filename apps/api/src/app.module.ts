@@ -18,6 +18,7 @@ import { InstructorFollowersModule } from "./instructor-followers/instructor-fol
 import { AiModule } from "./ai/ai.module";
 import { StorageModule } from "./storage/storage.module";
 import { HealthModule } from "./health/health.module";
+import { BranchesModule } from "./branches/branches.module";
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { HealthModule } from "./health/health.module";
     InstructorFollowersModule,
     AiModule,
     HealthModule,
+    BranchesModule,
   ],
 })
 export class AppModule implements NestModule {

@@ -174,6 +174,39 @@ export const followersApi = {
     (await api.get<FollowingStatus>(`/instructor-followers/${instructorId}/is-following`)).data,
 };
 
+// Branches API (Admin)
+export const branchesApi = {
+  getAll: async () => (await api.get('/branches')).data,
+
+  create: async (data: {
+    name: string;
+    code: string;
+    address: string;
+    openingHours?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+  }) => (await api.post('/branches', data)).data,
+
+  update: async (
+    id: string,
+    data: {
+      name?: string;
+      code?: string;
+      address?: string;
+      openingHours?: string;
+      contactEmail?: string;
+      contactPhone?: string;
+      isActive?: boolean;
+    },
+  ) => (await api.patch(`/branches/${id}`, data)).data,
+
+  activate: async (id: string) =>
+    (await api.patch(`/branches/${id}/activate`)).data,
+
+  deactivate: async (id: string) =>
+    (await api.patch(`/branches/${id}/deactivate`)).data,
+};
+
 // AI Assistant API
 export const aiApi = {
   chat: async (data: { message: string }): Promise<{ reply: string; modelUsed: string; sources?: string[] }> =>

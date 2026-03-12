@@ -872,3 +872,15 @@ Files / .ai/ACTIVITY_LOG.md
 Commands run / git status -sb ; git log --oneline --decorate -15 ; rg roadmap/TODO markers ; sed on main.ts/app.module.ts/schema
 Result / Confirmed latest local commit is performance optimization (5851938, ahead by 1). Phase 4 checklist still has Error Logging & Monitoring unchecked despite baseline logging middleware/filter already present.
 Next / Implement Monitoring Slice: dedicated health/readiness endpoints with dependency checks, then mark Phase 4 complete in README
+Goal / Troubleshoot failed curl to /health/live after monitoring implementation
+Changes / No code edits; verified port/process state and successfully called health endpoint
+Files / .ai/ACTIVITY_LOG.md
+Commands run / git status -sb ; ss -ltnp ; curl -i http://127.0.0.1:3001/health/live
+Result / Endpoint is healthy (HTTP 200); earlier curl failure was due API process not being up at that time
+Next / Use root startup sequence (db:start + npm run dev) before health checks and feature testing
+Goal / Validate monitoring endpoints after implementation
+Changes / No code edits; verified live and readiness endpoints via curl
+Files / .ai/ACTIVITY_LOG.md
+Commands run / curl -i http://127.0.0.1:3001/health/live ; curl -i http://127.0.0.1:3001/health/ready
+Result / Both endpoints returned 200 with expected payloads (live=ok, ready with db=up and ollama=skipped)
+Next / Move to Phase 5 Slice 1: Branch Management (admin CRUD + UI)
