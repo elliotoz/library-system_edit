@@ -43,6 +43,7 @@ export class ReservationsService {
         branch: { select: { id: true, name: true, code: true, address: true } },
       },
       orderBy: { createdAt: "desc" },
+      take: 50,
     });
 
     return reservations.map((r) => ({
@@ -129,6 +130,7 @@ export class ReservationsService {
         branch: { select: { id: true, name: true, code: true } },
       },
       orderBy: { createdAt: "asc" },
+      take: 100,
     });
 
     return reservations.map((r) => ({
@@ -555,6 +557,7 @@ export class ReservationsService {
         branch: { select: { id: true, name: true, code: true } },
       },
       orderBy: { pickupDeadline: "asc" },
+      take: 100,
     });
 
     return reservations.map((r) => ({

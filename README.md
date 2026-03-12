@@ -658,7 +658,7 @@ When Ollama is not available, all AI features gracefully fall back to rule-based
 - [x] Cloud File Storage (AWS S3 with local fallback)
 - [ ] Error Logging & Monitoring
 - [x] Security Hardening (Helmet, CORS allowlist, rate limiting)
-- [ ] Performance Optimization
+- [x] Performance Optimization (query shaping, pagination, compound indexes)
 
 ### 📋 Phase 5: Admin Enhancements (Planned)
 
@@ -666,6 +666,30 @@ When Ollama is not available, all AI features gracefully fall back to rule-based
 - [ ] Configurable Borrow Policies
 - [ ] Fine Payment Tracking
 - [ ] Report Generation (PDF/Excel)
+
+---
+
+## ⚡ Performance Optimization
+
+### Query Shaping
+- Expensive Prisma reads use `select` to fetch only required fields instead of full model includes
+- `findActiveBorrows()`, `findAllBorrows()` now return only the columns the frontend needs
+
+### Pagination & Safety Caps
+- `GET /borrows` (admin) now supports `?page=&pageSize=` with a 100-row max
+- User-scoped list endpoints (`findMyBorrows`, `findMyReservations`, `findMyLists`) have `take: 50` safety caps
+- Admin list endpoints (`findPendingReservations`, `findReadyForPickup`, `findAllForModeration`) have `take: 100` caps
+
+### Database Indexes
+Compound indexes added for common query patterns:
+- `Notification(userId, read)` — unread count queries
+- `Notification(userId, createdAt)` — notification feed sorting
+- `Borrow(userId, status)` — user active borrows lookup
+- `Borrow(status, dueAt)` — admin overdue queries
+- `Reservation(userId, status)` — user active reservation checks
+- `ReadingList(status, visibility)` — global feed discovery
+
+Run `npx prisma migrate dev` after pulling to apply the new indexes.
 
 ---
 

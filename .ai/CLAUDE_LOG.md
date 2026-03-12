@@ -4,6 +4,30 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-12 — Phase 4 Performance Optimization Slice 1
+
+**Goal**: Add pagination, query shaping, and compound indexes to reduce unbounded query risk and improve response efficiency.
+
+**Changes**:
+- `borrows.service.ts` — `findAllBorrows()`: added full pagination (page/pageSize/count); `findMyBorrows()`: added `take: 50` cap; `findActiveBorrows()`: narrowed includes to select only needed fields
+- `borrows.controller.ts` — pass page/pageSize query params to `findAllBorrows()`
+- `reservations.service.ts` — `findMyReservations()`: `take: 50`; `findPendingReservations()`: `take: 100`; `findReadyForPickup()`: `take: 100`
+- `reading-lists.service.ts` — `findMyLists()`: `take: 50`; `findAllForModeration()`: `take: 100`
+- `schema.prisma` — replaced single-column indexes with compound indexes: `Notification(userId, read)`, `Notification(userId, createdAt)`, `Borrow(userId, status)`, `Borrow(status, dueAt)`, `Reservation(userId, status)`, `ReadingList(status, visibility)`
+- `README.md` — Performance Optimization section, roadmap item marked complete
+
+**Before/After observations**:
+- `GET /borrows` (admin, no filters): Before = unbounded `findMany` fetching ALL rows with full `book` + `branch` includes. After = paginated (default 20, max 100) with shaped selects — query cost capped at O(pageSize) instead of O(total_rows)
+- `Notification.findUnreadCount(userId)`: Before = seq scan on `read` column + filter by `userId`. After = compound index `(userId, read)` enables index-only lookup
+
+**Files**: `borrows.service.ts`, `borrows.controller.ts`, `reservations.service.ts`, `reading-lists.service.ts`, `schema.prisma`, `README.md`
+
+**Commands**: `npx prisma generate` ✅, `npx nest build` ✅, `npx next build` ✅
+
+**Result**: Both builds pass. All unbounded list queries now have safety caps or full pagination.
+
+---
+
 ## 2026-03-12 — Phase 4 Security Hardening Slice 1
 
 **Goal**: Add baseline production API hardening — Helmet, CORS allowlist, rate limiting on auth + AI endpoints.

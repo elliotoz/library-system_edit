@@ -122,9 +122,16 @@ export class BorrowsController {
   @ApiOperation({ summary: "Get all borrows (admin only)" })
   async getAllBorrows(
     @Query("status") status?: string,
-    @Query("userId") userId?: string
+    @Query("userId") userId?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
   ) {
-    return this.borrowsService.findAllBorrows({ status, userId });
+    return this.borrowsService.findAllBorrows({
+      status,
+      userId,
+      page: page ? parseInt(page, 10) : undefined,
+      pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
+    });
   }
 
   @Patch(":id/extend")

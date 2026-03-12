@@ -48,6 +48,7 @@ export class ReadingListsService {
       where: { ownerId: userId },
       include: listInclude,
       orderBy: { updatedAt: 'desc' },
+      take: 50,
     });
   }
 
@@ -356,6 +357,7 @@ export class ReadingListsService {
       where: { status: { not: ReadingListStatus.ARCHIVED } },
       include: listInclude,
       orderBy: { updatedAt: 'desc' },
+      take: 100,
     });
   }
 

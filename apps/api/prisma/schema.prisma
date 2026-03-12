@@ -344,7 +344,7 @@ model Reservation {
   // Notes
   notes String?
 
-  @@index([userId])
+  @@index([userId, status])
   @@index([status])
   @@map("reservations")
 }
@@ -376,9 +376,8 @@ model Borrow {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([userId])
-  @@index([status])
-  @@index([dueAt])
+  @@index([userId, status])
+  @@index([status, dueAt])
   @@map("borrows")
 }
 
@@ -449,9 +448,8 @@ model Notification {
   createdAt DateTime  @default(now())
   readAt    DateTime?
 
-  @@index([userId])
-  @@index([read])
-  @@index([createdAt])
+  @@index([userId, read])
+  @@index([userId, createdAt])
   @@map("notifications")
 }
 
@@ -482,6 +480,7 @@ model ReadingList {
   items ReadingListItem[]
 
   @@index([ownerId])
+  @@index([status, visibility])
   @@map("reading_lists")
 }
 

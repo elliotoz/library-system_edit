@@ -36,6 +36,7 @@ export class BorrowsService {
         },
       },
       orderBy: { borrowedAt: "desc" },
+      take: 50,
     });
 
     return borrows.map((borrow) => {
@@ -68,7 +69,21 @@ export class BorrowsService {
   async findActiveBorrows(userId: string) {
     return this.prisma.borrow.findMany({
       where: { userId, status: BorrowStatus.ACTIVE },
-      include: { bookCopy: { include: { book: true, branch: true } } },
+      include: {
+        bookCopy: {
+          include: {
+            book: {
+              select: {
+                id: true,
+                title: true,
+                authors: true,
+                coverImageUrl: true,
+              },
+            },
+            branch: { select: { id: true, name: true, code: true } },
+          },
+        },
+      },
     });
   }
 
@@ -138,19 +153,50 @@ export class BorrowsService {
     });
   }
 
-  async findAllBorrows(query: { status?: string; userId?: string }) {
+  async findAllBorrows(query: {
+    status?: string;
+    userId?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const page = query.page || 1;
+    const pageSize = Math.min(query.pageSize || 20, 100);
+    const skip = (page - 1) * pageSize;
+
     const where: any = {};
     if (query.status) where.status = query.status;
     if (query.userId) where.userId = query.userId;
 
-    return this.prisma.borrow.findMany({
-      where,
-      include: {
-        user: { select: { id: true, name: true, email: true, role: true } },
-        bookCopy: { include: { book: true, branch: true } },
-      },
-      orderBy: { borrowedAt: "desc" },
-    });
+    const [borrows, total] = await Promise.all([
+      this.prisma.borrow.findMany({
+        where,
+        include: {
+          user: { select: { id: true, name: true, email: true, role: true } },
+          bookCopy: {
+            include: {
+              book: {
+                select: {
+                  id: true,
+                  title: true,
+                  authors: true,
+                  coverImageUrl: true,
+                },
+              },
+              branch: { select: { id: true, name: true, code: true } },
+            },
+          },
+        },
+        orderBy: { borrowedAt: "desc" },
+        skip,
+        take: pageSize,
+      }),
+      this.prisma.borrow.count({ where }),
+    ]);
+
+    return {
+      data: borrows,
+      meta: { total, page, pageSize, totalPages: Math.ceil(total / pageSize) },
+    };
   }
 
   async extendBorrow(borrowId: string, userId: string, userRole: Role) {
