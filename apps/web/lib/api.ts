@@ -75,7 +75,7 @@ export const authApi = {
     return response.data;
   },
 
-  getConfig: async (): Promise<{ googleOAuthEnabled: boolean }> => {
+  getConfig: async (): Promise<{ googleOAuthEnabled: boolean; smtpEnabled: boolean; ollamaEnabled: boolean }> => {
     const response = await api.get('/auth/config');
     return response.data;
   },

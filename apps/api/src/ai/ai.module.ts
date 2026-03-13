@@ -23,5 +23,6 @@ import { UsersModule } from '../users/users.module';
     ResearchAssistantService,
     OllamaService,
   ],
+  exports: [OllamaService],
 })
 export class AiModule {}

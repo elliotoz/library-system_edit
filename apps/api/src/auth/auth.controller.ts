@@ -10,6 +10,8 @@ import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
+import { MailService } from '../mail/mail.service';
+import { OllamaService } from '../ai/ollama.service';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -19,6 +21,8 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
+    private readonly mailService: MailService,
+    private readonly ollamaService: OllamaService,
   ) {
     const corsOrigin = this.configService.get<string>('CORS_ORIGIN') || 'http://localhost:3000';
     this.frontendUrl = this.configService.get<string>('FRONTEND_URL') || corsOrigin.split(',')[0].trim();
@@ -194,6 +198,8 @@ export class AuthController {
 
     return {
       googleOAuthEnabled: !!(googleClientId && googleClientSecret),
+      smtpEnabled: this.mailService.isConfigured(),
+      ollamaEnabled: this.ollamaService.isAvailable(),
     };
   }
 

@@ -181,7 +181,7 @@ export default function SignupPage() {
           </form>
 
           {/* Google Sign-Up (only shown if OAuth is configured) */}
-          {googleOAuthEnabled && (
+          {googleOAuthEnabled ? (
             <>
               {/* Divider */}
               <div className="relative my-6">
@@ -206,6 +206,10 @@ export default function SignupPage() {
                 Continue with Google
               </a>
             </>
+          ) : (
+            <p className="text-center text-xs text-gray-400 mt-6">
+              Google sign-in is disabled by the administrator.
+            </p>
           )}
 
           {/* Login link */}

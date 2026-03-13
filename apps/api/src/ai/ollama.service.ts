@@ -22,6 +22,7 @@ const MODEL_MAP: Record<Role, string> = {
 export class OllamaService implements OnModuleInit {
   private readonly logger = new Logger(OllamaService.name);
   private readonly baseUrl: string;
+  private available = false;
 
   constructor() {
     this.baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
@@ -30,12 +31,19 @@ export class OllamaService implements OnModuleInit {
   async onModuleInit() {
     try {
       await this.listTags();
+      this.available = true;
       this.logger.log(`Ollama connected at ${this.baseUrl}`);
     } catch {
+      this.available = false;
       this.logger.warn(
         `Ollama not reachable at ${this.baseUrl} — AI chat will fall back to rule-based responses`,
       );
     }
+  }
+
+  /** Returns true if Ollama was reachable on startup */
+  isAvailable(): boolean {
+    return this.available;
   }
 
   getModel(role: Role, queryType?: 'deep-reasoning' | 'simple'): string {

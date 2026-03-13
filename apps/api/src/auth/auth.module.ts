@@ -9,6 +9,8 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { MailModule } from '../mail/mail.module';
+import { AiModule } from '../ai/ai.module';
 
 @Module({
   imports: [
@@ -23,6 +25,8 @@ import { RolesGuard } from './guards/roles.guard';
       }),
       inject: [ConfigService],
     }),
+    MailModule,
+    AiModule,
   ],
   controllers: [AuthController],
   providers: [

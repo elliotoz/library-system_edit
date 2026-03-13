@@ -4,6 +4,26 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-14 — Configuration Visibility (SMTP/Ollama/Google OAuth)
+
+**Goal**: Make feature configuration visible via `/auth/config` endpoint and show disabled note when Google OAuth is off.
+
+**Changes**:
+- `apps/api/src/ai/ollama.service.ts`: Added `available` flag set in `onModuleInit`, exposed via `isAvailable()` getter
+- `apps/api/src/ai/ai.module.ts`: Export `OllamaService` for use in AuthModule
+- `apps/api/src/auth/auth.module.ts`: Import `MailModule` and `AiModule`
+- `apps/api/src/auth/auth.controller.ts`:
+  - Inject `MailService` and `OllamaService`
+  - Extend `/auth/config` to return `{ googleOAuthEnabled, smtpEnabled, ollamaEnabled }`
+- `apps/web/lib/api.ts`: Update `getConfig()` return type with new fields
+- `apps/web/app/login/page.tsx`: Show "Google sign-in is disabled by the administrator." note when OAuth disabled
+- `apps/web/app/signup/page.tsx`: Same disabled note
+- `README.md`: Add "Optional Feature Configuration" table in Environment Variables section
+
+**Verification**: `npx nest build` ✓, `npx next build` ✓
+
+---
+
 ## 2026-03-13 — Reading Streak Feature
 
 **Goal**: Implement functional reading streak on student dashboard (replace hard-coded "12").

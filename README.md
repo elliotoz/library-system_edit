@@ -58,6 +58,7 @@ The **AI-Integrated University Library Management System** is a comprehensive we
 - Browse and search book catalog with advanced filters
 - Create and track book reservations
 - View borrowed books and due dates
+- Track a **reading streak**: counts consecutive calendar days (up to today) with at least one active borrow (borrowedAt ≤ day ≤ returnedAt or today) in ACTIVE/OVERDUE status; not based on reading time or page views
 - Access research materials and e-books
 - Receive notifications for due dates and reservation updates
 - Follow instructors and discover their reading lists
@@ -292,6 +293,19 @@ NEXT_PUBLIC_API_URL=http://localhost:3001
 
 # App Configuration
 NEXT_PUBLIC_APP_NAME="Library System"
+```
+
+### Optional Feature Configuration
+
+| Feature | Required Env Vars | Fallback |
+|---------|-------------------|----------|
+| **SMTP Email** | `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` | Emails logged to console |
+| **Ollama AI** | `OLLAMA_BASE_URL` (and running Ollama) | Rule-based responses |
+| **Google OAuth** | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Button hidden on login/signup |
+
+The `/auth/config` endpoint returns the current status of each feature:
+```json
+{ "googleOAuthEnabled": false, "smtpEnabled": false, "ollamaEnabled": true }
 ```
 
 ---
