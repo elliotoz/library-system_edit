@@ -20,6 +20,7 @@ interface StudentStats {
   borrowedBooks: number;
   activeReservations: number;
   daysUntilDue: number | null;
+  readingStreak: number;
 }
 
 interface Book {
@@ -184,7 +185,9 @@ export default function StudentDashboard() {
               <Flame className="w-6 h-6 text-orange-500" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">12</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {stats?.readingStreak ?? 0}
+              </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">Reading Streak</p>
             </div>
           </div>

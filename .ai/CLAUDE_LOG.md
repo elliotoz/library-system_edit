@@ -4,6 +4,25 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-13 — Reading Streak Feature
+
+**Goal**: Implement functional reading streak on student dashboard (replace hard-coded "12").
+
+**Definition**: Consecutive calendar days (backward from today) where the student had at least one ACTIVE/OVERDUE borrow covering that day.
+
+**Changes**:
+- `apps/api/src/dashboard/dashboard.service.ts`:
+  - Added `activeBorrows` query fetching ACTIVE/OVERDUE borrows with borrowedAt, returnedAt
+  - Added `calculateReadingStreak()` helper method
+  - Included `readingStreak` in `getStudentStats()` return object
+- `apps/web/app/dashboard/student/page.tsx`:
+  - Extended `StudentStats` interface with `readingStreak: number`
+  - Replaced hard-coded "12" with `stats?.readingStreak ?? 0`
+
+**Verification**: `npx nest build` ✓, `npx next build` ✓
+
+---
+
 ## 2026-03-13 — Production Auth/Mail Hardening
 
 **Goal**: Harden auth/mail configuration so the app is production-ready and does not expose non-working Google OAuth or rely on overloaded env vars.
