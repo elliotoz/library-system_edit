@@ -1,5 +1,6 @@
 // src/auth/auth.controller.ts
 import { Controller, Post, Body, Get, Req, UseGuards, HttpCode, HttpStatus, Res } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiExcludeEndpoint } from '@nestjs/swagger';
@@ -13,7 +14,15 @@ import { GoogleAuthGuard } from './guards/google-auth.guard';
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  private readonly frontendUrl: string;
+
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {
+    const corsOrigin = this.configService.get<string>('CORS_ORIGIN') || 'http://localhost:3000';
+    this.frontendUrl = this.configService.get<string>('FRONTEND_URL') || corsOrigin.split(',')[0].trim();
+  }
 
   @Public()
   @Post('login')
@@ -172,8 +181,20 @@ export class AuthController {
     });
 
     // Redirect to frontend dashboard after successful OAuth
-    const frontendUrl = process.env.CORS_ORIGIN || 'http://localhost:3000';
-    res.redirect(`${frontendUrl}/dashboard/student`);
+    res.redirect(`${this.frontendUrl}/dashboard/student`);
+  }
+
+  @Public()
+  @Get('config')
+  @ApiOperation({ summary: 'Get auth configuration for frontend' })
+  @ApiResponse({ status: 200, description: 'Auth configuration' })
+  getAuthConfig() {
+    const googleClientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
+    const googleClientSecret = this.configService.get<string>('GOOGLE_CLIENT_SECRET');
+
+    return {
+      googleOAuthEnabled: !!(googleClientId && googleClientSecret),
+    };
   }
 
   @Public()

@@ -730,6 +730,70 @@ Exceeding the limit returns `429 Too Many Requests`. Tune via env vars:
 
 ---
 
+## 📧 Production Auth & Mail Setup
+
+Configure authentication and email services for production deployments.
+
+### Google OAuth
+
+The "Continue with Google" button is **automatically hidden** if OAuth is not configured. To enable:
+
+1. Create credentials at [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Set authorized redirect URI: `https://your-api-domain/auth/google/callback`
+3. Add to `.env`:
+   ```env
+   GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+   GOOGLE_CLIENT_SECRET="your-client-secret"
+   GOOGLE_CALLBACK_URL="https://your-api-domain/auth/google/callback"
+   ```
+
+**Startup log:**
+```
+[Bootstrap] Google OAuth: ENABLED
+```
+
+If credentials are missing:
+```
+[Bootstrap] Google OAuth: DISABLED (set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to enable)
+```
+
+### SMTP Email
+
+Email verification codes and password reset links require SMTP in production. Without it, emails are logged to the console (dev mode only).
+
+```env
+SMTP_HOST="smtp.sendgrid.net"
+SMTP_PORT="587"
+SMTP_USER="apikey"
+SMTP_PASS="SG.your-api-key"
+SMTP_FROM="noreply@library.uskudar.edu.tr"
+```
+
+**Startup log:**
+```
+[MailService] SMTP connected: smtp.sendgrid.net
+```
+
+If SMTP is not configured:
+```
+[MailService] SMTP_HOST not configured — emails will be logged to console instead of sent
+```
+
+### FRONTEND_URL vs CORS_ORIGIN
+
+| Variable | Purpose |
+|----------|---------|
+| `CORS_ORIGIN` | Comma-separated list of allowed origins for CORS (e.g., `http://localhost:3000,https://app.example.com`) |
+| `FRONTEND_URL` | Canonical URL for password reset links and OAuth redirects. Falls back to first CORS origin if not set. |
+
+In production, set both:
+```env
+CORS_ORIGIN="https://app.example.com,https://staging.example.com"
+FRONTEND_URL="https://app.example.com"
+```
+
+---
+
 ## ☁️ Cloud File Storage
 
 File uploads (avatars, materials) support both local disk and AWS S3.

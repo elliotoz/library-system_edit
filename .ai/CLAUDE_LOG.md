@@ -4,6 +4,36 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-13 — Production Auth/Mail Hardening
+
+**Goal**: Harden auth/mail configuration so the app is production-ready and does not expose non-working Google OAuth or rely on overloaded env vars.
+
+**Changes**:
+- `apps/api/src/mail/mail.service.ts`: Use `FRONTEND_URL` for password reset links, falls back to first `CORS_ORIGIN`
+- `apps/api/src/auth/auth.controller.ts`:
+  - Inject `ConfigService`, use `FRONTEND_URL` for Google OAuth redirect
+  - Add `GET /auth/config` endpoint returning `{ googleOAuthEnabled: boolean }`
+- `apps/api/src/main.ts`: Add startup logs for Google OAuth status and FRONTEND_URL
+- `apps/web/lib/api.ts`: Add `authApi.getConfig()` function
+- `apps/web/app/login/page.tsx`: Conditionally render Google sign-in button based on `authApi.getConfig()`
+- `apps/web/app/signup/page.tsx`: Conditionally render Google sign-up button based on `authApi.getConfig()`
+- `apps/api/.env.example`: Add `FRONTEND_URL`, improve documentation for Google OAuth and SMTP settings
+- `README.md`: Add "Production Auth & Mail Setup" section with Google OAuth, SMTP, and FRONTEND_URL guidance
+
+**Files modified**:
+- `apps/api/src/mail/mail.service.ts`
+- `apps/api/src/auth/auth.controller.ts`
+- `apps/api/src/main.ts`
+- `apps/api/.env.example`
+- `apps/web/lib/api.ts`
+- `apps/web/app/login/page.tsx`
+- `apps/web/app/signup/page.tsx`
+- `README.md`
+
+**Verification**: `npx nest build` ✓, `npx next build` ✓
+
+---
+
 ## 2026-03-12 — Phase 5 Slice 4: Report Generation (PDF/Excel)
 
 **Goal**: Admin can generate/export operational reports in PDF and Excel.

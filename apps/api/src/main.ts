@@ -82,6 +82,22 @@ async function bootstrap() {
   logger.log(
     `Server: http://localhost:${port} | Docs: http://localhost:${port}/api/docs`,
   );
+
+  // Log auth/mail configuration status
+  const googleClientId = process.env.GOOGLE_CLIENT_ID;
+  const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (googleClientId && googleClientSecret) {
+    logger.log("Google OAuth: ENABLED");
+  } else {
+    logger.warn(
+      "Google OAuth: DISABLED (set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to enable)"
+    );
+  }
+
+  const frontendUrl =
+    process.env.FRONTEND_URL ||
+    (process.env.CORS_ORIGIN || "http://localhost:3000").split(",")[0].trim();
+  logger.log(`Frontend URL: ${frontendUrl}`);
 }
 
 bootstrap();

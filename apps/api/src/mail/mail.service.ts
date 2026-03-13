@@ -11,7 +11,9 @@ export class MailService implements OnModuleInit {
 
   constructor(private readonly config: ConfigService) {
     this.from = this.config.get<string>('SMTP_FROM') || 'noreply@library.uskudar.edu.tr';
-    this.frontendUrl = this.config.get<string>('CORS_ORIGIN') || 'http://localhost:3000';
+    // FRONTEND_URL is the canonical URL for password reset links; falls back to first CORS origin
+    const corsOrigin = this.config.get<string>('CORS_ORIGIN') || 'http://localhost:3000';
+    this.frontendUrl = this.config.get<string>('FRONTEND_URL') || corsOrigin.split(',')[0].trim();
   }
 
   async onModuleInit() {

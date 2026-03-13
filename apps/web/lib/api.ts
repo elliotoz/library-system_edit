@@ -74,6 +74,11 @@ export const authApi = {
     const response = await api.post('/auth/reset-password', data);
     return response.data;
   },
+
+  getConfig: async (): Promise<{ googleOAuthEnabled: boolean }> => {
+    const response = await api.get('/auth/config');
+    return response.data;
+  },
 };
 
 // Users API
