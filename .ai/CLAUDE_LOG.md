@@ -4,6 +4,22 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-14 — Fix Signup Route Access
+
+**Goal**: Fix /signup redirecting to /login when user is unauthenticated.
+
+**Root Cause**: The axios response interceptor redirected to /login on ANY 401 error, except when already on /login. When visiting /signup, AuthProvider called getMe() which returned 401, triggering the redirect.
+
+**Changes**:
+- `apps/web/lib/api.ts`: Added PUBLIC_ROUTES array and updated 401 interceptor to skip redirect for /login, /signup, /verify-email, /forgot-password, /reset-password
+- `README.md`: Added Gmail App Password documentation for SMTP configuration
+
+**Note**: MailService already has proper fallback logging (confirmed no changes needed).
+
+**Verification**: `npx nest build` ✓, `npx next build` ✓
+
+---
+
 ## 2026-03-14 — Configuration Visibility (SMTP/Ollama/Google OAuth)
 
 **Goal**: Make feature configuration visible via `/auth/config` endpoint and show disabled note when Google OAuth is off.

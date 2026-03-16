@@ -783,6 +783,15 @@ SMTP_PASS="SG.your-api-key"
 SMTP_FROM="noreply@library.uskudar.edu.tr"
 ```
 
+**Gmail users:** You must use an [App Password](https://support.google.com/accounts/answer/185833), not your account password. Enable 2-Step Verification first, then generate an App Password for "Mail".
+
+```env
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT="587"
+SMTP_USER="your-email@gmail.com"
+SMTP_PASS="your-16-char-app-password"
+```
+
 **Startup log:**
 ```
 [MailService] SMTP connected: smtp.sendgrid.net

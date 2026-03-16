@@ -15,14 +15,20 @@ const api: AxiosInstance = axios.create({
   withCredentials: true, // Required for HttpOnly cookies
 });
 
+// Public routes that should not trigger 401 redirect
+const PUBLIC_ROUTES = ['/login', '/signup', '/verify-email', '/forgot-password', '/reset-password'];
+
 // Response interceptor - handle errors
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiError>) => {
     if (error.response?.status === 401) {
-      // Redirect to login on auth failure (cookie will be cleared by server on logout)
-      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-        window.location.href = '/login';
+      // Redirect to login on auth failure, but not from public auth routes
+      if (typeof window !== 'undefined') {
+        const isPublicRoute = PUBLIC_ROUTES.some(route => window.location.pathname.startsWith(route));
+        if (!isPublicRoute) {
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);
