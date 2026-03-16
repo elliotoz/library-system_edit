@@ -4,6 +4,44 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-17 — Fix Google OAuth role-based redirect
+
+**Goal**: Fix Google OAuth callback hardcoding `/dashboard/student` for all users regardless of role.
+
+**Root cause**: `auth.controller.ts` line 188 had `res.redirect(\`${this.frontendUrl}/dashboard/student\`)` — no role check, so ADMINs and INSTRUCTORs landing via Google OAuth were sent to the student dashboard.
+
+**Changes**:
+- `apps/api/src/auth/auth.controller.ts` — replaced hardcoded path with a `roleDashboards` map keyed on `user.role`
+
+**Verification**: nest build ✓
+
+**Next**: Test Google OAuth login with each role type
+
+---
+
+## 2026-03-16 — Surface SMTP failures, add auth-page guards, remove wallet guard
+
+**Goal**: Fix silent SMTP failure hiding from users, add authenticated-user redirect on signup, improve login error messages, remove irrelevant InjectedWalletErrorGuard component.
+
+**Root cause**:
+- `mail.service.ts` swallowed SMTP errors silently — users saw "Registration successful" but never received a code
+- `signup/page.tsx` had no check for already-authenticated users (unlike login page)
+- `login/page.tsx` showed generic toasts regardless of error type
+- `InjectedWalletErrorGuard` was a crypto wallet noise suppressor with no relevance to the app
+
+**Changes**:
+- `apps/api/src/mail/mail.service.ts` — `send()` now throws `ServiceUnavailableException` when transporter is null or sendMail fails; removed `logFallback()` silent swallow
+- `apps/api/src/auth/auth.service.ts` — `register()` catches email failure, returns `emailSent: boolean` flag; in dev mode includes the verification code in the response message
+- `apps/web/lib/api.ts` — updated `register()` return type to include `emailSent: boolean`
+- `apps/web/app/signup/page.tsx` — added `useAuth` redirect for authenticated users; shows warning toast when `emailSent: false`
+- `apps/web/app/login/page.tsx` — smarter error handling: unverified account redirects to /verify-email, deactivated shows admin message, wrong password clears field
+- `apps/web/app/layout.tsx` — removed `InjectedWalletErrorGuard` import and usage
+- `apps/web/components/InjectedWalletErrorGuard.tsx` — deleted
+
+**Verification**: nest build ✓ | next tsc --noEmit ✓ (next build blocked by dev server file lock on .next/trace — not a code error)
+
+**Next**: Fix SMTP_PASS in .env (remove spaces from Gmail App Password: `zejmvpsmythumexs`), restart API, test signup flow end-to-end
+
 ## 2026-03-14 — Fix Signup Route Access
 
 **Goal**: Fix /signup redirecting to /login when user is unauthenticated.

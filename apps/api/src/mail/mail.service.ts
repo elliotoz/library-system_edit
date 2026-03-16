@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 
@@ -95,8 +95,15 @@ export class MailService implements OnModuleInit {
     text: string,
   ): Promise<void> {
     if (!this.transporter) {
-      this.logFallback(to, subject, text);
-      return;
+      this.logger.error(
+        `[MAIL] SMTP is not configured — email to "${to}" was NOT sent. ` +
+        `Check SMTP_HOST, SMTP_USER, SMTP_PASS in your .env file. ` +
+        `If using Gmail, SMTP_PASS must be an App Password (no spaces).`,
+      );
+      throw new ServiceUnavailableException(
+        'Email service is unavailable. The verification email could not be sent. ' +
+        'Please contact the administrator or use "Resend Code" to try again.',
+      );
     }
 
     try {
@@ -109,13 +116,10 @@ export class MailService implements OnModuleInit {
       });
       this.logger.log(`Email sent to ${to}: "${subject}"`);
     } catch (err) {
-      this.logger.error(`Failed to send email to ${to}: ${err}`);
-      // Fall back to console so the flow doesn't break
-      this.logFallback(to, subject, text);
+      this.logger.error(`[MAIL] Failed to send email to "${to}": ${err}`);
+      throw new ServiceUnavailableException(
+        'Failed to send email. Please try again later or contact the administrator.',
+      );
     }
-  }
-
-  private logFallback(to: string, subject: string, text: string): void {
-    this.logger.warn(`[MAIL FALLBACK] To: ${to} | Subject: ${subject} | ${text}`);
   }
 }

@@ -926,3 +926,9 @@ Files / .ai/ACTIVITY_LOG.md, .ai/CLAUDE_LOG.md, package.json
 Commands run / git status -sb ; git diff --stat ; git add .ai/ACTIVITY_LOG.md .ai/CLAUDE_LOG.md package.json ; git commit ; git push origin main
 Result / Pending local docs/config updates committed and pushed
 Next / Pull latest main on Windows and continue feature testing/presentation prep
+Goal / Prepare Claude prompt for reading streak metric
+Changes / No code edits; drafted scoped implementation prompt to make student dashboard streak card functional with backend calculation.
+Files / .ai/ACTIVITY_LOG.md
+Commands run / None
+Result / Prompt ready to hand to Claude for implementation
+Next / Run the prompt with Claude, implement, then build/test

@@ -56,7 +56,7 @@ export const authApi = {
     return response.data;
   },
 
-  register: async (data: { name: string; email: string; password: string; studentId?: string }): Promise<{ message: string; email: string }> => {
+  register: async (data: { name: string; email: string; password: string; studentId?: string }): Promise<{ message: string; email: string; emailSent: boolean }> => {
     const response = await api.post('/auth/register', data);
     return response.data;
   },

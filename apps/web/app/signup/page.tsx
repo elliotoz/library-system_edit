@@ -6,6 +6,8 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { Eye, EyeOff, Mail, Lock, User, Library } from 'lucide-react';
 import { authApi } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
+import { DASHBOARD_ROUTES, Role } from '@/types';
 
 export default function SignupPage() {
   const [name, setName] = useState('');
@@ -17,6 +19,14 @@ export default function SignupPage() {
   const [googleOAuthEnabled, setGoogleOAuthEnabled] = useState(false);
 
   const router = useRouter();
+  const { isAuthenticated, user, isLoading } = useAuth();
+
+  // Redirect already-authenticated users to their dashboard
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user) {
+      router.push(DASHBOARD_ROUTES[user.role as Role]);
+    }
+  }, [isAuthenticated, user, isLoading, router]);
 
   // Fetch auth config on mount
   useEffect(() => {
@@ -52,7 +62,11 @@ export default function SignupPage() {
 
     try {
       const result = await authApi.register({ name: name.trim(), email, password });
-      toast.success(result.message);
+      if (!result.emailSent) {
+        toast.error('Account created but the verification email could not be sent. Use "Resend Code" on the next page.', { duration: 8000 });
+      } else {
+        toast.success(result.message);
+      }
       router.push(`/verify-email?email=${encodeURIComponent(result.email)}`);
     } catch (err: any) {
       const message = err.response?.data?.message || err.message || 'Registration failed';

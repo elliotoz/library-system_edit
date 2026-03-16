@@ -50,7 +50,19 @@ export default function LoginPage() {
       await login({ email, password });
       toast.success('Welcome back!');
     } catch (err: any) {
-      toast.error(err.message || 'Login failed');
+      const message = err.response?.data?.message || err.message || 'Login failed';
+
+      if (message.toLowerCase().includes('verify your email')) {
+        toast.error('Your account is not verified. Check your inbox or request a new code.', { duration: 6000 });
+        router.push(`/verify-email?email=${encodeURIComponent(email)}`);
+      } else if (message.toLowerCase().includes('deactivated')) {
+        toast.error('Your account has been deactivated. Please contact the administrator.');
+      } else if (message.toLowerCase().includes('invalid email or password')) {
+        setPassword('');
+        toast.error('Incorrect email or password — please try again.');
+      } else {
+        toast.error(message);
+      }
     } finally {
       setIsSubmitting(false);
     }

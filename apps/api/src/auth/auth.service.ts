@@ -2,7 +2,7 @@
 import { Injectable, UnauthorizedException, BadRequestException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { randomInt, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
@@ -172,11 +172,24 @@ export class AuthService {
       throw error;
     }
 
-    await this.mailService.sendVerificationEmail(user.email, verificationCode);
+    let emailSent = true;
+    try {
+      await this.mailService.sendVerificationEmail(user.email, verificationCode);
+    } catch {
+      emailSent = false;
+    }
+
+    const isDev = process.env.NODE_ENV === 'development';
+    const message = emailSent
+      ? 'Registration successful. Please check your email for the verification code.'
+      : isDev
+        ? `Account created but email delivery failed. Dev code: ${verificationCode}`
+        : 'Account created but the verification email could not be sent. Please use "Resend Code" on the next page.';
 
     return {
-      message: 'Registration successful. Please check your email for the verification code.',
+      message,
       email: user.email,
+      emailSent,
     };
   }
 

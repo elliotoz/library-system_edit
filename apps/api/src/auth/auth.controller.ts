@@ -184,8 +184,15 @@ export class AuthController {
       path: '/',
     });
 
-    // Redirect to frontend dashboard after successful OAuth
-    res.redirect(`${this.frontendUrl}/dashboard/student`);
+    // Redirect to role-appropriate dashboard after successful OAuth
+    const roleDashboards: Record<string, string> = {
+      ADMIN: '/dashboard/admin',
+      STUDENT: '/dashboard/student',
+      INSTRUCTOR: '/dashboard/instructor',
+      STAFF: '/dashboard/staff',
+    };
+    const destination = roleDashboards[user.role] || '/dashboard/student';
+    res.redirect(`${this.frontendUrl}${destination}`);
   }
 
   @Public()
