@@ -10,6 +10,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/dashboard/admin/reservations': ['ADMIN'],
   '/dashboard/admin/settings': ['ADMIN'],
   '/dashboard/admin/upload': ['ADMIN'],
+  '/dashboard/admin/import-books': ['ADMIN'],
   '/dashboard/student': ['STUDENT', 'ADMIN'],
   '/dashboard/instructor': ['INSTRUCTOR', 'ADMIN'],
   '/dashboard/staff': ['STAFF', 'ADMIN'],

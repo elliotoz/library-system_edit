@@ -22,6 +22,7 @@ import { BranchesModule } from "./branches/branches.module";
 import { BorrowPoliciesModule } from "./borrow-policies/borrow-policies.module";
 import { FinePaymentsModule } from "./fine-payments/fine-payments.module";
 import { ReportsModule } from "./reports/reports.module";
+import { ExternalBooksModule } from "./external-books/external-books.module";
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { ReportsModule } from "./reports/reports.module";
     BorrowPoliciesModule,
     FinePaymentsModule,
     ReportsModule,
+    ExternalBooksModule,
   ],
 })
 export class AppModule implements NestModule {

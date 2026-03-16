@@ -260,6 +260,35 @@ export const reportsApi = {
     `${API_URL}/reports/export?format=${format}&from=${from}&to=${to}`,
 };
 
+// External Books API
+export interface NormalizedBook {
+  title: string;
+  authors: string[];
+  description?: string;
+  coverImageUrl?: string;
+  ebookUrl?: string;
+  source: 'OpenLibrary' | 'Gutendex';
+  isbn?: string;
+  publicationYear?: number;
+}
+
+export const externalBooksApi = {
+  search: async (q: string): Promise<NormalizedBook[]> => {
+    const response = await api.get<NormalizedBook[]>('/external-books/search', { params: { q } });
+    return response.data;
+  },
+
+  importBook: async (book: NormalizedBook): Promise<any> => {
+    const response = await api.post('/external-books/import', book);
+    return response.data;
+  },
+
+  bulkImportGutendex: async (): Promise<{ imported: number; skipped: number }> => {
+    const response = await api.post<{ imported: number; skipped: number }>('/external-books/import/gutendex');
+    return response.data;
+  },
+};
+
 // AI Assistant API
 export const aiApi = {
   chat: async (data: { message: string }): Promise<{ reply: string; modelUsed: string; sources?: string[] }> =>

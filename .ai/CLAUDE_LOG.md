@@ -4,6 +4,27 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-17 — External E-Book API Integration
+
+**Goal**: Add external book search and import from Open Library and Gutendex (free, no-key APIs only).
+
+**Changes**:
+- `apps/api/src/external-books/dto/external-books.dto.ts` — ImportBookDto, NormalizedBook interface
+- `apps/api/src/external-books/external-books.service.ts` — fetchOpenLibraryBooks, fetchGutendexBooks, normalizeGutendexResults, importBook (with duplicate ISBN guard), bulkImportGutendex; uses Node.js built-in `https` module, no new deps
+- `apps/api/src/external-books/external-books.controller.ts` — GET /external-books/search, POST /external-books/import (ADMIN), POST /external-books/import/gutendex (ADMIN)
+- `apps/api/src/external-books/external-books.module.ts` — module registration
+- `apps/api/src/app.module.ts` — registered ExternalBooksModule
+- `apps/web/lib/api.ts` — added NormalizedBook interface and externalBooksApi (search, importBook, bulkImportGutendex)
+- `apps/web/app/dashboard/admin/import-books/page.tsx` — search UI, source filter tabs, book card grid with cover/import button, loading skeletons, bulk import button
+- `apps/web/middleware.ts` — added /dashboard/admin/import-books to ROUTE_PERMISSIONS
+- `docs/EBOOK_INTEGRATION.md` — full academic-style documentation
+
+**Verification**: nest build ✓ | tsc --noEmit ✓
+
+**Next**: Navigate to /dashboard/admin/import-books and test search + single import + bulk import
+
+---
+
 ## 2026-03-17 — Fix Google OAuth role-based redirect
 
 **Goal**: Fix Google OAuth callback hardcoding `/dashboard/student` for all users regardless of role.
