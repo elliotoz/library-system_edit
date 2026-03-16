@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   DollarSign,
   FileDown,
+  Globe,
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import { cn, getInitials } from '@/lib/utils';
@@ -225,6 +226,11 @@ export default function DashboardLayout({
               label: 'Reports',
               href: '/dashboard/admin/reports',
               icon: FileDown,
+            },
+            {
+              label: 'Import E-Books',
+              href: '/dashboard/admin/import-books',
+              icon: Globe,
             },
           ]
         : [];
