@@ -283,6 +283,22 @@ export const externalBooksApi = {
     return response.data;
   },
 
+  checkExisting: async (books: NormalizedBook[]): Promise<string[]> => {
+    const payload = books.map((b) => ({
+      isbn: b.isbn,
+      title: b.title,
+      source: b.source,
+      authors: b.authors,
+    }));
+    const response = await api.post<string[]>('/external-books/check-existing', { books: payload });
+    return response.data;
+  },
+
+  bulkImportOpenLibrary: async (): Promise<{ imported: number; skipped: number }> => {
+    const response = await api.post<{ imported: number; skipped: number }>('/external-books/import/openlibrary');
+    return response.data;
+  },
+
   bulkImportGutendex: async (): Promise<{ imported: number; skipped: number }> => {
     const response = await api.post<{ imported: number; skipped: number }>('/external-books/import/gutendex');
     return response.data;

@@ -29,6 +29,20 @@ export class ExternalBooksController {
     return this.service.importBook(dto);
   }
 
+  @Post('check-existing')
+  @ApiOperation({ summary: 'Check which books from a list already exist in the catalog' })
+  async checkExisting(@Body() body: { books: Array<{ isbn?: string; title: string; source: string; authors?: string[] }> }) {
+    return this.service.checkExisting(body.books);
+  }
+
+  @Post('import/openlibrary')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Bulk import first 100 Open Library ebooks into the catalog (admin only)' })
+  async bulkImportOpenLibrary() {
+    return this.service.bulkImportOpenLibrary();
+  }
+
   @Post('import/gutendex')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)

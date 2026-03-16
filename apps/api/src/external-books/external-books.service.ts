@@ -61,6 +61,84 @@ export class ExternalBooksService {
     });
   }
 
+  async checkExisting(
+    books: Array<{ isbn?: string; title: string; source: string; authors?: string[] }>,
+  ): Promise<string[]> {
+    const existingKeys: string[] = [];
+
+    // Check ISBN-bearing books first
+    const withIsbn = books.filter((b) => b.isbn);
+    if (withIsbn.length > 0) {
+      const found = await this.prisma.book.findMany({
+        where: { isbn: { in: withIsbn.map((b) => b.isbn!) } },
+        select: { isbn: true },
+      });
+      const foundIsbns = new Set(found.map((b) => b.isbn));
+      for (const book of withIsbn) {
+        if (foundIsbns.has(book.isbn!)) {
+          existingKeys.push(book.isbn!);
+        }
+      }
+    }
+
+    // Check non-ISBN books by title + source
+    const withoutIsbn = books.filter((b) => !b.isbn);
+    if (withoutIsbn.length > 0) {
+      const found = await this.prisma.book.findMany({
+        where: { OR: withoutIsbn.map((b) => ({ title: b.title, source: b.source })) },
+        select: { title: true, source: true },
+      });
+      const foundSet = new Set(found.map((b) => `${b.source}::${b.title}`));
+      for (const book of withoutIsbn) {
+        if (foundSet.has(`${book.source}::${book.title}`)) {
+          existingKeys.push(`${book.source}::${book.title}::${book.authors?.[0] ?? ''}`);
+        }
+      }
+    }
+
+    return existingKeys;
+  }
+
+  async bulkImportOpenLibrary(): Promise<{ imported: number; skipped: number }> {
+    // Fetch up to 100 Open Library books that have full-text available
+    const url =
+      `https://openlibrary.org/search.json` +
+      `?q=the&has_fulltext=true&limit=100` +
+      `&fields=title,author_name,isbn,cover_i,first_publish_year,key`;
+
+    let books: NormalizedBook[] = [];
+    try {
+      const data = await this.httpGet(url);
+      books = (data.docs ?? []).map((doc: any): NormalizedBook => ({
+        title: doc.title || 'Untitled',
+        authors: Array.isArray(doc.author_name) ? doc.author_name : [],
+        coverImageUrl: doc.cover_i
+          ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`
+          : undefined,
+        ebookUrl: doc.key ? `https://openlibrary.org${doc.key}` : undefined,
+        source: 'OpenLibrary',
+        isbn: Array.isArray(doc.isbn) ? doc.isbn[0] : undefined,
+        publicationYear: doc.first_publish_year ?? undefined,
+      }));
+    } catch (err) {
+      this.logger.error(`Open Library bulk fetch failed: ${err}`);
+    }
+
+    let imported = 0;
+    let skipped = 0;
+
+    for (const book of books.slice(0, 100)) {
+      try {
+        await this.importBook(book as ImportBookDto);
+        imported++;
+      } catch {
+        skipped++;
+      }
+    }
+
+    return { imported, skipped };
+  }
+
   async bulkImportGutendex(): Promise<{ imported: number; skipped: number }> {
     // Fetch 4 pages concurrently (Gutendex returns ~32 per page = up to 128, take first 100)
     const pages = await Promise.allSettled([
