@@ -4,6 +4,35 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-17 — Fix book catalog: availability filter, list view, ebook-only UX, dedup
+**Goal**: Fix all broken catalog features reported after browser testing.
+**Root cause**: Availability filter was never applied in Prisma query; list view had no render code; ebook-only books showed as "Unavailable"; Gutendex re-import created duplicates; no descriptions saved for imported books.
+**Changes**:
+- `apps/api/src/books/dto/books.dto.ts` — added `'ebook-only'` to availability union
+- `apps/api/src/books/books.service.ts` — implemented availability filter at DB level using Prisma `copies` relation (`some`/`none`/`AND NOT`); fixed author sort (String[] unorderable → falls back to `createdAt`)
+- `apps/api/src/external-books/external-books.service.ts` — title+source duplicate check for non-ISBN books; added `first_sentence` to OL fields + `extractOLDescription` helper; Gutendex subjects as description
+- `apps/web/app/dashboard/catalog/page.tsx` — full list view implementation; three-state badge (Available/E-book Only/Unavailable); filter options renamed; `isEbookAvailable` added to interface
+- `apps/web/app/dashboard/catalog/[id]/page.tsx` — ebook-only books get blue status; inline read button in availability card; amber warning hidden for ebook-only
+**Verification**: nest build ✓ | tsc --noEmit ✓
+**Commit**: `5fa7baa` fix(catalog): availability filter, list view, ebook-only UX, and dedup
+**Next**: Watch for edge cases on books that have both physical copies AND ebook — currently show green badge + small blue "E-book" pill
+
+---
+
+## 2026-03-17 — External ebook integration: dual bulk import + persistent import state
+**Goal**: Add bulk Open Library import (was missing), make imported state survive page reloads.
+**Root cause**: Only Gutendex bulk endpoint existed; imported Set was React state only (lost on reload).
+**Changes**:
+- `apps/api/src/external-books/external-books.service.ts` — added `checkExisting()` (ISBN + title+source), `bulkImportOpenLibrary()`
+- `apps/api/src/external-books/external-books.controller.ts` — added `POST /external-books/check-existing`, `POST /external-books/import/openlibrary`
+- `apps/web/lib/api.ts` — added `checkExisting()`, `bulkImportOpenLibrary()` to `externalBooksApi`
+- `apps/web/app/dashboard/admin/import-books/page.tsx` — rewritten: dual bulk buttons, source filter tabs, `checkExisting` call after search pre-populates imported Set from DB, 409 treated as already-imported
+**Verification**: nest build ✓ | tsc --noEmit ✓
+**Commit**: `123dcce` feat(external-books): add bulk open library import and persistent import state
+**Next**: —
+
+---
+
 ## 2026-03-17 — Add UI/UX Pro Max design skills + 21st.dev MCP
 **Goal**: Enhance Claude's UI/UX capabilities with design intelligence skills and 21st.dev component library access.
 **Changes**:
