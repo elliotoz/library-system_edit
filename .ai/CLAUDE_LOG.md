@@ -4,6 +4,17 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-17 — Add UI/UX Pro Max design skills + 21st.dev MCP
+**Goal**: Enhance Claude's UI/UX capabilities with design intelligence skills and 21st.dev component library access.
+**Changes**:
+- `local-notes/skills/` — added 7 skill folders from ui-ux-pro-max-skill repo (ui-ux-pro-max, design-system, ui-styling, brand, banner-design, slides, design)
+- `~/.claude.json` — registered 21st.dev magic MCP server (user-scoped)
+- Skipped external local-notes.md to preserve project instructions
+**Verification**: No code changes — skills are reference-only
+**Next**: Claude agents will auto-apply design rules when building UI components
+
+---
+
 ## 2026-03-17 — Add 8 test books with real data and e-book URLs
 **Goal**: Add 8 specific books to the database with real metadata, cover images, e-book URLs, and random campus assignments.
 **Root cause**: Need realistic test data with e-book support for development and demo.
