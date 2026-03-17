@@ -4,6 +4,16 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-17 — Dashboard layout redesign
+**Goal**: Polish the dashboard shell — header, sidebar, and mobile UX
+**Root cause**: Layout was minimal — no branding, no section labels, no mobile backdrop, no transitions
+**Changes**:
+- `apps/web/app/dashboard/layout.tsx` — branded header with Library icon + wordmark, user name/role chip, properly sized icon buttons with hover rings, drop shadow; sidebar with named section groups, left-accent active state, ChevronRight indicator, smooth `transition-transform` slide, right border; semi-transparent mobile backdrop; loading state with animated bar; nav sections refactored from flat arrays to `NavSection[]` objects
+**Verification**: tsc --noEmit ✓
+**Next**: Individual dashboard home pages could receive a stats/summary redesign
+
+---
+
 ## 2026-03-17 — Catalog page visual redesign
 **Goal**: Improve catalog listing page design without changing logic
 **Root cause**: Page lacked dark mode, had plain card design, basic pagination, no filter chips
