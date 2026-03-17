@@ -4,6 +4,19 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-17 — Add 8 test books with real data and e-book URLs
+**Goal**: Add 8 specific books to the database with real metadata, cover images, e-book URLs, and random campus assignments.
+**Root cause**: Need realistic test data with e-book support for development and demo.
+**Changes**:
+- `apps/api/prisma/add-books.ts` — standalone script to upsert 8 books (Clean Code, Art of War, Think Python, Pro Git, Intro to Algorithms, Eloquent JavaScript, Linux Command Line, Frankenstein) with full metadata, cover images, and e-book URLs where available
+- 2 existing books updated (Clean Code, Intro to Algorithms) with richer data; all copies set to AVAILABLE
+- 6 new books created with 3 copies each at randomly assigned campuses
+- 7/8 books have `isEbookAvailable: true` with read-only e-book URLs
+**Verification**: nest build ✓ | next build ✓ | script executed successfully
+**Next**: Books are live in the database; verify in the UI
+
+---
+
 ## 2026-03-17 — External E-Book API Integration
 
 **Goal**: Add external book search and import from Open Library and Gutendex (free, no-key APIs only).
