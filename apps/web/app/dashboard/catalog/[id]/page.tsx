@@ -18,6 +18,10 @@ import {
   AlertCircle,
   Bell,
   Loader2,
+  Hash,
+  Layers,
+  Tag,
+  ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -60,7 +64,7 @@ interface ReservationInfo {
 export default function BookDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   const [book, setBook] = useState<BookDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -69,8 +73,8 @@ export default function BookDetailPage() {
   const [reservationInfo, setReservationInfo] =
     useState<ReservationInfo | null>(null);
   const [notifyWhenAvailable, setNotifyWhenAvailable] = useState(false);
+  const [coverError, setCoverError] = useState(false);
 
-  // Fetch book details
   useEffect(() => {
     const fetchBook = async () => {
       setIsLoading(true);
@@ -83,7 +87,6 @@ export default function BookDetailPage() {
           const data = await response.json();
           setBook(data);
 
-          // Auto-select first branch with available copies
           if (data.availability?.length > 0) {
             const branchWithCopies = data.availability.find(
               (a: any) => a.available > 0
@@ -104,7 +107,6 @@ export default function BookDetailPage() {
     if (params.id) fetchBook();
   }, [params.id]);
 
-  // Fetch user's reservation info
   useEffect(() => {
     const fetchReservationInfo = async () => {
       if (!isAuthenticated) return;
@@ -163,7 +165,6 @@ export default function BookDetailPage() {
           { duration: 5000 }
         );
 
-        // Update reservation info
         if (reservationInfo) {
           setReservationInfo({
             ...reservationInfo,
@@ -173,7 +174,6 @@ export default function BookDetailPage() {
           });
         }
 
-        // Refresh book to update availability
         const bookResponse = await fetch(`/api/books/${params.id}`, {
           credentials: 'include',
         });
@@ -211,16 +211,30 @@ export default function BookDetailPage() {
   const canReserveAtBranch =
     selectedBranchData && selectedBranchData.available > 0;
 
+  const hasCover = book?.coverImageUrl && !coverError;
+
+  // --- Skeleton loader ---
   if (isLoading) {
     return (
-      <div className="animate-pulse space-y-6">
-        <div className="h-8 w-32 rounded bg-gray-200 dark:bg-gray-700" />
+      <div className="space-y-0">
+        {/* Hero skeleton */}
+        <div className="relative -mx-4 -mt-4 mb-8 h-64 animate-pulse bg-gray-200 dark:bg-gray-800 sm:-mx-6 lg:-mx-8" />
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-          <div className="aspect-[3/4] rounded-xl bg-gray-200 dark:bg-gray-700" />
+          <div className="space-y-4">
+            <div className="-mt-32 aspect-[3/4] animate-pulse rounded-2xl bg-gray-200 shadow-xl dark:bg-gray-700" />
+            <div className="h-12 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-700" />
+            <div className="h-12 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-700" />
+          </div>
           <div className="space-y-4 lg:col-span-2">
-            <div className="h-8 w-3/4 rounded bg-gray-200 dark:bg-gray-700" />
-            <div className="h-4 w-1/2 rounded bg-gray-200 dark:bg-gray-700" />
-            <div className="h-32 rounded bg-gray-200 dark:bg-gray-700" />
+            <div className="h-10 w-3/4 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
+            <div className="h-5 w-1/3 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+            <div className="flex gap-3">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-8 w-24 animate-pulse rounded-full bg-gray-200 dark:bg-gray-700" />
+              ))}
+            </div>
+            <div className="h-40 animate-pulse rounded-2xl bg-gray-200 dark:bg-gray-700" />
+            <div className="h-32 animate-pulse rounded-2xl bg-gray-200 dark:bg-gray-700" />
           </div>
         </div>
       </div>
@@ -229,129 +243,292 @@ export default function BookDetailPage() {
 
   if (!book) {
     return (
-      <div className="py-12 text-center">
-        <BookOpen className="mx-auto mb-4 h-16 w-16 text-gray-300 dark:text-gray-600" />
-        <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-white">
+      <div className="py-20 text-center">
+        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+          <BookOpen className="h-10 w-10 text-gray-400 dark:text-gray-500" />
+        </div>
+        <h3 className="mb-2 text-xl font-semibold text-gray-900 dark:text-white">
           Book not found
         </h3>
+        <p className="mb-6 text-gray-500 dark:text-gray-400">
+          This book may have been removed or the link is incorrect.
+        </p>
         <button
           onClick={() => router.back()}
-          className="font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary-500 px-5 py-2.5 font-medium text-white transition-colors hover:bg-primary-600"
         >
-          Go back
+          <ArrowLeft className="h-4 w-4" />
+          Go Back
         </button>
       </div>
     );
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Back Button */}
-      <button
-        onClick={() => router.back()}
-        className="flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back to Catalog
-      </button>
+  // Availability percentage for progress bar
+  const availPercent =
+    book.totalCopies > 0
+      ? Math.round((book.availableCopies / book.totalCopies) * 100)
+      : 0;
 
+  return (
+    <div className="space-y-0">
+      {/* ===== Hero Banner ===== */}
+      <div className="relative -mx-4 -mt-4 mb-8 overflow-hidden sm:-mx-6 lg:-mx-8">
+        {/* Blurred cover background */}
+        {hasCover && (
+          <img
+            src={book.coverImageUrl!}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 h-full w-full scale-110 object-cover blur-2xl"
+          />
+        )}
+        {/* Gradient overlay */}
+        <div
+          className={cn(
+            'absolute inset-0',
+            hasCover
+              ? 'bg-gradient-to-b from-gray-900/70 via-gray-900/60 to-gray-50 dark:to-gray-900'
+              : 'bg-gradient-to-br from-primary-600 to-primary-800 dark:from-primary-900 dark:to-gray-900'
+          )}
+        />
+
+        {/* Hero content */}
+        <div className="relative px-4 pb-8 pt-6 sm:px-6 lg:px-8">
+          {/* Back button */}
+          <button
+            onClick={() => router.back()}
+            className="mb-6 flex items-center gap-2 text-sm font-medium text-white/80 transition-colors hover:text-white"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back to Catalog
+          </button>
+
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
+            {/* Mini cover in hero (mobile-hidden, shown on sm+) */}
+            <div className="hidden sm:block">
+              <div className="h-32 w-24 overflow-hidden rounded-lg shadow-lg ring-2 ring-white/20">
+                {hasCover ? (
+                  <img
+                    src={book.coverImageUrl!}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    onError={() => setCoverError(true)}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-primary-200 dark:bg-primary-800">
+                    <BookOpen className="h-8 w-8 text-primary-500 dark:text-primary-400" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl font-bold leading-tight text-white sm:text-3xl lg:text-4xl">
+                {book.title}
+              </h1>
+              <p className="mt-2 text-base text-white/70 sm:text-lg">
+                by{' '}
+                {book.authors.map((a, i) => (
+                  <span key={i}>
+                    {i > 0 && <span className="mx-1.5 text-white/40">&middot;</span>}
+                    <span className="font-medium text-white/90">{a}</span>
+                  </span>
+                ))}
+              </p>
+
+              {/* Quick badges in hero */}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {book.publicationYear && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">
+                    <Calendar className="h-3 w-3" /> {book.publicationYear}
+                  </span>
+                )}
+                {book.category && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">
+                    <Layers className="h-3 w-3" /> {book.category}
+                  </span>
+                )}
+                {book.mainFaculty && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">
+                    <Building className="h-3 w-3" /> {book.mainFaculty.code}
+                  </span>
+                )}
+                {book.isEbookAvailable && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/30 px-3 py-1 text-xs font-medium text-blue-100 backdrop-blur-sm">
+                    <Globe className="h-3 w-3" /> E-book
+                  </span>
+                )}
+                {/* Availability pill */}
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium backdrop-blur-sm',
+                    book.isAvailable
+                      ? 'bg-green-500/25 text-green-100'
+                      : book.totalCopies === 0 && book.isEbookAvailable
+                        ? 'bg-blue-500/25 text-blue-100'
+                        : 'bg-red-500/25 text-red-100'
+                  )}
+                >
+                  {book.isAvailable ? (
+                    <><CheckCircle className="h-3 w-3" /> Available</>
+                  ) : book.totalCopies === 0 && book.isEbookAvailable ? (
+                    <><Globe className="h-3 w-3" /> E-book Only</>
+                  ) : (
+                    <><XCircle className="h-3 w-3" /> Unavailable</>
+                  )}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ===== Main Content Grid ===== */}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        {/* Left Column - Cover & Actions */}
-        <div className="space-y-4">
-          {/* Book Cover */}
-          <div className="flex aspect-[3/4] items-center justify-center rounded-xl bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/30 dark:to-primary-800/30">
-            {book.coverImageUrl ? (
-              <img
-                src={book.coverImageUrl}
-                alt={book.title}
-                className="h-full w-full rounded-xl object-cover"
-              />
-            ) : (
-              <BookOpen className="h-24 w-24 text-primary-400 dark:text-primary-500" />
-            )}
+        {/* ===== Left Column — Cover & Actions ===== */}
+        <div className="space-y-5 lg:sticky lg:top-4 lg:self-start">
+          {/* Large Cover */}
+          <div className="overflow-hidden rounded-2xl shadow-2xl ring-1 ring-gray-200 dark:ring-gray-700">
+            <div className="relative aspect-[3/4] bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/40 dark:to-primary-800/40">
+              {hasCover ? (
+                <img
+                  src={book.coverImageUrl!}
+                  alt={book.title}
+                  className="h-full w-full object-cover"
+                  onError={() => setCoverError(true)}
+                />
+              ) : (
+                <div className="flex h-full w-full flex-col items-center justify-center gap-3">
+                  <BookOpen className="h-20 w-20 text-primary-300 dark:text-primary-600" />
+                  <span className="max-w-[80%] text-center text-sm font-medium text-primary-400 dark:text-primary-500">
+                    {book.title}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Availability & Reservation Card */}
-          <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-            <h3 className="mb-3 font-semibold text-gray-900 dark:text-white">
+          {/* ── Availability Card ── */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
               Availability
             </h3>
 
-            {/* Overall availability status */}
-            <div className="mb-4 flex items-center gap-2">
-              {book.isAvailable ? (
-                <>
-                  <div className="h-3 w-3 rounded-full bg-green-500" />
-                  <span className="font-medium text-green-700 dark:text-green-400">
-                    {book.availableCopies} of {book.totalCopies} copies available
+            {/* Overall status with progress bar */}
+            {book.totalCopies > 0 && (
+              <div className="mb-4">
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Physical copies
                   </span>
-                </>
-              ) : book.totalCopies === 0 && book.isEbookAvailable ? (
-                <>
-                  <div className="h-3 w-3 rounded-full bg-blue-500" />
-                  <span className="font-medium text-blue-700 dark:text-blue-400">
-                    E-book available online
+                  <span
+                    className={cn(
+                      'font-semibold',
+                      book.availableCopies > 0
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-red-600 dark:text-red-400'
+                    )}
+                  >
+                    {book.availableCopies} / {book.totalCopies}
                   </span>
-                </>
-              ) : (
-                <>
-                  <div className="h-3 w-3 rounded-full bg-red-500" />
-                  <span className="font-medium text-red-700 dark:text-red-400">
-                    {book.totalCopies > 0
-                      ? `All ${book.totalCopies} copies are currently borrowed`
-                      : 'Currently unavailable'}
-                  </span>
-                </>
-              )}
-            </div>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
+                  <div
+                    className={cn(
+                      'h-full rounded-full transition-all duration-500',
+                      availPercent > 50
+                        ? 'bg-green-500'
+                        : availPercent > 0
+                          ? 'bg-amber-500'
+                          : 'bg-red-400'
+                    )}
+                    style={{ width: `${availPercent}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* E-book only status */}
+            {book.totalCopies === 0 && book.isEbookAvailable && (
+              <div className="mb-4 flex items-center gap-2 rounded-lg bg-blue-50 p-3 text-sm font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+                <Globe className="h-4 w-4 shrink-0" />
+                Available as e-book only
+              </div>
+            )}
+
+            {/* No copies at all */}
+            {book.totalCopies === 0 && !book.isEbookAvailable && (
+              <div className="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                No copies in the system
+              </div>
+            )}
 
             {/* Reservation limit info */}
             {reservationInfo && (
               <div className="mb-4 rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-400">
-                    Your reservations:
+                    Your reservations
                   </span>
-                  <span className="font-medium text-gray-900 dark:text-white">
+                  <span className="font-semibold text-gray-900 dark:text-white">
                     {reservationInfo.activeReservations} /{' '}
                     {reservationInfo.reservationLimit}
                   </span>
                 </div>
-                {reservationInfo.remainingReservations > 0 ? (
-                  <p className="mt-1 text-xs text-green-600 dark:text-green-400">
-                    You can make {reservationInfo.remainingReservations} more
-                    reservation(s)
-                  </p>
-                ) : (
-                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                    Reservation limit reached
-                  </p>
-                )}
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-600">
+                  <div
+                    className={cn(
+                      'h-full rounded-full transition-all',
+                      reservationInfo.remainingReservations > 0
+                        ? 'bg-primary-500'
+                        : 'bg-red-500'
+                    )}
+                    style={{
+                      width: `${Math.round((reservationInfo.activeReservations / reservationInfo.reservationLimit) * 100)}%`,
+                    }}
+                  />
+                </div>
+                <p
+                  className={cn(
+                    'mt-1.5 text-xs',
+                    reservationInfo.remainingReservations > 0
+                      ? 'text-green-600 dark:text-green-400'
+                      : 'text-red-600 dark:text-red-400'
+                  )}
+                >
+                  {reservationInfo.remainingReservations > 0
+                    ? `${reservationInfo.remainingReservations} reservation(s) remaining`
+                    : 'Reservation limit reached'}
+                </p>
               </div>
             )}
 
-            {/* Ebook-only hint — show read button inline when no physical copies */}
-            {(!book.availability || book.availability.length === 0) && book.isEbookAvailable && book.ebookUrl && (
-              <a
-                href={book.ebookUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white py-2.5 text-sm font-medium transition-colors"
-              >
-                <BookOpen className="h-4 w-4" />
-                Read E-book Online
-              </a>
-            )}
+            {/* Ebook-only: inline read button */}
+            {(!book.availability || book.availability.length === 0) &&
+              book.isEbookAvailable &&
+              book.ebookUrl && (
+                <a
+                  href={book.ebookUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-600"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Read E-book Online
+                </a>
+              )}
 
-            {/* Branch selection & Reserve button */}
+            {/* Branch selection & Reserve */}
             {book.availability && book.availability.length > 0 && (
               <div className="space-y-3">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Select Pickup Location
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Pickup Location
                 </label>
                 <select
                   value={selectedBranch || ''}
                   onChange={(e) => setSelectedBranch(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-gray-900 focus:border-transparent focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 transition-colors focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 >
                   {book.availability.map((a) => (
                     <option
@@ -359,40 +536,40 @@ export default function BookDetailPage() {
                       value={a.branch.id}
                       disabled={a.available === 0}
                     >
-                      {a.branch.name} ({a.available}/{a.total} available)
+                      {a.branch.name} — {a.available}/{a.total} available
                     </option>
                   ))}
                 </select>
 
-                {/* Selected branch info */}
+                {/* Selected branch chip */}
                 {selectedBranchData && (
                   <div
                     className={cn(
-                      'rounded-lg p-3 text-sm',
+                      'flex items-center gap-2 rounded-xl p-3 text-sm',
                       selectedBranchData.available > 0
                         ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
                         : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
                     )}
                   >
                     {selectedBranchData.available > 0 ? (
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4" />
+                      <>
+                        <CheckCircle className="h-4 w-4 shrink-0" />
                         <span>
                           {selectedBranchData.available} cop
                           {selectedBranchData.available > 1 ? 'ies' : 'y'}{' '}
-                          available at {selectedBranchData.branch.name}
+                          at {selectedBranchData.branch.name}
                         </span>
-                      </div>
+                      </>
                     ) : (
-                      <div className="flex items-center gap-2">
-                        <XCircle className="h-4 w-4" />
-                        <span>No copies available at this location</span>
-                      </div>
+                      <>
+                        <XCircle className="h-4 w-4 shrink-0" />
+                        <span>None available here</span>
+                      </>
                     )}
                   </div>
                 )}
 
-                {/* Reserve Button */}
+                {/* Reserve / Unavailable */}
                 {canReserveAtBranch ? (
                   <button
                     onClick={handleReserve}
@@ -400,10 +577,10 @@ export default function BookDetailPage() {
                       isReserving || reservationInfo?.canReserve === false
                     }
                     className={cn(
-                      'flex w-full items-center justify-center gap-2 rounded-lg py-2.5 font-medium transition-colors',
+                      'flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all',
                       isReserving || reservationInfo?.canReserve === false
-                        ? 'cursor-not-allowed bg-gray-300 text-gray-500 dark:bg-gray-600 dark:text-gray-400'
-                        : 'bg-primary-500 text-white hover:bg-primary-600'
+                        ? 'cursor-not-allowed bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500'
+                        : 'bg-primary-500 text-white shadow-lg shadow-primary-500/25 hover:bg-primary-600 hover:shadow-primary-500/35'
                     )}
                   >
                     {isReserving ? (
@@ -414,224 +591,153 @@ export default function BookDetailPage() {
                     ) : (
                       <>
                         <BookMarked className="h-4 w-4" />
-                        Reserve Book
+                        Reserve This Book
                       </>
                     )}
                   </button>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <button
                       disabled
-                      className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-lg bg-gray-300 py-2.5 font-medium text-gray-500 dark:bg-gray-600 dark:text-gray-400"
+                      className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-gray-200 py-3 text-sm font-semibold text-gray-400 dark:bg-gray-700 dark:text-gray-500"
                     >
                       <XCircle className="h-4 w-4" />
-                      Unavailable
+                      Unavailable at This Branch
                     </button>
 
-                    {/* Notify when available */}
                     {!notifyWhenAvailable ? (
                       <button
                         onClick={handleNotifyMe}
-                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-primary-500 py-2.5 font-medium text-primary-600 transition-colors hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-primary-500/30 py-2.5 text-sm font-semibold text-primary-600 transition-all hover:border-primary-500 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
                       >
                         <Bell className="h-4 w-4" />
                         Notify Me When Available
                       </button>
                     ) : (
-                      <div className="flex items-center justify-center gap-2 text-sm text-green-600 dark:text-green-400">
+                      <div className="flex items-center justify-center gap-2 rounded-xl bg-green-50 py-2.5 text-sm font-medium text-green-600 dark:bg-green-900/20 dark:text-green-400">
                         <CheckCircle className="h-4 w-4" />
-                        You'll be notified when available
+                        You&apos;ll be notified
                       </div>
                     )}
                   </div>
                 )}
               </div>
             )}
-
-            {/* No physical copies warning — only show for non-ebook-only books */}
-            {(!book.availability || book.availability.length === 0) && !book.isEbookAvailable && (
-              <div className="rounded-lg bg-amber-50 p-3 dark:bg-amber-900/20">
-                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
-                  <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm">No physical copies in the system</span>
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* E-book Button */}
-          {book.isEbookAvailable && book.ebookUrl && (
-            <a
-              href={book.ebookUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 py-3 font-medium text-white transition-all hover:from-blue-600 hover:to-blue-700"
+          {/* ── Action Buttons ── */}
+          <div className="space-y-3">
+            {/* E-book button */}
+            {book.isEbookAvailable && book.ebookUrl && (
+              <a
+                href={book.ebookUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:from-blue-600 hover:to-blue-700 hover:shadow-blue-500/30"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Read E-book Online
+              </a>
+            )}
+
+            {/* E-book no URL */}
+            {book.isEbookAvailable && !book.ebookUrl && (
+              <div className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-blue-200 py-3 text-sm font-medium text-blue-600 dark:border-blue-800 dark:text-blue-400">
+                <BookOpen className="h-4 w-4" />
+                E-book Available — Ask Librarian
+              </div>
+            )}
+
+            {/* AI Study Help */}
+            <Link
+              href={`/dashboard/ai-assistant?book=${book.id}`}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:from-purple-600 hover:to-violet-700 hover:shadow-purple-500/30"
             >
-              <BookOpen className="h-5 w-5" />
-              Read E-book Online
-            </a>
-          )}
-
-          {/* E-book Available Badge (no URL) */}
-          {book.isEbookAvailable && !book.ebookUrl && (
-            <div className="flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 py-3 text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
-              <BookOpen className="h-5 w-5" />
-              E-book Available (Ask Librarian)
-            </div>
-          )}
-
-          {/* AI Study Help Button */}
-          <Link
-            href={`/dashboard/ai-assistant?book=${book.id}`}
-            className="block w-full rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 py-3 text-center font-medium text-white transition-all hover:from-purple-600 hover:to-purple-700"
-          >
-            <div className="flex items-center justify-center gap-2">
-              <Sparkles className="h-5 w-5" />
+              <Sparkles className="h-4 w-4" />
               Get AI Study Help
-            </div>
-          </Link>
+            </Link>
 
-          {/* View My Reservations Link */}
-          <Link
-            href="/dashboard/reservations"
-            className="block w-full rounded-xl border border-gray-200 py-2.5 text-center text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-          >
-            View My Reservations
-          </Link>
+            {/* My Reservations */}
+            <Link
+              href="/dashboard/reservations"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+            >
+              View My Reservations
+            </Link>
+          </div>
         </div>
 
-        {/* Right Column - Book Details */}
+        {/* ===== Right Column — Details ===== */}
         <div className="space-y-6 lg:col-span-2">
-          {/* Title & Author */}
-          <div>
-            <h1 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
+          {/* Title (visible on mobile since hero mini-cover is hidden) */}
+          <div className="sm:hidden">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
               {book.title}
             </h1>
-            <p className="text-lg text-gray-600 dark:text-gray-400">
+            <p className="mt-1 text-gray-600 dark:text-gray-400">
               by {book.authors.join(', ')}
             </p>
           </div>
 
-          {/* Quick Info Grid */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            {book.publicationYear && (
-              <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
-                <div className="mb-1 flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                  <Calendar className="h-4 w-4" />
-                  <span className="text-xs">Year</span>
-                </div>
-                <p className="font-medium text-gray-900 dark:text-white">
-                  {book.publicationYear}
-                </p>
-              </div>
-            )}
+          {/* Metadata Chips */}
+          <div className="flex flex-wrap gap-2">
             {book.pageCount && (
-              <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
-                <div className="mb-1 flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                  <FileText className="h-4 w-4" />
-                  <span className="text-xs">Pages</span>
-                </div>
-                <p className="font-medium text-gray-900 dark:text-white">
-                  {book.pageCount}
-                </p>
-              </div>
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                <FileText className="h-3.5 w-3.5 text-gray-400" />
+                {book.pageCount} pages
+              </span>
             )}
             {book.language && (
-              <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
-                <div className="mb-1 flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                  <Globe className="h-4 w-4" />
-                  <span className="text-xs">Language</span>
-                </div>
-                <p className="font-medium text-gray-900 dark:text-white">
-                  {book.language}
-                </p>
-              </div>
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                <Globe className="h-3.5 w-3.5 text-gray-400" />
+                {book.language}
+              </span>
             )}
-            {book.mainFaculty && (
-              <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
-                <div className="mb-1 flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                  <Building className="h-4 w-4" />
-                  <span className="text-xs">Faculty</span>
-                </div>
-                <p className="font-medium text-gray-900 dark:text-white">
-                  {book.mainFaculty.code}
-                </p>
-              </div>
+            {book.isbn && (
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                <Hash className="h-3.5 w-3.5 text-gray-400" />
+                {book.isbn}
+              </span>
+            )}
+            {book.edition && (
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                <Layers className="h-3.5 w-3.5 text-gray-400" />
+                {book.edition}
+              </span>
+            )}
+            {book.publisher && (
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                <Building className="h-3.5 w-3.5 text-gray-400" />
+                {book.publisher}
+              </span>
             )}
           </div>
 
           {/* Description */}
           {book.description && (
-            <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
-              <h2 className="mb-3 font-semibold text-gray-900 dark:text-white">
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <FileText className="h-4 w-4" />
                 Description
               </h2>
-              <p className="leading-relaxed text-gray-600 dark:text-gray-400">
+              <p className="text-[15px] leading-relaxed text-gray-700 dark:text-gray-300">
                 {book.description}
               </p>
             </div>
           )}
 
-          {/* Book Details */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
-            <h2 className="mb-4 font-semibold text-gray-900 dark:text-white">
-              Book Details
-            </h2>
-            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {book.isbn && (
-                <div>
-                  <dt className="text-sm text-gray-500 dark:text-gray-400">
-                    ISBN
-                  </dt>
-                  <dd className="font-medium text-gray-900 dark:text-white">
-                    {book.isbn}
-                  </dd>
-                </div>
-              )}
-              {book.publisher && (
-                <div>
-                  <dt className="text-sm text-gray-500 dark:text-gray-400">
-                    Publisher
-                  </dt>
-                  <dd className="font-medium text-gray-900 dark:text-white">
-                    {book.publisher}
-                  </dd>
-                </div>
-              )}
-              {book.edition && (
-                <div>
-                  <dt className="text-sm text-gray-500 dark:text-gray-400">
-                    Edition
-                  </dt>
-                  <dd className="font-medium text-gray-900 dark:text-white">
-                    {book.edition}
-                  </dd>
-                </div>
-              )}
-              {book.category && (
-                <div>
-                  <dt className="text-sm text-gray-500 dark:text-gray-400">
-                    Category
-                  </dt>
-                  <dd className="font-medium text-gray-900 dark:text-white">
-                    {book.category}
-                  </dd>
-                </div>
-              )}
-            </dl>
-          </div>
-
           {/* Subject Tags */}
           {book.subjectTags && book.subjectTags.length > 0 && (
-            <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
-              <h2 className="mb-3 font-semibold text-gray-900 dark:text-white">
-                Subject Tags
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <Tag className="h-4 w-4" />
+                Subjects
               </h2>
               <div className="flex flex-wrap gap-2">
                 {book.subjectTags.map((tag, i) => (
                   <span
                     key={i}
-                    className="rounded-full bg-primary-50 px-3 py-1 text-sm text-primary-700 dark:bg-primary-900/30 dark:text-primary-400"
+                    className="rounded-full border border-primary-200 bg-primary-50 px-3.5 py-1.5 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-100 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-400 dark:hover:bg-primary-900/50"
                   >
                     {tag}
                   </span>
@@ -642,49 +748,74 @@ export default function BookDetailPage() {
 
           {/* Campus Availability */}
           {book.availability && book.availability.length > 0 && (
-            <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
-              <h2 className="mb-4 flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
-                <MapPin className="h-5 w-5" />
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <MapPin className="h-4 w-4" />
                 Campus Availability
               </h2>
               <div className="space-y-3">
-                {book.availability.map((a) => (
-                  <div
-                    key={a.branch.id}
-                    className={cn(
-                      'flex items-center justify-between rounded-lg p-3',
-                      a.branch.id === selectedBranch
-                        ? 'border border-primary-200 bg-primary-50 dark:border-primary-800 dark:bg-primary-900/20'
-                        : 'bg-gray-50 dark:bg-gray-700/50'
-                    )}
-                  >
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        {a.branch.name}
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {a.branch.code}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {a.available > 0 ? (
-                        <>
-                          <CheckCircle className="h-5 w-5 text-green-500" />
-                          <span className="font-medium text-green-700 dark:text-green-400">
-                            {a.available} available
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <XCircle className="h-5 w-5 text-red-500" />
-                          <span className="font-medium text-red-700 dark:text-red-400">
-                            Unavailable
-                          </span>
-                        </>
+                {book.availability.map((a) => {
+                  const branchPercent =
+                    a.total > 0
+                      ? Math.round((a.available / a.total) * 100)
+                      : 0;
+                  const isSelected = a.branch.id === selectedBranch;
+
+                  return (
+                    <button
+                      key={a.branch.id}
+                      type="button"
+                      onClick={() => setSelectedBranch(a.branch.id)}
+                      className={cn(
+                        'w-full rounded-xl p-4 text-left transition-all',
+                        isSelected
+                          ? 'border-2 border-primary-400 bg-primary-50 shadow-sm dark:border-primary-600 dark:bg-primary-900/20'
+                          : 'border border-gray-100 bg-gray-50 hover:border-gray-200 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-700/50 dark:hover:bg-gray-700'
                       )}
-                    </div>
-                  </div>
-                ))}
+                    >
+                      <div className="mb-2 flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-gray-900 dark:text-white">
+                            {a.branch.name}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {a.branch.code}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {a.available > 0 ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                              <CheckCircle className="h-3 w-3" />
+                              {a.available} available
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                              <XCircle className="h-3 w-3" />
+                              Unavailable
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {/* Per-branch progress bar */}
+                      <div className="h-1.5 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-600">
+                        <div
+                          className={cn(
+                            'h-full rounded-full transition-all duration-500',
+                            branchPercent > 50
+                              ? 'bg-green-500'
+                              : branchPercent > 0
+                                ? 'bg-amber-500'
+                                : 'bg-red-400'
+                          )}
+                          style={{ width: `${branchPercent}%` }}
+                        />
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {a.available} of {a.total} copies
+                      </p>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
