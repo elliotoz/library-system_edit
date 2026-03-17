@@ -41,9 +41,24 @@ export class BooksService {
       where.category = category;
     }
 
+    // Availability filter — applied at DB level so pagination is correct
+    if (availability === "available") {
+      where.copies = { some: { status: BookCopyStatus.AVAILABLE } };
+    } else if (availability === "ebook-only") {
+      where.isEbookAvailable = true;
+      where.copies = { none: {} };
+    } else if (availability === "unavailable") {
+      // Has at least one physical copy but none are available
+      where.AND = [
+        { copies: { some: {} } },
+        { NOT: { copies: { some: { status: BookCopyStatus.AVAILABLE } } } },
+      ];
+    }
+
     const orderBy: any = {};
     if (sortBy === "author") {
-      orderBy.authors = sortOrder;
+      // authors is a String[] — Prisma cannot order by array fields; fall back to createdAt
+      orderBy.createdAt = sortOrder;
     } else if (sortBy === "year") {
       orderBy.publicationYear = sortOrder;
     } else {
@@ -75,6 +90,8 @@ export class BooksService {
         totalCopies,
         availableCopies,
         isAvailable: availableCopies > 0,
+        isEbookAvailable: book.isEbookAvailable,
+        ebookUrl: book.ebookUrl,
       };
     });
 

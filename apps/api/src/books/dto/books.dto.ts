@@ -29,7 +29,7 @@ export class BookQueryDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  availability?: "all" | "available" | "unavailable";
+  availability?: "all" | "available" | "unavailable" | "ebook-only";
 
   @ApiPropertyOptional()
   @IsOptional()

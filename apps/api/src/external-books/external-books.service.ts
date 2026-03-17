@@ -44,6 +44,16 @@ export class ExternalBooksService {
           `A book with ISBN ${dto.isbn} already exists in the catalog.`,
         );
       }
+    } else {
+      // No ISBN — check by title + source to avoid duplicates
+      const existing = await this.prisma.book.findFirst({
+        where: { title: dto.title, source: dto.source },
+      });
+      if (existing) {
+        throw new ConflictException(
+          `"${dto.title}" already exists in the catalog.`,
+        );
+      }
     }
 
     return this.prisma.book.create({
@@ -104,7 +114,7 @@ export class ExternalBooksService {
     const url =
       `https://openlibrary.org/search.json` +
       `?q=the&has_fulltext=true&limit=100` +
-      `&fields=title,author_name,isbn,cover_i,first_publish_year,key`;
+      `&fields=title,author_name,isbn,cover_i,first_publish_year,key,first_sentence`;
 
     let books: NormalizedBook[] = [];
     try {
@@ -112,6 +122,7 @@ export class ExternalBooksService {
       books = (data.docs ?? []).map((doc: any): NormalizedBook => ({
         title: doc.title || 'Untitled',
         authors: Array.isArray(doc.author_name) ? doc.author_name : [],
+        description: this.extractOLDescription(doc),
         coverImageUrl: doc.cover_i
           ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`
           : undefined,
@@ -176,13 +187,14 @@ export class ExternalBooksService {
     const url =
       `https://openlibrary.org/search.json` +
       `?q=${encodeURIComponent(q)}&limit=15` +
-      `&fields=title,author_name,isbn,cover_i,first_publish_year,key`;
+      `&fields=title,author_name,isbn,cover_i,first_publish_year,key,first_sentence`;
 
     const data = await this.httpGet(url);
 
     return (data.docs ?? []).map((doc: any): NormalizedBook => ({
       title: doc.title || 'Untitled',
       authors: Array.isArray(doc.author_name) ? doc.author_name : [],
+      description: this.extractOLDescription(doc),
       coverImageUrl: doc.cover_i
         ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`
         : undefined,
@@ -211,6 +223,10 @@ export class ExternalBooksService {
       authors: Array.isArray(book.authors)
         ? book.authors.map((a: any) => a.name).filter(Boolean)
         : [],
+      description:
+        Array.isArray(book.subjects) && book.subjects.length > 0
+          ? book.subjects.slice(0, 6).join(' · ')
+          : undefined,
       coverImageUrl: book.formats?.['image/jpeg'] ?? undefined,
       ebookUrl:
         book.formats?.['text/html'] ??
@@ -220,6 +236,15 @@ export class ExternalBooksService {
       isbn: undefined,
       publicationYear: undefined,
     }));
+  }
+
+  /** Extract a readable description from an Open Library search doc */
+  private extractOLDescription(doc: any): string | undefined {
+    const fs = doc.first_sentence;
+    if (!fs) return undefined;
+    if (typeof fs === 'string') return fs;
+    if (typeof fs === 'object' && fs.value) return String(fs.value);
+    return undefined;
   }
 
   // ── HTTP helper (Node.js built-in, no external deps) ──────────

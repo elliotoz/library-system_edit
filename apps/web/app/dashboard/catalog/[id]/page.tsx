@@ -278,24 +278,30 @@ export default function BookDetailPage() {
 
             {/* Overall availability status */}
             <div className="mb-4 flex items-center gap-2">
-              <div
-                className={cn(
-                  'h-3 w-3 rounded-full',
-                  book.isAvailable ? 'bg-green-500' : 'bg-red-500'
-                )}
-              />
-              <span
-                className={cn(
-                  'font-medium',
-                  book.isAvailable
-                    ? 'text-green-700 dark:text-green-400'
-                    : 'text-red-700 dark:text-red-400'
-                )}
-              >
-                {book.isAvailable
-                  ? `${book.availableCopies} of ${book.totalCopies} copies available`
-                  : 'Currently unavailable'}
-              </span>
+              {book.isAvailable ? (
+                <>
+                  <div className="h-3 w-3 rounded-full bg-green-500" />
+                  <span className="font-medium text-green-700 dark:text-green-400">
+                    {book.availableCopies} of {book.totalCopies} copies available
+                  </span>
+                </>
+              ) : book.totalCopies === 0 && book.isEbookAvailable ? (
+                <>
+                  <div className="h-3 w-3 rounded-full bg-blue-500" />
+                  <span className="font-medium text-blue-700 dark:text-blue-400">
+                    E-book available online
+                  </span>
+                </>
+              ) : (
+                <>
+                  <div className="h-3 w-3 rounded-full bg-red-500" />
+                  <span className="font-medium text-red-700 dark:text-red-400">
+                    {book.totalCopies > 0
+                      ? `All ${book.totalCopies} copies are currently borrowed`
+                      : 'Currently unavailable'}
+                  </span>
+                </>
+              )}
             </div>
 
             {/* Reservation limit info */}
@@ -321,6 +327,19 @@ export default function BookDetailPage() {
                   </p>
                 )}
               </div>
+            )}
+
+            {/* Ebook-only hint — show read button inline when no physical copies */}
+            {(!book.availability || book.availability.length === 0) && book.isEbookAvailable && book.ebookUrl && (
+              <a
+                href={book.ebookUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white py-2.5 text-sm font-medium transition-colors"
+              >
+                <BookOpen className="h-4 w-4" />
+                Read E-book Online
+              </a>
             )}
 
             {/* Branch selection & Reserve button */}
@@ -429,12 +448,12 @@ export default function BookDetailPage() {
               </div>
             )}
 
-            {/* No branches warning */}
-            {(!book.availability || book.availability.length === 0) && (
+            {/* No physical copies warning — only show for non-ebook-only books */}
+            {(!book.availability || book.availability.length === 0) && !book.isEbookAvailable && (
               <div className="rounded-lg bg-amber-50 p-3 dark:bg-amber-900/20">
                 <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
                   <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm">No copies in the system</span>
+                  <span className="text-sm">No physical copies in the system</span>
                 </div>
               </div>
             )}

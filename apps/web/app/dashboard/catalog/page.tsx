@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Search, Filter, Grid, List, BookOpen, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Search, Filter, Grid, List, BookOpen, ChevronLeft, ChevronRight, X, Laptop } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Book {
@@ -19,6 +19,8 @@ interface Book {
   totalCopies: number;
   availableCopies: number;
   isAvailable: boolean;
+  isEbookAvailable: boolean;
+  ebookUrl: string | null;
 }
 
 interface Faculty {
@@ -37,6 +39,28 @@ interface PaginationMeta {
   hasPreviousPage: boolean;
 }
 
+type AvailabilityFilter = 'all' | 'available' | 'unavailable' | 'ebook-only';
+
+/** Returns the badge props for a book based on physical copy + ebook state */
+function availabilityBadge(book: Book): { label: string; className: string } {
+  if (book.availableCopies > 0) {
+    return {
+      label: `${book.availableCopies} Available`,
+      className: 'bg-green-50 text-green-700',
+    };
+  }
+  if (book.totalCopies === 0 && book.isEbookAvailable) {
+    return {
+      label: 'E-book Only',
+      className: 'bg-blue-50 text-blue-700',
+    };
+  }
+  return {
+    label: 'Unavailable',
+    className: 'bg-red-50 text-red-700',
+  };
+}
+
 export default function CatalogPage() {
   const [books, setBooks] = useState<Book[]>([]);
   const [faculties, setFaculties] = useState<Faculty[]>([]);
@@ -49,7 +73,7 @@ export default function CatalogPage() {
   const [search, setSearch] = useState('');
   const [selectedFaculty, setSelectedFaculty] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [availability, setAvailability] = useState<'all' | 'available' | 'unavailable'>('all');
+  const [availability, setAvailability] = useState<AvailabilityFilter>('all');
   const [sortBy, setSortBy] = useState('title');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
@@ -61,7 +85,6 @@ export default function CatalogPage() {
           fetch('/api/books/faculties', { credentials: 'include' }),
           fetch('/api/books/categories', { credentials: 'include' }),
         ]);
-
         if (facultiesRes.ok) setFaculties(await facultiesRes.json());
         if (categoriesRes.ok) setCategories(await categoriesRes.json());
       } catch (error) {
@@ -76,14 +99,12 @@ export default function CatalogPage() {
       setIsLoading(true);
       try {
         const params = new URLSearchParams({ page: page.toString(), pageSize: '12', sortBy, sortOrder });
-
         if (search) params.append('search', search);
         if (selectedFaculty) params.append('facultyId', selectedFaculty);
         if (selectedCategory) params.append('category', selectedCategory);
         if (availability !== 'all') params.append('availability', availability);
 
         const response = await fetch(`/api/books?${params}`, { credentials: 'include' });
-
         if (response.ok) {
           const data = await response.json();
           setBooks(data.data);
@@ -107,6 +128,21 @@ export default function CatalogPage() {
 
   const hasActiveFilters = search || selectedFaculty || selectedCategory || availability !== 'all';
 
+  const BookCover = ({ book, className }: { book: Book; className: string }) => (
+    <div className={cn('overflow-hidden rounded-lg bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center', className)}>
+      {book.coverImageUrl ? (
+        <img
+          src={book.coverImageUrl}
+          alt={book.title}
+          className="h-full w-full object-cover"
+          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+        />
+      ) : (
+        <BookOpen className="w-10 h-10 text-primary-400" />
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -114,6 +150,7 @@ export default function CatalogPage() {
         <p className="text-gray-500 mt-1">Browse and search our collection of {meta?.total || 0} books</p>
       </div>
 
+      {/* Search + filter bar */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1 relative">
@@ -137,11 +174,19 @@ export default function CatalogPage() {
               <Filter className="w-4 h-4" /> Filters
               {hasActiveFilters && <span className="w-2 h-2 bg-primary-500 rounded-full" />}
             </button>
-            <div className="flex items-center border border-gray-200 rounded-lg">
-              <button onClick={() => setViewMode('grid')} className={cn('p-2.5', viewMode === 'grid' ? 'bg-gray-100 text-gray-900' : 'text-gray-400')}>
+            <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={cn('p-2.5 transition-colors', viewMode === 'grid' ? 'bg-primary-500 text-white' : 'text-gray-400 hover:bg-gray-50')}
+                aria-label="Grid view"
+              >
                 <Grid className="w-4 h-4" />
               </button>
-              <button onClick={() => setViewMode('list')} className={cn('p-2.5', viewMode === 'list' ? 'bg-gray-100 text-gray-900' : 'text-gray-400')}>
+              <button
+                onClick={() => setViewMode('list')}
+                className={cn('p-2.5 transition-colors', viewMode === 'list' ? 'bg-primary-500 text-white' : 'text-gray-400 hover:bg-gray-50')}
+                aria-label="List view"
+              >
                 <List className="w-4 h-4" />
               </button>
             </div>
@@ -167,17 +212,18 @@ export default function CatalogPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Availability</label>
-                <select value={availability} onChange={(e) => { setAvailability(e.target.value as any); setPage(1); }} className="w-full px-3 py-2 border border-gray-200 rounded-lg">
+                <select value={availability} onChange={(e) => { setAvailability(e.target.value as AvailabilityFilter); setPage(1); }} className="w-full px-3 py-2 border border-gray-200 rounded-lg">
                   <option value="all">All Books</option>
-                  <option value="available">Available Only</option>
-                  <option value="unavailable">Unavailable</option>
+                  <option value="available">Available (Physical Copy)</option>
+                  <option value="ebook-only">E-book Only</option>
+                  <option value="unavailable">Unavailable (All Borrowed)</option>
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
-                <select value={`${sortBy}-${sortOrder}`} onChange={(e) => { const [f, o] = e.target.value.split('-'); setSortBy(f); setSortOrder(o as any); setPage(1); }} className="w-full px-3 py-2 border border-gray-200 rounded-lg">
-                  <option value="title-asc">Title (A-Z)</option>
-                  <option value="title-desc">Title (Z-A)</option>
+                <select value={`${sortBy}-${sortOrder}`} onChange={(e) => { const [f, o] = e.target.value.split('-'); setSortBy(f); setSortOrder(o as 'asc' | 'desc'); setPage(1); }} className="w-full px-3 py-2 border border-gray-200 rounded-lg">
+                  <option value="title-asc">Title (A–Z)</option>
+                  <option value="title-desc">Title (Z–A)</option>
                   <option value="year-desc">Newest First</option>
                   <option value="year-asc">Oldest First</option>
                 </select>
@@ -196,7 +242,8 @@ export default function CatalogPage() {
 
       <p className="text-sm text-gray-500">Showing {books.length} of {meta?.total || 0} books</p>
 
-      {isLoading ? (
+      {/* Loading skeleton */}
+      {isLoading && viewMode === 'grid' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 animate-pulse">
@@ -206,55 +253,110 @@ export default function CatalogPage() {
             </div>
           ))}
         </div>
-      ) : books.length === 0 ? (
+      )}
+
+      {isLoading && viewMode === 'list' && (
+        <div className="space-y-2">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 animate-pulse flex gap-4">
+              <div className="w-12 h-16 bg-gray-200 rounded-lg shrink-0" />
+              <div className="flex-1 space-y-2 py-1">
+                <div className="h-4 bg-gray-200 rounded w-3/4" />
+                <div className="h-3 bg-gray-200 rounded w-1/2" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!isLoading && books.length === 0 && (
         <div className="text-center py-12">
           <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No books found</h3>
           <p className="text-gray-500 mb-4">Try adjusting your search or filters</p>
           <button onClick={clearFilters} className="text-primary-600 hover:text-primary-700 font-medium">Clear all filters</button>
         </div>
-      ) : (
+      )}
+
+      {/* Grid view */}
+      {!isLoading && books.length > 0 && viewMode === 'grid' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {books.map((book) => (
-            <Link key={book.id} href={`/dashboard/catalog/${book.id}`} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg hover:border-primary-200 transition-all group">
-              <div className="aspect-[2/3] w-full overflow-hidden rounded-lg mb-4 bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
-                {book.coverImageUrl ? (
-                  <img
-                    src={book.coverImageUrl}
-                    alt={book.title}
-                    className="h-full w-full object-cover"
-                    onError={(e) => {
-                      const target = e.currentTarget;
-                      target.style.display = 'none';
-                      target.parentElement?.classList.add('flex', 'items-center', 'justify-center');
-                      const icon = document.createElement('div');
-                      icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-primary-400"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>';
-                      target.parentElement?.appendChild(icon);
-                    }}
-                  />
-                ) : (
-                  <BookOpen className="w-16 h-16 text-primary-400" />
-                )}
-              </div>
-              <h3 className="font-medium text-gray-900 group-hover:text-primary-600 line-clamp-2 mb-1">{book.title}</h3>
-              <p className="text-sm text-gray-500 line-clamp-1 mb-2">{book.authors.join(', ')}</p>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className={cn('text-xs px-2 py-1 rounded-full font-medium', book.isAvailable ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700')}>
-                  {book.isAvailable ? `${book.availableCopies} Available` : 'Unavailable'}
-                </span>
-                {book.mainFaculty && <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full">{book.mainFaculty.code}</span>}
-              </div>
-            </Link>
-          ))}
+          {books.map((book) => {
+            const badge = availabilityBadge(book);
+            return (
+              <Link key={book.id} href={`/dashboard/catalog/${book.id}`} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg hover:border-primary-200 transition-all group flex flex-col">
+                <div className="aspect-[2/3] w-full mb-4">
+                  <BookCover book={book} className="w-full h-full" />
+                </div>
+                <h3 className="font-medium text-gray-900 group-hover:text-primary-600 line-clamp-2 mb-1">{book.title}</h3>
+                <p className="text-sm text-gray-500 line-clamp-1 mb-2">{book.authors.join(', ') || 'Unknown author'}</p>
+                <div className="flex items-center gap-2 flex-wrap mt-auto">
+                  <span className={cn('text-xs px-2 py-1 rounded-full font-medium', badge.className)}>
+                    {badge.label}
+                  </span>
+                  {book.isEbookAvailable && book.totalCopies > 0 && (
+                    <span className="text-xs px-2 py-1 rounded-full font-medium bg-blue-50 text-blue-700 flex items-center gap-1">
+                      <Laptop className="w-3 h-3" /> E-book
+                    </span>
+                  )}
+                  {book.mainFaculty && <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full">{book.mainFaculty.code}</span>}
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
 
+      {/* List view */}
+      {!isLoading && books.length > 0 && viewMode === 'list' && (
+        <div className="space-y-2">
+          {books.map((book) => {
+            const badge = availabilityBadge(book);
+            return (
+              <Link key={book.id} href={`/dashboard/catalog/${book.id}`} className="bg-white rounded-xl border border-gray-200 p-3 hover:shadow-md hover:border-primary-200 transition-all group flex items-center gap-4">
+                {/* Thumbnail */}
+                <BookCover book={book} className="w-12 h-16 shrink-0" />
+
+                {/* Main info */}
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-medium text-gray-900 group-hover:text-primary-600 truncate">{book.title}</h3>
+                  <p className="text-sm text-gray-500 truncate">{book.authors.join(', ') || 'Unknown author'}</p>
+                  {book.description && (
+                    <p className="text-xs text-gray-400 line-clamp-1 mt-0.5">{book.description}</p>
+                  )}
+                </div>
+
+                {/* Meta */}
+                <div className="hidden sm:flex flex-col items-end gap-1.5 shrink-0">
+                  <span className={cn('text-xs px-2 py-1 rounded-full font-medium', badge.className)}>
+                    {badge.label}
+                  </span>
+                  {book.isEbookAvailable && book.totalCopies > 0 && (
+                    <span className="text-xs px-2 py-1 rounded-full font-medium bg-blue-50 text-blue-700 flex items-center gap-1">
+                      <Laptop className="w-3 h-3" /> E-book
+                    </span>
+                  )}
+                  {book.mainFaculty && (
+                    <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full">{book.mainFaculty.code}</span>
+                  )}
+                  {book.publicationYear && (
+                    <span className="text-xs text-gray-400">{book.publicationYear}</span>
+                  )}
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Pagination */}
       {meta && meta.totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
           <button onClick={() => setPage(page - 1)} disabled={!meta.hasPreviousPage} className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50">
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <span className="px-4 py-2">Page {page} of {meta.totalPages}</span>
+          <span className="px-4 py-2 text-sm">Page {page} of {meta.totalPages}</span>
           <button onClick={() => setPage(page + 1)} disabled={!meta.hasNextPage} className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50">
             <ChevronRight className="w-5 h-5" />
           </button>
