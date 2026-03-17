@@ -4,6 +4,16 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-17 — Catalog page visual redesign
+**Goal**: Improve catalog listing page design without changing logic
+**Root cause**: Page lacked dark mode, had plain card design, basic pagination, no filter chips
+**Changes**:
+- `apps/web/app/dashboard/catalog/page.tsx` — full dark mode support, card hover-lift animation, spine-style cover placeholder, inline dismissible filter chips, numbered pagination with ellipsis, polished header with total count badge, improved skeleton and empty state
+**Verification**: tsc --noEmit ✓  |  next build N/A (tsc used per project convention)
+**Next**: Book detail page could receive similar polish pass if desired
+
+---
+
 ## 2026-03-17 — Fix book catalog: availability filter, list view, ebook-only UX, dedup
 **Goal**: Fix all broken catalog features reported after browser testing.
 **Root cause**: Availability filter was never applied in Prisma query; list view had no render code; ebook-only books showed as "Unavailable"; Gutendex re-import created duplicates; no descriptions saved for imported books.
