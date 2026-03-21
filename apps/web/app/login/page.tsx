@@ -9,6 +9,8 @@ import { Eye, EyeOff, Mail, Lock, ArrowRight, Library } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { authApi } from '@/lib/api';
 import { DASHBOARD_ROUTES, Role } from '@/types';
+import { SplineScene } from '@/components/ui/spline-scene';
+import { Spotlight } from '@/components/ui/spotlight';
 
 // Deterministic particles — no Math.random() to avoid hydration mismatch
 const PARTICLES = Array.from({ length: 28 }, (_, i) => ({
@@ -81,36 +83,6 @@ export default function LoginPage() {
   return (
     <>
       <style>{`
-        @keyframes robot-float {
-          0%, 100% { transform: translateY(0px); }
-          50%       { transform: translateY(-18px); }
-        }
-        @keyframes eye-pulse {
-          0%, 100% { opacity: 1; }
-          50%       { opacity: 0.4; }
-        }
-        @keyframes eye-scan {
-          0%, 80%, 100% { transform: translateX(0); }
-          40%           { transform: translateX(5px); }
-        }
-        @keyframes scan-line {
-          0%   { transform: translateY(-100%); opacity: 0; }
-          10%  { opacity: 0.5; }
-          90%  { opacity: 0.5; }
-          100% { transform: translateY(600%); opacity: 0; }
-        }
-        @keyframes platform-pulse {
-          0%, 100% { opacity: 0.45; rx: 70; }
-          50%       { opacity: 0.85; rx: 80; }
-        }
-        @keyframes orbit-ring {
-          from { transform: rotateY(0deg) rotateX(20deg); }
-          to   { transform: rotateY(360deg) rotateX(20deg); }
-        }
-        @keyframes orbit-ring2 {
-          from { transform: rotateY(60deg) rotateX(-15deg); }
-          to   { transform: rotateY(420deg) rotateX(-15deg); }
-        }
         @keyframes star-twinkle {
           0%, 100% { opacity: var(--op); transform: scale(1); }
           50%       { opacity: calc(var(--op) * 2); transform: scale(1.4); }
@@ -131,16 +103,6 @@ export default function LoginPage() {
           0%   { transform: translateY(120%); }
           100% { transform: translateY(-320%); }
         }
-        @keyframes chest-blink {
-          0%, 90%, 100% { opacity: 1; }
-          95%            { opacity: 0.2; }
-        }
-        .robot-float    { animation: robot-float 4.2s ease-in-out infinite; }
-        .eye-pulse      { animation: eye-pulse 2s ease-in-out infinite; }
-        .eye-scan       { animation: eye-scan 3.5s ease-in-out infinite; }
-        .scan-line-anim { animation: scan-line 3.5s ease-in-out infinite; }
-        .platform-anim  { animation: platform-pulse 3s ease-in-out infinite; }
-        .chest-blink    { animation: chest-blink 2.4s ease-in-out infinite; }
       `}</style>
 
       <div className="min-h-screen flex overflow-hidden"
@@ -162,151 +124,21 @@ export default function LoginPage() {
         </div>
 
         {/* ════════════════════════════════════════════
-            LEFT PANEL — AI Robot
+            LEFT PANEL — 3D AI Robot (Spline)
         ════════════════════════════════════════════ */}
         <div className="hidden lg:flex lg:w-[58%] flex-col items-center justify-center relative px-12 py-10">
 
-          {/* Ambient radial glow behind robot */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[55%] w-[480px] h-[480px] rounded-full pointer-events-none"
-            style={{ background: 'radial-gradient(circle, rgba(42,157,157,0.13) 0%, transparent 65%)' }} />
-
-          {/* 3-D orbital rings */}
-          <div className="absolute top-[42%] left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-            style={{ perspective: '700px', width: '340px', height: '340px' }}>
-            <div style={{ animation: 'orbit-ring 9s linear infinite', transformStyle: 'preserve-3d' }}
-              className="absolute inset-0 rounded-full border border-teal-500/25 border-dashed" />
-            <div style={{ animation: 'orbit-ring2 14s linear infinite', transformStyle: 'preserve-3d' }}
-              className="absolute -inset-10 rounded-full border border-teal-400/15" />
-          </div>
-
-          {/* ── Robot SVG ── */}
-          <div className="robot-float relative z-10 select-none mb-6">
-            <svg width="300" height="360" viewBox="0 0 300 360" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <radialGradient id="bodyGrad" cx="50%" cy="25%" r="75%">
-                  <stop offset="0%" stopColor="#1a2f48" />
-                  <stop offset="100%" stopColor="#080f1e" />
-                </radialGradient>
-                <radialGradient id="platGrad" cx="50%" cy="50%" r="50%">
-                  <stop offset="0%" stopColor="#2A9D9D" stopOpacity="0.7" />
-                  <stop offset="100%" stopColor="#2A9D9D" stopOpacity="0" />
-                </radialGradient>
-                <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
-                  <feGaussianBlur stdDeviation="3" result="b" />
-                  <feComposite in="SourceGraphic" in2="b" operator="over" />
-                </filter>
-                <clipPath id="headClip">
-                  <rect x="72" y="50" width="156" height="88" rx="18" />
-                </clipPath>
-                <clipPath id="visorClip">
-                  <rect x="80" y="72" width="140" height="40" rx="8" />
-                </clipPath>
-              </defs>
-
-              {/* Glow platform */}
-              <ellipse cx="150" cy="348" rx="72" ry="11" fill="url(#platGrad)" className="platform-anim" />
-
-              {/* ── Legs ── */}
-              <rect x="96" y="238" width="38" height="72" rx="11" fill="url(#bodyGrad)" stroke="#2A9D9D" strokeWidth="1.5" />
-              <rect x="166" y="238" width="38" height="72" rx="11" fill="url(#bodyGrad)" stroke="#2A9D9D" strokeWidth="1.5" />
-              {/* Feet */}
-              <rect x="88"  y="298" width="52" height="20" rx="8" fill="#06111f" stroke="#4ABFBF" strokeWidth="1.2" />
-              <rect x="160" y="298" width="52" height="20" rx="8" fill="#06111f" stroke="#4ABFBF" strokeWidth="1.2" />
-              {/* Knee joints */}
-              <circle cx="115" cy="260" r="5" fill="#2A9D9D" opacity="0.5" />
-              <circle cx="185" cy="260" r="5" fill="#2A9D9D" opacity="0.5" />
-
-              {/* ── Body ── */}
-              <rect x="72" y="142" width="156" height="106" rx="16" fill="url(#bodyGrad)" stroke="#2A9D9D" strokeWidth="1.8" />
-
-              {/* Chest panel background */}
-              <rect x="95" y="158" width="110" height="76" rx="10" fill="#040d1a" stroke="#4ABFBF" strokeWidth="1" />
-
-              {/* Chest accent line top */}
-              <rect x="95" y="158" width="110" height="4" rx="2" fill="#2A9D9D" opacity="0.4" />
-
-              {/* Chest lights */}
-              <circle cx="123" cy="178" r="7" fill="#2A9D9D" className="chest-blink eye-pulse" style={{ animationDelay: '0s' }} filter="url(#glow)" />
-              <circle cx="150" cy="178" r="7" fill="#4ABFBF" className="chest-blink eye-pulse" style={{ animationDelay: '0.5s' }} filter="url(#glow)" />
-              <circle cx="177" cy="178" r="7" fill="#2A9D9D" className="chest-blink eye-pulse" style={{ animationDelay: '1s' }} filter="url(#glow)" />
-
-              {/* Circuit lines */}
-              <line x1="123" y1="185" x2="123" y2="222" stroke="#2A9D9D" strokeWidth="1" strokeOpacity="0.45" strokeDasharray="4 3" />
-              <line x1="150" y1="185" x2="150" y2="222" stroke="#4ABFBF" strokeWidth="1" strokeOpacity="0.5" strokeDasharray="4 3" />
-              <line x1="177" y1="185" x2="177" y2="222" stroke="#2A9D9D" strokeWidth="1" strokeOpacity="0.45" strokeDasharray="4 3" />
-              <line x1="100" y1="203" x2="200" y2="203" stroke="#2A9D9D" strokeWidth="0.8" strokeOpacity="0.3" />
-              <line x1="100" y1="215" x2="200" y2="215" stroke="#2A9D9D" strokeWidth="0.8" strokeOpacity="0.2" />
-
-              {/* Body side bolts */}
-              <circle cx="80"  cy="165" r="4" fill="#0d1c2e" stroke="#2A9D9D" strokeWidth="1" />
-              <circle cx="80"  cy="235" r="4" fill="#0d1c2e" stroke="#2A9D9D" strokeWidth="1" />
-              <circle cx="220" cy="165" r="4" fill="#0d1c2e" stroke="#2A9D9D" strokeWidth="1" />
-              <circle cx="220" cy="235" r="4" fill="#0d1c2e" stroke="#2A9D9D" strokeWidth="1" />
-
-              {/* ── Arms ── */}
-              {/* Left arm */}
-              <rect x="32" y="148" width="38" height="84" rx="12" fill="url(#bodyGrad)" stroke="#2A9D9D" strokeWidth="1.5" />
-              <rect x="28" y="218" width="46" height="28" rx="9" fill="#06111f" stroke="#4ABFBF" strokeWidth="1.2" />
-              <circle cx="51" cy="171" r="5" fill="#2A9D9D" opacity="0.3" />
-
-              {/* Right arm */}
-              <rect x="230" y="148" width="38" height="84" rx="12" fill="url(#bodyGrad)" stroke="#2A9D9D" strokeWidth="1.5" />
-              <rect x="226" y="218" width="46" height="28" rx="9" fill="#06111f" stroke="#4ABFBF" strokeWidth="1.2" />
-              <circle cx="249" cy="171" r="5" fill="#2A9D9D" opacity="0.3" />
-
-              {/* ── Neck ── */}
-              <rect x="126" y="126" width="48" height="20" rx="7" fill="#0a1628" stroke="#2A9D9D" strokeWidth="1.2" />
-              <rect x="133" y="130" width="34" height="4" rx="2" fill="#2A9D9D" opacity="0.3" />
-
-              {/* ── Head ── */}
-              <rect x="72" y="50" width="156" height="88" rx="18" fill="url(#bodyGrad)" stroke="#2A9D9D" strokeWidth="2" />
-
-              {/* Head corner accents */}
-              <rect x="72"  y="50"  width="16" height="4" rx="2" fill="#4ABFBF" opacity="0.6" />
-              <rect x="212" y="50"  width="16" height="4" rx="2" fill="#4ABFBF" opacity="0.6" />
-              <rect x="72"  y="134" width="16" height="4" rx="2" fill="#4ABFBF" opacity="0.6" />
-              <rect x="212" y="134" width="16" height="4" rx="2" fill="#4ABFBF" opacity="0.6" />
-
-              {/* ── Antenna ── */}
-              <rect x="147" y="18" width="6" height="34" rx="3" fill="#4ABFBF" />
-              <circle cx="150" cy="14" r="9" fill="#2A9D9D" className="eye-pulse" filter="url(#glow)" />
-              <circle cx="150" cy="14" r="5" fill="#4ABFBF" />
-              <circle cx="150" cy="14" r="2" fill="white" opacity="0.8" />
-
-              {/* ── Visor / Eyes ── */}
-              {/* Eye sockets */}
-              <rect x="82"  y="68" width="50" height="34" rx="10" fill="#030b15" />
-              <rect x="168" y="68" width="50" height="34" rx="10" fill="#030b15" />
-
-              {/* Eye glow */}
-              <rect x="85"  y="71" width="44" height="28" rx="8" fill="#2A9D9D" className="eye-pulse" opacity="0.9" />
-              <rect x="171" y="71" width="44" height="28" rx="8" fill="#2A9D9D" className="eye-pulse" opacity="0.9" />
-
-              {/* Eye pupils */}
-              <rect x="98"  y="78" width="16" height="14" rx="4" fill="white" opacity="0.92" className="eye-scan" />
-              <rect x="184" y="78" width="16" height="14" rx="4" fill="white" opacity="0.92" className="eye-scan" />
-
-              {/* Pupil highlight */}
-              <rect x="101" y="80" width="6" height="5" rx="2" fill="white" opacity="0.5" />
-              <rect x="187" y="80" width="6" height="5" rx="2" fill="white" opacity="0.5" />
-
-              {/* Scan line across head */}
-              <rect x="72" y="0" width="156" height="10" fill="#4ABFBF" opacity="0.12"
-                clipPath="url(#headClip)" className="scan-line-anim" />
-
-              {/* ── Mouth grill ── */}
-              <rect x="110" y="114" width="80" height="16" rx="6" fill="#030b15" stroke="#2A9D9D" strokeWidth="1" strokeOpacity="0.5" />
-              {[118, 130, 142, 150, 162, 174, 182].map((x, i) => (
-                <line key={i} x1={x} y1="114" x2={x} y2="130"
-                  stroke={x === 150 ? '#4ABFBF' : '#2A9D9D'}
-                  strokeWidth={x === 150 ? 1.5 : 1}
-                  strokeOpacity={x === 150 ? 0.7 : 0.35} />
-              ))}
-            </svg>
+          {/* Spline 3D scene */}
+          <div className="relative w-full flex-1 min-h-0">
+            <Spotlight className="-top-40 left-0 md:left-60 md:-top-20" fill="rgba(42,157,157,0.45)" />
+            <SplineScene
+              scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+              className="w-full h-full"
+            />
           </div>
 
           {/* Branding text */}
-          <div className="relative z-10 text-center max-w-md">
+          <div className="relative z-10 text-center max-w-md mt-4">
             <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-4"
               style={{ background: 'rgba(42,157,157,0.1)', border: '1px solid rgba(42,157,157,0.25)' }}>
               <Library className="w-4 h-4 text-teal-400" />

@@ -8,6 +8,8 @@ import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Library } from 'lucide-react
 import { authApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { DASHBOARD_ROUTES, Role } from '@/types';
+import { SplineScene } from '@/components/ui/spline-scene';
+import { Spotlight } from '@/components/ui/spotlight';
 
 const PARTICLES = Array.from({ length: 24 }, (_, i) => ({
   id: i,
@@ -86,18 +88,6 @@ export default function SignupPage() {
   return (
     <>
       <style>{`
-        @keyframes robot-float-sm {
-          0%, 100% { transform: translateY(0px) rotate(-2deg); }
-          50%       { transform: translateY(-12px) rotate(2deg); }
-        }
-        @keyframes eye-pulse-sm {
-          0%, 100% { opacity: 1; }
-          50%       { opacity: 0.35; }
-        }
-        @keyframes orbit-sm {
-          from { transform: rotateY(0deg) rotateX(25deg); }
-          to   { transform: rotateY(360deg) rotateX(25deg); }
-        }
         @keyframes star-twinkle {
           0%, 100% { opacity: var(--op); }
           50%       { opacity: calc(var(--op) * 2.2); }
@@ -118,15 +108,6 @@ export default function SignupPage() {
           0%   { transform: translateY(120%); }
           100% { transform: translateY(-320%); }
         }
-        @keyframes scan-line {
-          0%   { transform: translateY(-100%); opacity: 0; }
-          10%  { opacity: 0.4; }
-          90%  { opacity: 0.4; }
-          100% { transform: translateY(600%); opacity: 0; }
-        }
-        .robot-float-sm { animation: robot-float-sm 5s ease-in-out infinite; }
-        .eye-sm         { animation: eye-pulse-sm 2.2s ease-in-out infinite; }
-        .scan-sm        { animation: scan-line 4s ease-in-out infinite; }
       `}</style>
 
       <div className="min-h-screen flex overflow-hidden"
@@ -148,111 +129,21 @@ export default function SignupPage() {
         </div>
 
         {/* ════════════════════════════════════════════
-            LEFT ACCENT PANEL (lg only) — compact robot
+            LEFT ACCENT PANEL (lg only) — 3D AI Robot (Spline)
         ════════════════════════════════════════════ */}
         <div className="hidden lg:flex lg:w-[38%] flex-col items-center justify-center relative px-10 py-12">
 
-          {/* Ambient glow */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full pointer-events-none"
-            style={{ background: 'radial-gradient(circle, rgba(42,157,157,0.12) 0%, transparent 65%)' }} />
-
-          {/* Orbit ring */}
-          <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-            style={{ perspective: '600px', width: '260px', height: '260px' }}>
-            <div style={{ animation: 'orbit-sm 11s linear infinite', transformStyle: 'preserve-3d' }}
-              className="absolute inset-0 rounded-full border border-teal-500/20 border-dashed" />
-          </div>
-
-          {/* Compact robot */}
-          <div className="robot-float-sm relative z-10 mb-6 select-none">
-            <svg width="220" height="270" viewBox="0 0 220 270" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <radialGradient id="bGrad2" cx="50%" cy="25%" r="75%">
-                  <stop offset="0%" stopColor="#1a2f48" />
-                  <stop offset="100%" stopColor="#080f1e" />
-                </radialGradient>
-                <radialGradient id="platGrad2" cx="50%" cy="50%" r="50%">
-                  <stop offset="0%" stopColor="#2A9D9D" stopOpacity="0.65" />
-                  <stop offset="100%" stopColor="#2A9D9D" stopOpacity="0" />
-                </radialGradient>
-                <filter id="glow2" x="-60%" y="-60%" width="220%" height="220%">
-                  <feGaussianBlur stdDeviation="2.5" result="b" />
-                  <feComposite in="SourceGraphic" in2="b" operator="over" />
-                </filter>
-                <clipPath id="headClip2">
-                  <rect x="48" y="36" width="124" height="68" rx="14" />
-                </clipPath>
-              </defs>
-
-              {/* Platform */}
-              <ellipse cx="110" cy="260" rx="55" ry="9" fill="url(#platGrad2)" />
-
-              {/* Legs */}
-              <rect x="70" y="180" width="28" height="54" rx="9" fill="url(#bGrad2)" stroke="#2A9D9D" strokeWidth="1.3" />
-              <rect x="122" y="180" width="28" height="54" rx="9" fill="url(#bGrad2)" stroke="#2A9D9D" strokeWidth="1.3" />
-              <rect x="64" y="225" width="38" height="16" rx="6" fill="#06111f" stroke="#4ABFBF" strokeWidth="1" />
-              <rect x="118" y="225" width="38" height="16" rx="6" fill="#06111f" stroke="#4ABFBF" strokeWidth="1" />
-
-              {/* Body */}
-              <rect x="54" y="110" width="112" height="78" rx="13" fill="url(#bGrad2)" stroke="#2A9D9D" strokeWidth="1.5" />
-
-              {/* Chest panel */}
-              <rect x="70" y="122" width="80" height="54" rx="8" fill="#040d1a" stroke="#4ABFBF" strokeWidth="0.8" />
-              <circle cx="90" cy="138" r="6" fill="#2A9D9D" className="eye-sm" style={{ animationDelay: '0s' }} filter="url(#glow2)" />
-              <circle cx="110" cy="138" r="6" fill="#4ABFBF" className="eye-sm" style={{ animationDelay: '0.5s' }} filter="url(#glow2)" />
-              <circle cx="130" cy="138" r="6" fill="#2A9D9D" className="eye-sm" style={{ animationDelay: '1s' }} filter="url(#glow2)" />
-              <line x1="90" y1="144" x2="90" y2="165" stroke="#2A9D9D" strokeWidth="0.8" strokeOpacity="0.4" strokeDasharray="3 2" />
-              <line x1="110" y1="144" x2="110" y2="165" stroke="#4ABFBF" strokeWidth="0.8" strokeOpacity="0.4" strokeDasharray="3 2" />
-              <line x1="130" y1="144" x2="130" y2="165" stroke="#2A9D9D" strokeWidth="0.8" strokeOpacity="0.4" strokeDasharray="3 2" />
-              <line x1="74" y1="155" x2="146" y2="155" stroke="#2A9D9D" strokeWidth="0.7" strokeOpacity="0.25" />
-
-              {/* Arms */}
-              <rect x="22" y="114" width="30" height="62" rx="9" fill="url(#bGrad2)" stroke="#2A9D9D" strokeWidth="1.3" />
-              <rect x="19" y="163" width="36" height="22" rx="7" fill="#06111f" stroke="#4ABFBF" strokeWidth="1" />
-              <rect x="168" y="114" width="30" height="62" rx="9" fill="url(#bGrad2)" stroke="#2A9D9D" strokeWidth="1.3" />
-              <rect x="165" y="163" width="36" height="22" rx="7" fill="#06111f" stroke="#4ABFBF" strokeWidth="1" />
-
-              {/* Neck */}
-              <rect x="93" y="98" width="34" height="16" rx="5" fill="#0a1628" stroke="#2A9D9D" strokeWidth="1" />
-
-              {/* Head */}
-              <rect x="48" y="36" width="124" height="68" rx="14" fill="url(#bGrad2)" stroke="#2A9D9D" strokeWidth="1.8" />
-              {/* Corner accents */}
-              <rect x="48"  y="36"  width="12" height="3" rx="1.5" fill="#4ABFBF" opacity="0.5" />
-              <rect x="160" y="36"  width="12" height="3" rx="1.5" fill="#4ABFBF" opacity="0.5" />
-              <rect x="48"  y="101" width="12" height="3" rx="1.5" fill="#4ABFBF" opacity="0.5" />
-              <rect x="160" y="101" width="12" height="3" rx="1.5" fill="#4ABFBF" opacity="0.5" />
-
-              {/* Antenna */}
-              <rect x="107" y="12" width="6" height="26" rx="3" fill="#4ABFBF" />
-              <circle cx="110" cy="9" r="7" fill="#2A9D9D" className="eye-sm" filter="url(#glow2)" />
-              <circle cx="110" cy="9" r="3" fill="white" opacity="0.8" />
-
-              {/* Eyes */}
-              <rect x="58"  y="52" width="40" height="26" rx="8" fill="#030b15" />
-              <rect x="122" y="52" width="40" height="26" rx="8" fill="#030b15" />
-              <rect x="61"  y="55" width="34" height="20" rx="6" fill="#2A9D9D" className="eye-sm" />
-              <rect x="125" y="55" width="34" height="20" rx="6" fill="#2A9D9D" className="eye-sm" />
-              <rect x="71"  y="60" width="12" height="10" rx="3" fill="white" opacity="0.9" />
-              <rect x="135" y="60" width="12" height="10" rx="3" fill="white" opacity="0.9" />
-
-              {/* Scan line */}
-              <rect x="48" y="0" width="124" height="8" fill="#4ABFBF" opacity="0.1"
-                clipPath="url(#headClip2)" className="scan-sm" />
-
-              {/* Mouth */}
-              <rect x="80" y="88" width="60" height="12" rx="5" fill="#030b15" stroke="#2A9D9D" strokeWidth="0.8" strokeOpacity="0.5" />
-              {[88, 98, 110, 122, 132].map((x, i) => (
-                <line key={i} x1={x} y1="88" x2={x} y2="100"
-                  stroke={x === 110 ? '#4ABFBF' : '#2A9D9D'}
-                  strokeWidth={x === 110 ? 1.2 : 0.8}
-                  strokeOpacity={x === 110 ? 0.65 : 0.3} />
-              ))}
-            </svg>
+          {/* Spline 3D scene */}
+          <div className="relative w-full flex-1 min-h-0">
+            <Spotlight className="-top-40 left-0 md:left-20 md:-top-20" fill="rgba(42,157,157,0.4)" />
+            <SplineScene
+              scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+              className="w-full h-full"
+            />
           </div>
 
           {/* Text */}
-          <div className="relative z-10 text-center">
+          <div className="relative z-10 text-center mt-4">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-3"
               style={{ background: 'rgba(42,157,157,0.1)', border: '1px solid rgba(42,157,157,0.22)' }}>
               <Library className="w-4 h-4 text-teal-400" />
