@@ -3,7 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
   images: {
-    domains: ['localhost', 'uskudar.edu.tr'],
+    domains: ['localhost'],
   },
   async rewrites() {
     return [

@@ -146,15 +146,13 @@ export default function SignupPage() {
           {/* Text */}
           <div className="relative z-10 text-center mt-4">
             <div className="inline-flex justify-center mb-3">
-              <div className="px-4 py-2 rounded-xl" style={{ background: 'white' }}>
-                <Image
-                  src="https://uskudar.edu.tr/assets/kurumsal/logo/png/uskudar-universitesi-logo.png"
-                  alt="Üsküdar University"
-                  width={130}
-                  height={36}
-                  className="object-contain"
-                />
-              </div>
+              <Image
+                src="/uskudar-logo.png"
+                alt="Üsküdar University"
+                width={130}
+                height={36}
+                className="object-contain"
+              />
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">Join the Library</h2>
             <p className="text-white/35 text-sm">Create your account and start exploring.</p>
@@ -170,15 +168,13 @@ export default function SignupPage() {
           <div className="w-full max-w-md">
             {/* Mobile header */}
             <div className="lg:hidden flex justify-center mb-8">
-              <div className="px-5 py-2.5 rounded-xl" style={{ background: 'white' }}>
-                <Image
-                  src="https://uskudar.edu.tr/assets/kurumsal/logo/png/uskudar-universitesi-logo.png"
-                  alt="Üsküdar University"
-                  width={140}
-                  height={40}
-                  className="object-contain"
-                />
-              </div>
+              <Image
+                src="/uskudar-logo.png"
+                alt="Üsküdar University"
+                width={140}
+                height={40}
+                className="object-contain"
+              />
             </div>
 
             {/* 3-D tilt card */}
@@ -220,9 +216,9 @@ export default function SignupPage() {
 
                     {/* Header */}
                     <div className="text-center mb-7 relative">
-                      <div className="inline-flex justify-center mb-4 px-5 py-2.5 rounded-xl" style={{ background: 'white' }}>
+                      <div className="flex justify-center mb-4">
                         <Image
-                          src="https://uskudar.edu.tr/assets/kurumsal/logo/png/uskudar-universitesi-logo.png"
+                          src="/uskudar-logo.png"
                           alt="Üsküdar University"
                           width={140}
                           height={40}
