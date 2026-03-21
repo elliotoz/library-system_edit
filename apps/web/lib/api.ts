@@ -305,6 +305,24 @@ export const externalBooksApi = {
   },
 };
 
+// Fine Payments API
+export interface MyFine {
+  id: string;
+  status: 'PENDING' | 'PAID' | 'WAIVED';
+  amount: number;
+  createdAt: string;
+  borrow: {
+    dueAt: string;
+    returnedAt: string | null;
+    bookCopy: { book: { id: string; title: string; coverImageUrl?: string } };
+  };
+}
+
+export const fineApi = {
+  getMyFines: async (): Promise<MyFine[]> =>
+    (await api.get<MyFine[]>('/fine-payments/my')).data,
+};
+
 // AI Assistant API
 export const aiApi = {
   chat: async (data: { message: string }): Promise<{ reply: string; modelUsed: string; sources?: string[] }> =>

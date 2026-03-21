@@ -107,6 +107,20 @@ export class FinePaymentsService {
     });
   }
 
+  async findMyFines(userId: string) {
+    return this.prisma.finePayment.findMany({
+      where: { userId },
+      include: {
+        borrow: {
+          include: {
+            bookCopy: { include: { book: { select: { id: true, title: true, coverImageUrl: true } } } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async getTotals() {
     const [pending, paid, waived] = await Promise.all([
       this.prisma.finePayment.aggregate({

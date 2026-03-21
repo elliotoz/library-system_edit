@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { BookOpen, AlertTriangle, CheckCircle, Clock, RefreshCw, Calendar } from 'lucide-react';
+import { BookOpen, AlertTriangle, CheckCircle, Clock, RefreshCw, Calendar, BadgeDollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { fineApi, MyFine } from '@/lib/api';
 
 interface Borrow {
   id: string;
@@ -14,6 +15,8 @@ interface Borrow {
   status: 'ACTIVE' | 'RETURNED' | 'OVERDUE';
   extensionCount: number;
   isOverdue: boolean;
+  overdueDays: number;
+  estimatedFine: number;
   daysUntilDue: number;
   book: {
     id: string;
@@ -40,10 +43,12 @@ export default function BorrowedBooksPage() {
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'returned'>('all');
   const [extendingId, setExtendingId] = useState<string | null>(null);
   const [policy, setPolicy] = useState<BorrowPolicy>({ maxExtensions: 2, extensionDays: 7 });
+  const [pendingFines, setPendingFines] = useState<MyFine[]>([]);
 
   useEffect(() => {
     fetchBorrows();
     fetchPolicy();
+    fineApi.getMyFines().then((fines) => setPendingFines(fines.filter((f) => f.status === 'PENDING'))).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -214,6 +219,20 @@ export default function BorrowedBooksPage() {
         </div>
       </div>
 
+      {/* Pending Fines Banner */}
+      {pendingFines.length > 0 && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
+          <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+            <BadgeDollarSign className="w-5 h-5 flex-shrink-0" />
+            <span className="font-medium">Pending Fine{pendingFines.length > 1 ? 's' : ''}:</span>
+            <span>
+              ₺{pendingFines.reduce((sum, f) => sum + f.amount, 0)} outstanding across {pendingFines.length} book{pendingFines.length > 1 ? 's' : ''}.
+              Please settle at the library desk.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="flex gap-2">
         {(['all', 'active', 'returned'] as const).map((filter) => (
@@ -306,6 +325,15 @@ export default function BorrowedBooksPage() {
                         </span>
                       </div>
                     </div>
+
+                    {borrow.isOverdue && borrow.estimatedFine > 0 && (
+                      <div className="flex items-center gap-1.5 mt-2 text-red-600 dark:text-red-400">
+                        <BadgeDollarSign className="w-4 h-4" />
+                        <span className="text-sm font-medium">
+                          Estimated fine: ₺{borrow.estimatedFine} ({borrow.overdueDays} day{borrow.overdueDays > 1 ? 's' : ''} overdue)
+                        </span>
+                      </div>
+                    )}
 
                     {borrow.extensionCount > 0 && (
                       <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">

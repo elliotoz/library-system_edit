@@ -17,11 +17,18 @@ import { Role, FineStatus } from '@prisma/client';
 
 @Controller('fine-payments')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
 export class FinePaymentsController {
   constructor(private readonly finePaymentsService: FinePaymentsService) {}
 
+  // Any authenticated user can view their own fines
+  @Get('my')
+  @Roles()
+  getMyFines(@CurrentUser('id') userId: string) {
+    return this.finePaymentsService.findMyFines(userId);
+  }
+
   @Get()
+  @Roles(Role.ADMIN)
   findAll(
     @Query('status') status?: FineStatus,
     @Query('userId') userId?: string,
@@ -37,21 +44,25 @@ export class FinePaymentsController {
   }
 
   @Get('totals')
+  @Roles(Role.ADMIN)
   getTotals() {
     return this.finePaymentsService.getTotals();
   }
 
   @Get(':id')
+  @Roles(Role.ADMIN)
   findOne(@Param('id') id: string) {
     return this.finePaymentsService.findById(id);
   }
 
   @Patch(':id/pay')
+  @Roles(Role.ADMIN)
   markPaid(@Param('id') id: string, @CurrentUser() user: any) {
     return this.finePaymentsService.markPaid(id, user.id);
   }
 
   @Patch(':id/waive')
+  @Roles(Role.ADMIN)
   waive(
     @Param('id') id: string,
     @CurrentUser() user: any,

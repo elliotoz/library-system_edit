@@ -4,6 +4,25 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-21 — Fine system: overdue scheduler, fine display, student fine endpoint
+**Goal**: Students see their fines and get automatic overdue/due-soon notifications
+**Root cause**:
+- `notifyOverdue()` / `notifyDueSoon()` existed but were never triggered — no scheduler
+- `estimatedFine` / `overdueDays` returned by API but not rendered on borrowed page
+- All fine endpoints were ADMIN-only — students had no way to query their own fines
+**Changes**:
+- `apps/api/src/borrows/borrow-scheduler.service.ts` — new `OnModuleInit` service; runs every hour; for each ACTIVE borrow sends BORROW_OVERDUE or BORROW_DUE_SOON notification with 22h dedup window (Prisma check on notifications table); no new npm dependencies
+- `apps/api/src/borrows/borrows.module.ts` — registered `BorrowSchedulerService`
+- `apps/api/src/fine-payments/fine-payments.service.ts` — added `findMyFines(userId)`
+- `apps/api/src/fine-payments/fine-payments.controller.ts` — added `GET /fine-payments/my` (any auth user, `@Roles()` override); added explicit `@Roles(Role.ADMIN)` to all other endpoints to restore protection after removing class-level role
+- `apps/web/lib/api.ts` — added `MyFine` interface and `fineApi.getMyFines()`
+- `apps/web/app/dashboard/borrowed/page.tsx` — added `estimatedFine`/`overdueDays` to Borrow interface; red fine line on each overdue card; pending fines banner showing total outstanding; fetches fines on load
+- `apps/web/app/dashboard/student/page.tsx` — fetches pending fines on load; shows red warning card with total fine + "View details" link to borrowed page
+**Verification**: nest build ✓ | tsc --noEmit ✓
+**Next**: Scheduler runs on server start (10s delay) then every hour. No DB migration needed.
+
+---
+
 ## 2026-03-21 — AI: per-user conversation memory, status indicator, gemma3 cover scanner
 **Goal**: Fix three AI stubs and add new gemma3:4b book cover scanning feature
 **Root cause**:

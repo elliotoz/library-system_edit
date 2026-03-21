@@ -12,9 +12,11 @@ import {
   Search,
   BookMarked,
   TrendingUp,
+  BadgeDollarSign,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { fineApi } from '@/lib/api';
 
 interface StudentStats {
   borrowedBooks: number;
@@ -57,6 +59,7 @@ export default function StudentDashboard() {
   const [recommendations, setRecommendations] = useState<Book[]>([]);
   const [borrows, setBorrows] = useState<Borrow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [pendingFineTotal, setPendingFineTotal] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -66,6 +69,11 @@ export default function StudentDashboard() {
           fetch('/api/books?pageSize=4', { credentials: 'include' }).catch(() => null),
           fetch('/api/borrows/my', { credentials: 'include' }).catch(() => null),
         ]);
+
+        fineApi.getMyFines().then((fines) => {
+          const total = fines.filter((f) => f.status === 'PENDING').reduce((sum, f) => sum + f.amount, 0);
+          setPendingFineTotal(total);
+        }).catch(() => {});
 
         if (statsRes?.ok) {
           const statsData = await statsRes.json();
@@ -134,6 +142,20 @@ export default function StudentDashboard() {
           Welcome to your library dashboard. Here's what's happening today.
         </p>
       </div>
+
+      {/* Pending Fines Warning */}
+      {pendingFineTotal > 0 && (
+        <div className="flex items-center gap-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
+          <BadgeDollarSign className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+          <div className="flex-1">
+            <span className="font-medium text-red-700 dark:text-red-400">Pending fine: ₺{pendingFineTotal}</span>
+            <span className="text-red-600 dark:text-red-500 text-sm ml-2">Please settle at the library desk.</span>
+          </div>
+          <Link href="/dashboard/borrowed" className="text-sm font-medium text-red-700 dark:text-red-400 hover:underline">
+            View details
+          </Link>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
