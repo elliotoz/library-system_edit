@@ -5,7 +5,7 @@ import { RoleResponseService } from './role-response.service';
 import { CatalogSearchService } from './catalog-search.service';
 import { LearningPathService } from './learning-path.service';
 import { ResearchAssistantService } from './research-assistant.service';
-import { OllamaService } from './ollama.service';
+import { OllamaService, OllamaMessage } from './ollama.service';
 import { UsersService } from '../users/users.service';
 
 export interface ChatResponse {
@@ -17,6 +17,8 @@ export interface ChatResponse {
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
+  private readonly sessions = new Map<string, OllamaMessage[]>();
+  private readonly MAX_HISTORY = 20; // 10 exchanges (user + assistant per turn)
 
   constructor(
     private readonly contextBuilder: ContextBuilderService,
@@ -66,7 +68,7 @@ export class AiService {
     }
 
     // Try Ollama-powered response, fallback to rule-based on failure
-    return this.ollamaChat(ctx, message);
+    return this.ollamaChat(userId, ctx, message);
   }
 
   private classifyQuery(message: string): 'deep-reasoning' | 'simple' | undefined {
@@ -78,23 +80,37 @@ export class AiService {
     return undefined;
   }
 
-  private async ollamaChat(ctx: AiContext, message: string): Promise<ChatResponse> {
+  private async ollamaChat(userId: string, ctx: AiContext, message: string): Promise<ChatResponse> {
     const queryType = this.classifyQuery(message);
     const model = this.ollama.getModel(ctx.user.role, queryType);
     const system = this.buildSystemPrompt(ctx);
 
+    // Build per-user message history
+    const history = this.sessions.get(userId) ?? [];
+    const messages: OllamaMessage[] = [
+      { role: 'system', content: system },
+      ...history,
+      { role: 'user', content: message },
+    ];
+
     try {
-      const result = await this.ollama.generate(model, message, system);
+      const result = await this.ollama.chat(model, messages);
+      const reply = result.message.content;
+
+      // Update session history (user turn + assistant turn)
+      const updated = [...history, { role: 'user' as const, content: message }, { role: 'assistant' as const, content: reply }];
+      this.sessions.set(userId, updated.slice(-this.MAX_HISTORY));
+
       const staticSources = this.extractSources(ctx.user.role);
-      const linkedSources = this.extractLinkedSources(result.response);
+      const linkedSources = this.extractLinkedSources(reply);
       const sources = this.dedupeArray([...staticSources, ...linkedSources]);
       return {
-        reply: result.response,
+        reply,
         modelUsed: result.model,
         sources,
       };
     } catch (err) {
-      this.logger.warn(`Ollama generate failed, falling back to rules: ${err}`);
+      this.logger.warn(`Ollama chat failed, falling back to rules: ${err}`);
       return this.roleResponse.respond(ctx, message);
     }
   }

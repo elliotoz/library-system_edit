@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, BookOpen, Plus, Trash2, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, BookOpen, Plus, Trash2, Save, Loader2, ScanLine } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { aiApi } from '@/lib/api';
 
 interface Branch {
   id: string;
@@ -26,12 +27,42 @@ interface BranchCopy {
   numberOfCopies: number;
 }
 
+async function compressImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1024;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
+          else { width = Math.round((width * MAX) / height); height = MAX; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        resolve(dataUrl.split(',')[1]); // strip "data:image/jpeg;base64,"
+      };
+      img.onerror = reject;
+      img.src = e.target!.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function AddBookPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [faculties, setFaculties] = useState<Faculty[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -124,6 +155,36 @@ export default function AddBookPage() {
     const updated = [...branchCopies];
     updated[index] = { ...updated[index], [field]: value };
     setBranchCopies(updated);
+  };
+
+  const handleScanCover = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsScanning(true);
+    try {
+      const base64 = await compressImage(file);
+      const result = await aiApi.scanCover(base64);
+      const filled: string[] = [];
+      setFormData((prev) => {
+        const next = { ...prev };
+        if (result.title) { next.title = result.title; filled.push('title'); }
+        if (result.authors) { next.authors = result.authors; filled.push('authors'); }
+        if (result.isbn) { next.isbn = result.isbn; filled.push('ISBN'); }
+        if (result.publisher) { next.publisher = result.publisher; filled.push('publisher'); }
+        if (result.publicationYear) { next.publicationYear = String(result.publicationYear); filled.push('year'); }
+        return next;
+      });
+      if (filled.length > 0) {
+        toast.success(`Cover scanned — filled: ${filled.join(', ')}. Please review before saving.`);
+      } else {
+        toast('Cover scanned but no data could be extracted. Please fill in manually.', { icon: '⚠️' });
+      }
+    } catch {
+      toast.error('Cover scan failed. Please fill in manually.');
+    } finally {
+      setIsScanning(false);
+      if (coverInputRef.current) coverInputRef.current.value = '';
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -230,7 +291,7 @@ export default function AddBookPage() {
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             Add New Book
           </h1>
@@ -238,6 +299,25 @@ export default function AddBookPage() {
             Add a new book to the library catalog
           </p>
         </div>
+        <input
+          ref={coverInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleScanCover}
+        />
+        <button
+          type="button"
+          onClick={() => coverInputRef.current?.click()}
+          disabled={isScanning}
+          className="flex items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-4 py-2.5 text-sm font-medium text-purple-700 hover:bg-purple-100 disabled:opacity-50 dark:border-purple-800 dark:bg-purple-900/20 dark:text-purple-300 dark:hover:bg-purple-900/40"
+        >
+          {isScanning ? (
+            <><Loader2 className="h-4 w-4 animate-spin" />Scanning...</>
+          ) : (
+            <><ScanLine className="h-4 w-4" />Scan Cover</>
+          )}
+        </button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">

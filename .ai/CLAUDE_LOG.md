@@ -4,6 +4,23 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-21 — AI: per-user conversation memory, status indicator, gemma3 cover scanner
+**Goal**: Fix three AI stubs and add new gemma3:4b book cover scanning feature
+**Root cause**:
+- Memory: `ollama.generate()` is stateless; no history passed between turns
+- Status: `isAvailable()` only checked at startup; UI had no degradation signal
+- Cover scanner: gemma3:4b multimodal capability was unused
+**Changes**:
+- `apps/api/src/ai/ollama.service.ts` — added `OllamaMessage`, `BookScanResult` interfaces; added `chat()` method using `/api/chat` (multi-turn); `scanBookCover()` using `/api/generate` with `gemma3:4b` + images array + JSON extraction; `this.available` now updated on every generate/chat success or failure
+- `apps/api/src/ai/ai.service.ts` — added `sessions: Map<userId, OllamaMessage[]>` (max 20 messages per user); `ollamaChat()` now builds per-user message history array and calls `ollama.chat()` instead of `ollama.generate()`
+- `apps/api/src/ai/ai.controller.ts` — added `GET /ai/status` (returns `{ available }`); added `POST /ai/scan-cover` (ADMIN only, RolesGuard)
+- `apps/api/src/ai/dto/scan-cover.dto.ts` — new DTO with base64 string + 2MB cap
+- `apps/web/lib/api.ts` — added `aiApi.getStatus()`, `aiApi.scanCover()`
+- `apps/web/app/dashboard/ai-assistant/page.tsx` — fetches status on mount; shows "AI Online" (green) or "Basic Mode" (amber) pill badge in header
+- `apps/web/app/dashboard/admin/books/new/page.tsx` — "Scan Cover" button with hidden file input; `compressImage()` helper (Canvas API, max 1024×1024, JPEG 80%, no deps); calls scanCover API, auto-fills title/authors/isbn/publisher/year in formData
+**Verification**: nest build ✓ | tsc --noEmit ✓
+**Next**: Session memory lives in-memory only (clears on server restart — acceptable for demo). pgvector embedding search remains a future upgrade.
+
 ## 2026-03-17 — Dashboard layout redesign
 **Goal**: Polish the dashboard shell — header, sidebar, and mobile UX
 **Root cause**: Layout was minimal — no branding, no section labels, no mobile backdrop, no transitions

@@ -309,6 +309,12 @@ export const externalBooksApi = {
 export const aiApi = {
   chat: async (data: { message: string }): Promise<{ reply: string; modelUsed: string; sources?: string[] }> =>
     (await api.post<{ reply: string; modelUsed: string; sources?: string[] }>('/ai/chat', data)).data,
+
+  getStatus: async (): Promise<{ available: boolean }> =>
+    (await api.get<{ available: boolean }>('/ai/status')).data,
+
+  scanCover: async (image: string): Promise<{ title?: string; authors?: string; isbn?: string; publisher?: string; publicationYear?: number }> =>
+    (await api.post<{ title?: string; authors?: string; isbn?: string; publisher?: string; publicationYear?: number }>('/ai/scan-cover', { image })).data,
 };
 
 export default api;

@@ -2,10 +2,14 @@ import { Controller, Post, Patch, Get, Body, UseGuards } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AiService } from './ai.service';
+import { OllamaService } from './ollama.service';
 import { ChatDto } from './dto/chat.dto';
 import { UpdateInterestsDto } from './dto/update-interests.dto';
+import { ScanCoverDto } from './dto/scan-cover.dto';
 import { Role } from '@prisma/client';
 
 @ApiTags('ai')
@@ -13,7 +17,10 @@ import { Role } from '@prisma/client';
 @UseGuards(JwtAuthGuard)
 @Controller('ai')
 export class AiController {
-  constructor(private readonly aiService: AiService) {}
+  constructor(
+    private readonly aiService: AiService,
+    private readonly ollama: OllamaService,
+  ) {}
 
   @Post('chat')
   @UseGuards(ThrottlerGuard)
@@ -49,5 +56,22 @@ export class AiController {
     @CurrentUser('role') userRole: Role,
   ) {
     return this.aiService.getContext(userId, userRole);
+  }
+
+  @Get('status')
+  @ApiOperation({ summary: 'Get Ollama availability status' })
+  @ApiResponse({ status: 200, description: 'Status returned' })
+  getStatus() {
+    return { available: this.ollama.isAvailable() };
+  }
+
+  @Post('scan-cover')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Scan a book cover image and extract metadata' })
+  @ApiResponse({ status: 200, description: 'Extracted book metadata' })
+  @ApiResponse({ status: 403, description: 'Admin only' })
+  scanCover(@Body() dto: ScanCoverDto) {
+    return this.ollama.scanBookCover(dto.image);
   }
 }

@@ -27,7 +27,12 @@ export default function AIAssistantPage() {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [aiOnline, setAiOnline] = useState<boolean | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    aiApi.getStatus().then((s) => setAiOnline(s.available)).catch(() => setAiOnline(false));
+  }, []);
 
   const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); };
   useEffect(() => { scrollToBottom(); }, [messages]);
@@ -67,10 +72,20 @@ export default function AIAssistantPage() {
         <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
           <Sparkles className="w-6 h-6 text-white" />
         </div>
-        <div>
+        <div className="flex-1">
           <h1 className="text-xl font-bold text-gray-900">AI Library Assistant</h1>
           <p className="text-sm text-gray-500">Get personalized book recommendations and help</p>
         </div>
+        {aiOnline !== null && (
+          <span className={cn(
+            'px-3 py-1 rounded-full text-xs font-medium',
+            aiOnline
+              ? 'bg-green-100 text-green-700'
+              : 'bg-amber-100 text-amber-700'
+          )}>
+            {aiOnline ? 'AI Online' : 'Basic Mode'}
+          </span>
+        )}
       </div>
 
       <div className="flex-1 bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
