@@ -4,6 +4,18 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-21 — Fix fine display bug and auto-settle fine on admin return
+**Goal**: Fix `₺0101010` string concatenation bug and stop fines showing as pending after admin returns book
+**Root cause**: (1) Prisma `Decimal` serializes as string in JSON — `reduce` with `+` concatenated instead of summing. (2) `returnBook()` created fine with `FineStatus.PENDING`; admin return did not settle it.
+**Changes**:
+- `apps/api/src/borrows/borrows.service.ts` — Changed `status: FineStatus.PENDING` to `FineStatus.PAID` and added `paidAt: now` in both `create` and `update` of `finePayment.upsert` — admin processing a return is the point of collection
+- `apps/web/app/dashboard/borrowed/page.tsx` — `Number(f.amount)` cast in `reduce` to avoid string concat
+- `apps/web/app/dashboard/student/page.tsx` — same `Number(f.amount)` cast
+**Verification**: nest build ✓ | tsc --noEmit ✓
+**Next**: Nothing pending on fine system
+
+---
+
 ## 2026-03-21 — Fine system: overdue scheduler, fine display, student fine endpoint
 **Goal**: Students see their fines and get automatic overdue/due-soon notifications
 **Root cause**:

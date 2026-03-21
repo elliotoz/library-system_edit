@@ -71,7 +71,7 @@ export default function StudentDashboard() {
         ]);
 
         fineApi.getMyFines().then((fines) => {
-          const total = fines.filter((f) => f.status === 'PENDING').reduce((sum, f) => sum + f.amount, 0);
+          const total = fines.filter((f) => f.status === 'PENDING').reduce((sum, f) => sum + Number(f.amount), 0);
           setPendingFineTotal(total);
         }).catch(() => {});
 

@@ -226,7 +226,7 @@ export default function BorrowedBooksPage() {
             <BadgeDollarSign className="w-5 h-5 flex-shrink-0" />
             <span className="font-medium">Pending Fine{pendingFines.length > 1 ? 's' : ''}:</span>
             <span>
-              ₺{pendingFines.reduce((sum, f) => sum + f.amount, 0)} outstanding across {pendingFines.length} book{pendingFines.length > 1 ? 's' : ''}.
+              ₺{pendingFines.reduce((sum, f) => sum + Number(f.amount), 0)} outstanding across {pendingFines.length} book{pendingFines.length > 1 ? 's' : ''}.
               Please settle at the library desk.
             </span>
           </div>
