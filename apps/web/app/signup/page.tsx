@@ -145,17 +145,16 @@ export default function SignupPage() {
 
           {/* Text */}
           <div className="relative z-10 text-center mt-4">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-3"
-              style={{ background: 'rgba(42,157,157,0.1)', border: '1px solid rgba(42,157,157,0.22)' }}>
-              <Image
-                src="https://uskudar.edu.tr/assets/kurumsal/logo/png/uskudar-universitesi-logo.png"
-                alt="Üsküdar University"
-                width={20}
-                height={20}
-                className="object-contain"
-                style={{ filter: 'brightness(0) invert(1)' }}
-              />
-              <span className="text-teal-300/75 text-sm font-medium">Üsküdar University</span>
+            <div className="inline-flex justify-center mb-3">
+              <div className="px-4 py-2 rounded-xl" style={{ background: 'white' }}>
+                <Image
+                  src="https://uskudar.edu.tr/assets/kurumsal/logo/png/uskudar-universitesi-logo.png"
+                  alt="Üsküdar University"
+                  width={130}
+                  height={36}
+                  className="object-contain"
+                />
+              </div>
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">Join the Library</h2>
             <p className="text-white/35 text-sm">Create your account and start exploring.</p>
@@ -170,19 +169,16 @@ export default function SignupPage() {
 
           <div className="w-full max-w-md">
             {/* Mobile header */}
-            <div className="lg:hidden flex items-center justify-center gap-2 mb-8">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden"
-                style={{ background: 'rgba(42,157,157,0.15)', border: '1px solid rgba(42,157,157,0.35)' }}>
+            <div className="lg:hidden flex justify-center mb-8">
+              <div className="px-5 py-2.5 rounded-xl" style={{ background: 'white' }}>
                 <Image
                   src="https://uskudar.edu.tr/assets/kurumsal/logo/png/uskudar-universitesi-logo.png"
                   alt="Üsküdar University"
-                  width={28}
-                  height={28}
+                  width={140}
+                  height={40}
                   className="object-contain"
-                  style={{ filter: 'brightness(0) invert(1)' }}
                 />
               </div>
-              <span className="text-white font-semibold">Library System</span>
             </div>
 
             {/* 3-D tilt card */}
@@ -224,15 +220,13 @@ export default function SignupPage() {
 
                     {/* Header */}
                     <div className="text-center mb-7 relative">
-                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 overflow-hidden"
-                        style={{ background: 'rgba(42,157,157,0.12)', border: '1px solid rgba(42,157,157,0.3)' }}>
+                      <div className="inline-flex justify-center mb-4 px-5 py-2.5 rounded-xl" style={{ background: 'white' }}>
                         <Image
                           src="https://uskudar.edu.tr/assets/kurumsal/logo/png/uskudar-universitesi-logo.png"
                           alt="Üsküdar University"
-                          width={40}
+                          width={140}
                           height={40}
                           className="object-contain"
-                          style={{ filter: 'brightness(0) invert(1)' }}
                         />
                       </div>
                       <h2 className="text-2xl font-bold text-white mb-1.5">Create Account</h2>
