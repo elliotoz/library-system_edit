@@ -4,6 +4,18 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-21 — 3D login & signup redesign with AI robot animation
+**Goal**: Redesign login and signup pages with dark/space theme, 3D animated AI robot on left panel, glassmorphism form card with traveling border beams and 3D tilt
+**Root cause**: Old pages used a simple teal gradient panel + white card — no depth or motion
+**Changes**:
+- `apps/web/app/login/page.tsx` — Full rewrite: deep space background, starfield, 58% left panel with full-height SVG robot (floating, glowing eyes, scan line, orbital rings, chest lights), 42% right glassmorphism card (3D CSS tilt on hover, traveling teal border beams, grid texture, input focus glow), all original auth logic preserved
+- `apps/web/app/signup/page.tsx` — Full rewrite: same theme, compact robot on 38% left panel, wider right panel with 4-field glass card, same beam/tilt effects, all original registration logic preserved
+- No new npm dependencies — pure SVG + CSS keyframes + Tailwind
+**Verification**: tsc --noEmit ✓
+**Next**: Nothing pending
+
+---
+
 ## 2026-03-21 — Fix AI Study Help flow, book deep-links, image upload in chat
 **Goal**: (1) "Get AI Study Help" passes book context to AI assistant. (2) AI-suggested books link to detail pages. (3) Image upload in chat. (4) Improved chat UI.
 **Root cause**: AI assistant page never read `?book=` param; catalog-search formatted books as plain text with no per-book links; `ChatDto` and pipeline had no image path.
