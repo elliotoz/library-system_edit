@@ -4,6 +4,7 @@ import { Role } from '@prisma/client';
 export interface OllamaMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
+  images?: string[];
 }
 
 interface OllamaGenerateResponse {

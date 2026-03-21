@@ -33,7 +33,7 @@ export class AiController {
     @CurrentUser('role') userRole: Role,
     @Body() dto: ChatDto,
   ) {
-    return this.aiService.chat(userId, userRole, dto.message);
+    return this.aiService.chat(userId, userRole, dto.message, dto.image);
   }
 
   @Patch('interests')

@@ -30,8 +30,13 @@ export class AiService {
     private readonly usersService: UsersService,
   ) {}
 
-  async chat(userId: string, userRole: Role, message: string): Promise<ChatResponse> {
+  async chat(userId: string, userRole: Role, message: string, image?: string): Promise<ChatResponse> {
     const ctx = await this.contextBuilder.build(userId, userRole);
+
+    // If an image is attached, route directly to Ollama (multimodal)
+    if (image) {
+      return this.ollamaChat(userId, ctx, message, image);
+    }
 
     // Staff interest bootstrap: check before anything else
     if (userRole === Role.STAFF && ctx.user.interests.length === 0) {
@@ -80,24 +85,28 @@ export class AiService {
     return undefined;
   }
 
-  private async ollamaChat(userId: string, ctx: AiContext, message: string): Promise<ChatResponse> {
-    const queryType = this.classifyQuery(message);
-    const model = this.ollama.getModel(ctx.user.role, queryType);
+  private async ollamaChat(userId: string, ctx: AiContext, message: string, image?: string): Promise<ChatResponse> {
+    const queryType = image ? undefined : this.classifyQuery(message);
+    // Use gemma3:4b for multimodal (image) messages; otherwise role-based model
+    const model = image ? 'gemma3:4b' : this.ollama.getModel(ctx.user.role, queryType);
     const system = this.buildSystemPrompt(ctx);
 
     // Build per-user message history
     const history = this.sessions.get(userId) ?? [];
+    const userMessage: OllamaMessage = image
+      ? { role: 'user', content: message, images: [image] }
+      : { role: 'user', content: message };
     const messages: OllamaMessage[] = [
       { role: 'system', content: system },
       ...history,
-      { role: 'user', content: message },
+      userMessage,
     ];
 
     try {
       const result = await this.ollama.chat(model, messages);
       const reply = result.message.content;
 
-      // Update session history (user turn + assistant turn)
+      // Update session history (user turn + assistant turn) — strip images to keep history lean
       const updated = [...history, { role: 'user' as const, content: message }, { role: 'assistant' as const, content: reply }];
       this.sessions.set(userId, updated.slice(-this.MAX_HISTORY));
 

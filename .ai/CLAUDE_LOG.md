@@ -4,6 +4,22 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-21 — Fix AI Study Help flow, book deep-links, image upload in chat
+**Goal**: (1) "Get AI Study Help" passes book context to AI assistant. (2) AI-suggested books link to detail pages. (3) Image upload in chat. (4) Improved chat UI.
+**Root cause**: AI assistant page never read `?book=` param; catalog-search formatted books as plain text with no per-book links; `ChatDto` and pipeline had no image path.
+**Changes**:
+- `apps/api/src/ai/ollama.service.ts` — Added `images?: string[]` to `OllamaMessage`
+- `apps/api/src/ai/dto/chat.dto.ts` — Added optional `image?: string` field
+- `apps/api/src/ai/ai.controller.ts` — Passes `dto.image` to `aiService.chat()`
+- `apps/api/src/ai/ai.service.ts` — `chat()` accepts optional `image`; routes image messages directly to Ollama with `gemma3:4b`; user Ollama message includes `images` array
+- `apps/api/src/ai/catalog-search.service.ts` — Book titles now link to `/dashboard/catalog/${b.id}`
+- `apps/web/lib/api.ts` — `aiApi.chat()` accepts optional `image`
+- `apps/web/app/dashboard/ai-assistant/page.tsx` — Full rewrite: reads `?book=` param, fetches book info, shows dismissible context banner, auto-sends study help message; image upload with canvas compression; markdown renderer (bold/italic/code/links/lists); typing dots; source pills as internal Links; dark mode
+**Verification**: nest build ✓ | tsc --noEmit ✓
+**Next**: Nothing pending
+
+---
+
 ## 2026-03-21 — Fix fine display bug and auto-settle fine on admin return
 **Goal**: Fix `₺0101010` string concatenation bug and stop fines showing as pending after admin returns book
 **Root cause**: (1) Prisma `Decimal` serializes as string in JSON — `reduce` with `+` concatenated instead of summing. (2) `returnBook()` created fine with `FineStatus.PENDING`; admin return did not settle it.

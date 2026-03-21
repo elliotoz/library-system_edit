@@ -134,7 +134,7 @@ export class CatalogSearchService {
         const avail = b.availableCopies > 0
           ? `✅ ${b.availableCopies} available`
           : '❌ Not available';
-        reply += `${i + 1}. **${b.title}**\n`;
+        reply += `${i + 1}. **[${b.title}](/dashboard/catalog/${b.id})**\n`;
         reply += `   ${b.authors.join(', ')}`;
         if (b.category) reply += ` · ${b.category}`;
         reply += ` · ${avail}\n`;

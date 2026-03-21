@@ -325,7 +325,7 @@ export const fineApi = {
 
 // AI Assistant API
 export const aiApi = {
-  chat: async (data: { message: string }): Promise<{ reply: string; modelUsed: string; sources?: string[] }> =>
+  chat: async (data: { message: string; image?: string }): Promise<{ reply: string; modelUsed: string; sources?: string[] }> =>
     (await api.post<{ reply: string; modelUsed: string; sources?: string[] }>('/ai/chat', data)).data,
 
   getStatus: async (): Promise<{ available: boolean }> =>
