@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Library } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, ArrowRight } from 'lucide-react';
+import Image from 'next/image';
 import { authApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { DASHBOARD_ROUTES, Role } from '@/types';
@@ -146,7 +147,14 @@ export default function SignupPage() {
           <div className="relative z-10 text-center mt-4">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-3"
               style={{ background: 'rgba(42,157,157,0.1)', border: '1px solid rgba(42,157,157,0.22)' }}>
-              <Library className="w-4 h-4 text-teal-400" />
+              <Image
+                src="https://uskudar.edu.tr/assets/kurumsal/logo/png/uskudar-universitesi-logo.png"
+                alt="Üsküdar University"
+                width={20}
+                height={20}
+                className="object-contain"
+                style={{ filter: 'brightness(0) invert(1)' }}
+              />
               <span className="text-teal-300/75 text-sm font-medium">Üsküdar University</span>
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">Join the Library</h2>
@@ -163,9 +171,16 @@ export default function SignupPage() {
           <div className="w-full max-w-md">
             {/* Mobile header */}
             <div className="lg:hidden flex items-center justify-center gap-2 mb-8">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden"
                 style={{ background: 'rgba(42,157,157,0.15)', border: '1px solid rgba(42,157,157,0.35)' }}>
-                <Library className="w-5 h-5 text-teal-400" />
+                <Image
+                  src="https://uskudar.edu.tr/assets/kurumsal/logo/png/uskudar-universitesi-logo.png"
+                  alt="Üsküdar University"
+                  width={28}
+                  height={28}
+                  className="object-contain"
+                  style={{ filter: 'brightness(0) invert(1)' }}
+                />
               </div>
               <span className="text-white font-semibold">Library System</span>
             </div>
@@ -209,9 +224,16 @@ export default function SignupPage() {
 
                     {/* Header */}
                     <div className="text-center mb-7 relative">
-                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 overflow-hidden"
                         style={{ background: 'rgba(42,157,157,0.12)', border: '1px solid rgba(42,157,157,0.3)' }}>
-                        <Library className="w-7 h-7 text-teal-400" />
+                        <Image
+                          src="https://uskudar.edu.tr/assets/kurumsal/logo/png/uskudar-universitesi-logo.png"
+                          alt="Üsküdar University"
+                          width={40}
+                          height={40}
+                          className="object-contain"
+                          style={{ filter: 'brightness(0) invert(1)' }}
+                        />
                       </div>
                       <h2 className="text-2xl font-bold text-white mb-1.5">Create Account</h2>
                       <p className="text-sm" style={{ color: 'rgba(255,255,255,0.38)' }}>
