@@ -4,6 +4,21 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-22 — Spline 3D robot integration on login/signup
+**Goal**: Replace hand-coded SVG robot with interactive Spline 3D scene
+**Root cause**: User requested true 3D interactive robot (not flat SVG) using Spline
+**Changes**:
+- `apps/web/components/ui/spline-scene.tsx` — lazy Spline wrapper with teal spinner fallback
+- `apps/web/components/ui/spotlight.tsx` — Aceternity Spotlight SVG component
+- `apps/web/app/login/page.tsx` — left panel replaced with SplineScene + Spotlight; robot keyframes removed
+- `apps/web/app/signup/page.tsx` — same treatment on compact left panel
+- `apps/web/tailwind.config.ts` — added `animate-spotlight` keyframe
+- `apps/web/package.json` — added @splinetool/react-spline, @splinetool/runtime, framer-motion
+**Verification**: tsc --noEmit ✓
+**Next**: —
+
+---
+
 ## 2026-03-21 — 3D login & signup redesign with AI robot animation
 **Goal**: Redesign login and signup pages with dark/space theme, 3D animated AI robot on left panel, glassmorphism form card with traveling border beams and 3D tilt
 **Root cause**: Old pages used a simple teal gradient panel + white card — no depth or motion
