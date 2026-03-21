@@ -347,13 +347,12 @@ export default function LoginPage() {
             </div>
 
             {/* 3-D tilt card wrapper */}
-            <div style={{ perspective: '1200px' }}
+            <div
               onMouseMove={handleCardMouseMove}
               onMouseLeave={() => setTilt({ x: 0, y: 0 })}>
               <div style={{
-                transform: `perspective(1200px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+                transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
                 transition: 'transform 0.15s ease-out',
-                transformStyle: 'preserve-3d',
               }}>
                 {/* Traveling border beams container */}
                 <div className="relative">
