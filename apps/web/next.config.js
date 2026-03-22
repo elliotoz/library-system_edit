@@ -2,6 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
+  transpilePackages: ['three', '@react-three/fiber', '@react-three/drei', '@react-spring/three'],
   images: {
     domains: ['localhost'],
   },
