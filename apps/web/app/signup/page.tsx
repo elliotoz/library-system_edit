@@ -145,15 +145,6 @@ export default function SignupPage() {
 
           {/* Text */}
           <div className="relative z-10 text-center mt-4">
-            <div className="inline-flex justify-center mb-3">
-              <Image
-                src="/uskudar-logo.png"
-                alt="Üsküdar University"
-                width={130}
-                height={36}
-                className="object-contain"
-              />
-            </div>
             <h2 className="text-2xl font-bold text-white mb-2">Join the Library</h2>
             <p className="text-white/35 text-sm">Create your account and start exploring.</p>
           </div>
@@ -166,16 +157,6 @@ export default function SignupPage() {
           style={{ borderLeft: '1px solid rgba(255,255,255,0.04)' }}>
 
           <div className="w-full max-w-md">
-            {/* Mobile header */}
-            <div className="lg:hidden flex justify-center mb-8">
-              <Image
-                src="/uskudar-logo.png"
-                alt="Üsküdar University"
-                width={140}
-                height={40}
-                className="object-contain"
-              />
-            </div>
 
             {/* 3-D tilt card */}
             <div

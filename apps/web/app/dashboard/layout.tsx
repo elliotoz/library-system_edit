@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   LayoutDashboard,
   BookOpen,
@@ -218,9 +219,13 @@ export default function DashboardLayout({
               href={DASHBOARD_ROUTES[user.role as Role]}
               className="flex items-center gap-2.5"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-500 text-white shadow-sm">
-                <Library className="h-4 w-4" />
-              </div>
+              <Image
+                src="/uskudar-logo.png"
+                alt="Üsküdar University"
+                width={110}
+                height={32}
+                className="object-contain dark:brightness-[1.1]"
+              />
               <span className="hidden font-semibold text-gray-900 dark:text-white sm:block">
                 Library System
               </span>

@@ -140,15 +140,6 @@ export default function LoginPage() {
 
           {/* Branding text */}
           <div className="relative z-10 text-center max-w-md mt-4">
-            <div className="inline-flex justify-center mb-4">
-              <Image
-                src="/uskudar-logo.png"
-                alt="Üsküdar University"
-                width={160}
-                height={44}
-                className="object-contain"
-              />
-            </div>
             <h1 className="text-3xl font-bold text-white mb-3 leading-tight">
               AI-Integrated Library System
             </h1>
@@ -174,16 +165,6 @@ export default function LoginPage() {
           style={{ borderLeft: '1px solid rgba(255,255,255,0.04)' }}>
 
           <div className="w-full max-w-md">
-            {/* Mobile logo */}
-            <div className="lg:hidden flex justify-center mb-8">
-              <Image
-                src="/uskudar-logo.png"
-                alt="Üsküdar University"
-                width={140}
-                height={40}
-                className="object-contain"
-              />
-            </div>
 
             {/* 3-D tilt card wrapper */}
             <div
