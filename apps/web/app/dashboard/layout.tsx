@@ -222,8 +222,8 @@ export default function DashboardLayout({
               <Image
                 src="/uskudar-logo.png"
                 alt="Üsküdar University"
-                width={110}
-                height={32}
+                width={80}
+                height={24}
                 className="object-contain dark:brightness-[1.1]"
               />
               <span className="hidden font-semibold text-gray-900 dark:text-white sm:block">
