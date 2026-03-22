@@ -10,7 +10,8 @@ import Image from 'next/image';
 import { useAuth } from '@/hooks/useAuth';
 import { authApi } from '@/lib/api';
 import { DASHBOARD_ROUTES, Role } from '@/types';
-import { Robot3D } from '@/components/ui/robot-3d';
+import { SplineScene } from '@/components/ui/spline-scene';
+import { Spotlight } from '@/components/ui/spotlight';
 
 // Deterministic particles — no Math.random() to avoid hydration mismatch
 const PARTICLES = Array.from({ length: 28 }, (_, i) => ({
@@ -126,15 +127,21 @@ export default function LoginPage() {
         {/* ════════════════════════════════════════════
             LEFT PANEL — 3D AI Robot (Spline)
         ════════════════════════════════════════════ */}
-        <div className="hidden lg:flex lg:w-[58%] flex-col items-center justify-center relative px-12 py-10">
+        <div className="hidden lg:flex lg:w-[58%] flex-col items-center justify-center relative overflow-hidden px-0 py-0">
 
-          {/* 3D Robot */}
+          {/* Spotlight sweep */}
+          <Spotlight className="-top-40 left-0 md:left-60 md:-top-20" fill="#2A9D9D" />
+
+          {/* 3D Robot — fills the panel */}
           <div className="relative w-full flex-1 min-h-0">
-            <Robot3D className="w-full h-full" />
+            <SplineScene
+              scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+              className="w-full h-full"
+            />
           </div>
 
           {/* Branding text */}
-          <div className="relative z-10 text-center max-w-md mt-4">
+          <div className="relative z-10 text-center max-w-md mt-0 pb-8 px-8">
             <h1 className="text-3xl font-bold text-white mb-3 leading-tight">
               AI-Integrated Library System
             </h1>

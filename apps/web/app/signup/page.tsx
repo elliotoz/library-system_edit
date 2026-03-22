@@ -9,7 +9,8 @@ import Image from 'next/image';
 import { authApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { DASHBOARD_ROUTES, Role } from '@/types';
-import { Robot3D } from '@/components/ui/robot-3d';
+import { SplineScene } from '@/components/ui/spline-scene';
+import { Spotlight } from '@/components/ui/spotlight';
 
 const PARTICLES = Array.from({ length: 24 }, (_, i) => ({
   id: i,
@@ -131,15 +132,21 @@ export default function SignupPage() {
         {/* ════════════════════════════════════════════
             LEFT ACCENT PANEL (lg only) — 3D AI Robot (Spline)
         ════════════════════════════════════════════ */}
-        <div className="hidden lg:flex lg:w-[38%] flex-col items-center justify-center relative px-10 py-12">
+        <div className="hidden lg:flex lg:w-[38%] flex-col items-center justify-center relative overflow-hidden px-0 py-0">
+
+          {/* Spotlight sweep */}
+          <Spotlight className="-top-40 left-0 md:-top-20" fill="#2A9D9D" />
 
           {/* 3D Robot */}
           <div className="relative w-full flex-1 min-h-0">
-            <Robot3D className="w-full h-full" />
+            <SplineScene
+              scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+              className="w-full h-full"
+            />
           </div>
 
           {/* Text */}
-          <div className="relative z-10 text-center mt-4">
+          <div className="relative z-10 text-center pb-8 px-8">
             <h2 className="text-2xl font-bold text-white mb-2">Join the Library</h2>
             <p className="text-white/35 text-sm">Create your account and start exploring.</p>
           </div>
