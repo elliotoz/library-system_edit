@@ -177,7 +177,7 @@ export default function AddBookPage() {
       if (filled.length > 0) {
         toast.success(`Cover scanned — filled: ${filled.join(', ')}. Please review before saving.`);
       } else {
-        toast('Cover scanned but no data could be extracted. Please fill in manually.', { icon: '⚠️' });
+        toast.error('Cover scanned but no data could be extracted. Please fill in manually.');
       }
     } catch {
       toast.error('Cover scan failed. Please fill in manually.');
