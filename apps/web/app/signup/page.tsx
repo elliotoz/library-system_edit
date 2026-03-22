@@ -9,8 +9,7 @@ import Image from 'next/image';
 import { authApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { DASHBOARD_ROUTES, Role } from '@/types';
-import { SplineScene } from '@/components/ui/spline-scene';
-import { Spotlight } from '@/components/ui/spotlight';
+import { Robot3D } from '@/components/ui/robot-3d';
 
 const PARTICLES = Array.from({ length: 24 }, (_, i) => ({
   id: i,
@@ -134,13 +133,9 @@ export default function SignupPage() {
         ════════════════════════════════════════════ */}
         <div className="hidden lg:flex lg:w-[38%] flex-col items-center justify-center relative px-10 py-12">
 
-          {/* Spline 3D scene */}
+          {/* 3D Robot */}
           <div className="relative w-full flex-1 min-h-0">
-            <Spotlight className="-top-40 left-0 md:left-20 md:-top-20" fill="rgba(42,157,157,0.4)" />
-            <SplineScene
-              scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
-              className="w-full h-full"
-            />
+            <Robot3D className="w-full h-full" />
           </div>
 
           {/* Text */}

@@ -10,8 +10,7 @@ import Image from 'next/image';
 import { useAuth } from '@/hooks/useAuth';
 import { authApi } from '@/lib/api';
 import { DASHBOARD_ROUTES, Role } from '@/types';
-import { SplineScene } from '@/components/ui/spline-scene';
-import { Spotlight } from '@/components/ui/spotlight';
+import { Robot3D } from '@/components/ui/robot-3d';
 
 // Deterministic particles — no Math.random() to avoid hydration mismatch
 const PARTICLES = Array.from({ length: 28 }, (_, i) => ({
@@ -129,13 +128,9 @@ export default function LoginPage() {
         ════════════════════════════════════════════ */}
         <div className="hidden lg:flex lg:w-[58%] flex-col items-center justify-center relative px-12 py-10">
 
-          {/* Spline 3D scene */}
+          {/* 3D Robot */}
           <div className="relative w-full flex-1 min-h-0">
-            <Spotlight className="-top-40 left-0 md:left-60 md:-top-20" fill="rgba(42,157,157,0.45)" />
-            <SplineScene
-              scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
-              className="w-full h-full"
-            />
+            <Robot3D className="w-full h-full" />
           </div>
 
           {/* Branding text */}

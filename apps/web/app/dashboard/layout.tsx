@@ -49,7 +49,7 @@ interface Notification {
 
 interface NavSection {
   label: string;
-  items: { label: string; href: string; icon: React.ElementType }[];
+  items: { label: string; href: string; icon: React.ComponentType<{ className?: string }> }[];
 }
 
 export default function DashboardLayout({

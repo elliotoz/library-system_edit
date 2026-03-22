@@ -11,6 +11,8 @@
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,css,json}\""
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
     "@splinetool/react-spline": "^4.1.0",
     "@splinetool/runtime": "^1.12.70",
     "axios": "^1.6.5",
@@ -21,7 +23,8 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.4.1",
-    "tailwind-merge": "^2.2.0"
+    "tailwind-merge": "^2.2.0",
+    "three": "^0.183.2"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
