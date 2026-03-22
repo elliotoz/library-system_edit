@@ -11,7 +11,6 @@
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,css,json}\""
   },
   "dependencies": {
-    "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.18.0",
     "@splinetool/react-spline": "^4.1.0",
     "@splinetool/runtime": "^1.12.70",
@@ -30,6 +29,7 @@
     "@types/node": "^20.11.0",
     "@types/react": "^18.2.47",
     "@types/react-dom": "^18.2.18",
+    "@types/three": "^0.183.1",
     "autoprefixer": "^10.4.17",
     "eslint": "^8.56.0",
     "eslint-config-next": "14.1.0",

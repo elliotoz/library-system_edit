@@ -2,7 +2,6 @@
 
 import { useRef } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 
 // ── Brand palette ───────────────────────────────────────────────
@@ -43,7 +42,10 @@ function RobotMesh() {
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
-    if (root.current) root.current.position.y = Math.sin(t * 0.8) * 0.15
+    if (root.current) {
+      root.current.position.y = Math.sin(t * 0.8) * 0.15
+      root.current.rotation.y += 0.003
+    }
     if (head.current) head.current.rotation.y = Math.sin(t * 0.45) * 0.10
     const ep = 1.5 + Math.sin(t * 2.5) * 0.8
     if (eyeL.current) eyeL.current.emissiveIntensity = ep
@@ -262,14 +264,6 @@ export function Robot3DScene() {
       <pointLight position={[-2, -1, 2]} color={C.tealLt} intensity={0.8} />
 
       <RobotMesh />
-
-      <OrbitControls
-        enableZoom={false}
-        enablePan={false}
-        minPolarAngle={Math.PI / 4}
-        maxPolarAngle={Math.PI / 1.8}
-        target={[0, 0.3, 0]}
-      />
     </Canvas>
   )
 }
