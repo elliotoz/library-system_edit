@@ -41,7 +41,9 @@ interface PaginationMeta {
 
 type AvailabilityFilter = 'all' | 'available' | 'unavailable' | 'ebook-only';
 
-/** Returns the badge props for a book based on physical copy + ebook state */
+/** Returns the badge props for a book based on physical copy + ebook state.
+ *  An e-book is always accessible — a book should only show "Unavailable"
+ *  when it has no digital format AND all physical copies are borrowed. */
 function availabilityBadge(book: Book): { label: string; className: string } {
   if (book.availableCopies > 0) {
     return {
@@ -49,9 +51,9 @@ function availabilityBadge(book: Book): { label: string; className: string } {
       className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
     };
   }
-  if (book.totalCopies === 0 && book.isEbookAvailable) {
+  if (book.isEbookAvailable) {
     return {
-      label: 'E-book Only',
+      label: book.totalCopies === 0 ? 'E-book Only' : 'E-book Available',
       className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
     };
   }

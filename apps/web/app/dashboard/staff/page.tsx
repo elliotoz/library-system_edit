@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { BookOpen, Bookmark, Sparkles, Clock, ArrowRight, CheckCircle } from 'lucide-react';
+import {
+  BookOpen, Bookmark, Sparkles, Clock, ArrowRight,
+  CheckCircle, ChevronRight,
+} from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -22,19 +25,19 @@ interface StaffStats {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  'Psychology': 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400',
-  'Finance': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  'Psychology':       'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400',
+  'Finance':          'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
   'Self-Improvement': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  'Technology': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  'Science': 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
-  'default': 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+  'Technology':       'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  'Science':          'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
+  'default':          'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
 };
 
-const BOOK_COLORS = [
-  'from-purple-100 to-purple-200 dark:from-purple-900/30 dark:to-purple-800/30',
-  'from-green-100 to-green-200 dark:from-green-900/30 dark:to-green-800/30',
-  'from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30',
-  'from-amber-100 to-amber-200 dark:from-amber-900/30 dark:to-amber-800/30',
+const BOOK_GRADIENTS = [
+  'from-purple-400 to-purple-600',
+  'from-emerald-400 to-emerald-600',
+  'from-blue-400 to-blue-600',
+  'from-amber-400 to-amber-600',
 ];
 
 export default function StaffDashboard() {
@@ -50,259 +53,155 @@ export default function StaffDashboard() {
           api.get('/dashboard/staff').catch(() => null),
           api.get('/books?pageSize=4').catch(() => null),
         ]);
-
-        if (statsRes?.data) {
-          setStats(statsRes.data);
-        }
-
-        if (booksRes?.data) {
-          setRecommendations(booksRes.data.data || []);
-        }
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
+        if (statsRes?.data) setStats(statsRes.data);
+        if (booksRes?.data) setRecommendations(booksRes.data.data || []);
+      } catch (e) {
+        console.error(e);
       } finally {
         setIsLoading(false);
       }
     };
-
     fetchData();
   }, []);
 
   const greeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 18) return 'Good afternoon';
     return 'Good evening';
   };
 
   if (isLoading) {
     return (
       <div className="space-y-6 animate-pulse">
-        <div className="h-8 w-64 bg-gray-200 dark:bg-gray-700 rounded" />
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded-xl" />
-          ))}
+        <div className="h-28 bg-gray-200 dark:bg-gray-700 rounded-2xl" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded-xl" />)}
         </div>
         <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded-xl" />
       </div>
     );
   }
 
+  const statCards = [
+    { label: 'Books Borrowed', value: stats?.borrowedBooks ?? 0, icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/30', border: 'border-l-blue-500' },
+    { label: 'Interests Saved', value: stats?.interestCount ?? 0, icon: Bookmark, color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/30', border: 'border-l-green-500' },
+    { label: 'AI Suggestions', value: 12, icon: Sparkles, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/30', border: 'border-l-purple-500' },
+    { label: 'Days Borrow Limit', value: 14, icon: Clock, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/30', border: 'border-l-amber-500' },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Welcome Section */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {greeting()}, {user?.name?.split(' ')[0]}!
-        </h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Welcome to your staff dashboard. Here's your library overview.
-        </p>
-      </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
-              <BookOpen className="w-6 h-6 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {stats?.borrowedBooks || 0}
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Books Borrowed</p>
-            </div>
+      {/* ── Welcome Banner ── */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-600 to-teal-700 p-6 text-white shadow-lg">
+        <div className="absolute inset-0 opacity-10"
+          style={{ backgroundImage: 'radial-gradient(circle at 80% 50%, white 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+        <div className="relative flex items-center justify-between">
+          <div>
+            <p className="text-emerald-100 text-sm font-medium mb-1">{greeting()}</p>
+            <h1 className="text-2xl font-bold">{user?.name?.split(' ')[0] || 'Staff'}</h1>
+            <p className="text-emerald-200 text-sm mt-1">Welcome to your staff dashboard</p>
           </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-green-50 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
-              <Bookmark className="w-6 h-6 text-green-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {stats?.interestCount || 0}
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Interests Saved</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-purple-50 dark:bg-purple-900/30 rounded-xl flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-purple-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">12</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">AI Suggestions</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-amber-50 dark:bg-amber-900/30 rounded-xl flex items-center justify-center">
-              <Clock className="w-6 h-6 text-amber-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">14</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Days Borrow Limit</p>
-            </div>
-          </div>
+          <span className="hidden sm:block px-3 py-1 bg-white/15 rounded-full text-xs font-medium backdrop-blur-sm">
+            Library Staff
+          </span>
         </div>
       </div>
 
-      {/* Recommended Books - Now Clickable */}
+      {/* ── Stat Cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {statCards.map((s, i) => (
+          <div key={i} className={cn('bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-100 dark:border-gray-700 border-l-4 shadow-sm', s.border)}>
+            <div className="flex items-center gap-3">
+              <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0', s.bg)}>
+                <s.icon className={cn('w-5 h-5', s.color)} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl font-bold text-gray-900 dark:text-white leading-none">{s.value}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-tight">{s.label}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Recommended Books ── */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Recommended Based on Your Interests
-          </h2>
-          <Link
-            href="/dashboard/catalog"
-            className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium flex items-center gap-1"
-          >
-            View All <ArrowRight className="w-4 h-4" />
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+          <h2 className="font-semibold text-gray-900 dark:text-white">Recommended Based on Your Interests</h2>
+          <Link href="/dashboard/catalog"
+            className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 flex items-center gap-1">
+            View All <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
         <div className="p-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {recommendations.length > 0 ? (
-              recommendations.map((book, index) => (
-                <Link
-                  key={book.id}
-                  href={`/dashboard/catalog/${book.id}`}
-                  className="group cursor-pointer block"
-                >
-                  <div
-                    className={cn(
-                      'aspect-[3/4] bg-gradient-to-br rounded-lg mb-3 flex items-center justify-center transition-transform group-hover:scale-[1.02]',
-                      BOOK_COLORS[index % BOOK_COLORS.length]
-                    )}
-                  >
-                    <BookOpen className="w-12 h-12 text-primary-400 dark:text-primary-500" />
-                  </div>
-                  <h3 className="font-medium text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors line-clamp-1">
-                    {book.title}
-                  </h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">
-                    {book.authors.join(', ')}
-                  </p>
-                  {book.category && (
-                    <span
-                      className={cn(
-                        'inline-block mt-2 text-xs px-2 py-1 rounded-full',
-                        CATEGORY_COLORS[book.category] || CATEGORY_COLORS.default
-                      )}
-                    >
-                      {book.category}
-                    </span>
-                  )}
-                </Link>
-              ))
-            ) : (
-              // Fallback placeholder books
-              [
-                { title: 'Thinking, Fast and Slow', author: 'Daniel Kahneman', category: 'Psychology' },
-                { title: 'The Psychology of Money', author: 'Morgan Housel', category: 'Finance' },
-                { title: 'Atomic Habits', author: 'James Clear', category: 'Self-Improvement' },
-                { title: 'Influence', author: 'Robert Cialdini', category: 'Psychology' },
-              ].map((book, index) => (
-                <Link
-                  key={index}
-                  href="/dashboard/catalog"
-                  className="group cursor-pointer block"
-                >
-                  <div
-                    className={cn(
-                      'aspect-[3/4] bg-gradient-to-br rounded-lg mb-3 flex items-center justify-center transition-transform group-hover:scale-[1.02]',
-                      BOOK_COLORS[index % BOOK_COLORS.length]
-                    )}
-                  >
-                    <BookOpen className="w-12 h-12 text-primary-400 dark:text-primary-500" />
-                  </div>
-                  <h3 className="font-medium text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors line-clamp-1">
-                    {book.title}
-                  </h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{book.author}</p>
-                  <span
-                    className={cn(
-                      'inline-block mt-2 text-xs px-2 py-1 rounded-full',
-                      CATEGORY_COLORS[book.category] || CATEGORY_COLORS.default
-                    )}
-                  >
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {(recommendations.length > 0
+              ? recommendations
+              : [
+                  { id: '1', title: 'Thinking, Fast and Slow', authors: ['Daniel Kahneman'], category: 'Psychology', availableCopies: 1 },
+                  { id: '2', title: 'The Psychology of Money', authors: ['Morgan Housel'], category: 'Finance', availableCopies: 0 },
+                  { id: '3', title: 'Atomic Habits', authors: ['James Clear'], category: 'Self-Improvement', availableCopies: 2 },
+                  { id: '4', title: 'Influence', authors: ['Robert Cialdini'], category: 'Psychology', availableCopies: 1 },
+                ]
+            ).map((book, i) => (
+              <Link key={book.id} href={`/dashboard/catalog/${book.id}`} className="group block">
+                <div className={cn('aspect-[3/4] rounded-xl mb-3 flex flex-col items-center justify-center bg-gradient-to-br p-3 transition-all group-hover:shadow-lg group-hover:-translate-y-0.5', BOOK_GRADIENTS[i % 4])}>
+                  <BookOpen className="w-10 h-10 text-white/80 mb-2" />
+                  <p className="text-white/70 text-[10px] text-center line-clamp-3">{book.title}</p>
+                </div>
+                <p className="text-sm font-medium text-gray-900 dark:text-white line-clamp-1 group-hover:text-primary-600 transition-colors">{book.title}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">{book.authors.join(', ')}</p>
+                {book.category && (
+                  <span className={cn('inline-block mt-1.5 text-[11px] px-2 py-0.5 rounded-full', CATEGORY_COLORS[book.category] || CATEGORY_COLORS.default)}>
                     {book.category}
                   </span>
-                </Link>
-              ))
-            )}
+                )}
+              </Link>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* AI Assistant Banner - Now Functional */}
-      <Link
-        href="/dashboard/ai-assistant"
-        className="block bg-gradient-to-r from-orange-400 to-orange-500 rounded-xl p-6 shadow-sm hover:shadow-md transition-all group"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-white">Chat with AI Personal Assistant</h3>
-              <p className="text-white/80 text-sm">
-                Get personalized book recommendations and learning paths based on your interests
-              </p>
-            </div>
+      {/* ── AI Assistant Banner ── */}
+      <Link href="/dashboard/ai-assistant"
+        className="group flex items-center justify-between gap-4 rounded-xl bg-gradient-to-r from-primary-500 to-primary-700 p-5 shadow-sm hover:shadow-md hover:from-primary-600 hover:to-primary-800 transition-all">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Sparkles className="w-6 h-6 text-white" />
           </div>
-          <button className="px-4 py-2 bg-white text-orange-500 rounded-lg font-medium hover:bg-orange-50 transition-colors group-hover:bg-orange-50">
-            Open AI Assistant
-          </button>
+          <div>
+            <h3 className="font-semibold text-white">AI Personal Assistant</h3>
+            <p className="text-white/70 text-sm mt-0.5">Get personalized recommendations based on your interests</p>
+          </div>
         </div>
+        <span className="hidden sm:flex items-center gap-2 px-4 py-2 bg-white text-primary-600 rounded-lg text-sm font-medium group-hover:bg-primary-50 transition-colors flex-shrink-0">
+          Open Assistant <ChevronRight className="w-4 h-4" />
+        </span>
       </Link>
 
-      {/* Quick Actions - STAFF APPROPRIATE (No admin routes) */}
+      {/* ── Quick Actions ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Link
-          href="/dashboard/catalog"
-          className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm hover:border-primary-200 dark:hover:border-primary-800 hover:shadow-md transition-all group"
-        >
-          <BookOpen className="w-8 h-8 text-primary-500 mb-3" />
-          <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400">
-            Search Catalog
-          </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Browse and reserve books</p>
-        </Link>
-
-        {/* Changed from admin route to staff's own reservations */}
-        <Link
-          href="/dashboard/reservations"
-          className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm hover:border-amber-200 dark:hover:border-amber-800 hover:shadow-md transition-all group"
-        >
-          <Clock className="w-8 h-8 text-amber-500 mb-3" />
-          <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400">
-            My Reservations
-          </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">View your reservation status</p>
-        </Link>
-
-        <Link
-          href="/dashboard/borrowed"
-          className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm hover:border-green-200 dark:hover:border-green-800 hover:shadow-md transition-all group"
-        >
-          <CheckCircle className="w-8 h-8 text-green-500 mb-3" />
-          <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400">
-            My Borrowed Books
-          </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">View your current loans</p>
-        </Link>
+        {[
+          { href: '/dashboard/catalog', icon: BookOpen, label: 'Search Catalog', desc: 'Browse and reserve books', color: 'text-primary-500', bg: 'bg-primary-50 dark:bg-primary-900/30', hover: 'hover:border-primary-300 dark:hover:border-primary-700' },
+          { href: '/dashboard/reservations', icon: Clock, label: 'My Reservations', desc: 'View your reservation status', color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/30', hover: 'hover:border-amber-300 dark:hover:border-amber-700' },
+          { href: '/dashboard/borrowed', icon: CheckCircle, label: 'Borrowed Books', desc: 'View your current loans', color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/30', hover: 'hover:border-green-300 dark:hover:border-green-700' },
+        ].map((a) => (
+          <Link key={a.href} href={a.href}
+            className={cn('group flex items-center gap-4 bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all', a.hover)}>
+            <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110', a.bg)}>
+              <a.icon className={cn('w-5 h-5', a.color)} />
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-gray-900 dark:text-white text-sm">{a.label}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{a.desc}</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-300 dark:text-gray-600 ml-auto flex-shrink-0 group-hover:text-gray-500 transition-colors" />
+          </Link>
+        ))}
       </div>
+
     </div>
   );
 }
