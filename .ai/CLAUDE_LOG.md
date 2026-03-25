@@ -4,6 +4,19 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-26 — WebGL animated background + Liquid Glass design system
+**Goal**: Full liquid glass UI with WebGL aurora mesh background, CSS glass cards, traveling beams, SVG liquid-distortion filter — uniform light & dark mode
+**Root cause**: Login had premium dark theme but dashboard used flat white cards with no visual depth or animation; light mode was stark and disconnected
+**Changes**:
+- `apps/web/components/ui/webgl-background.tsx` — NEW: Three.js canvas (dynamic import, no SSR); vertex displacement + 2D Perlin noise fragment shader; 3 animated light orbs; MutationObserver for dark/light mode color swap; visibility pause; resize handling
+- `apps/web/components/ui/glass-card.tsx` — NEW: Reusable glass card component; `beams` prop adds 4 traveling teal border animations; `liquid` prop activates SVG turbulence filter
+- `apps/web/app/globals.css` — Full glass token system (--glass-bg, --glass-border, --glass-shadow, --glass-highlight, --beam-rgb); light & dark CSS variable sets; `.glass-card` with specular ::before + rim ::after; `.glass-liquid`; global beam keyframes + `.beam-*` classes
+- `apps/web/app/dashboard/layout.tsx` — Dynamic WebGLBackground injection; inline SVG `<filter id="liquid-glass">` feTurbulence defs; removed flat bg-gray-50 in light mode
+- `apps/web/app/dashboard/student/page.tsx` — All cards converted to GlassCard; quick actions use `glass-card` class on Link; borrows table + borrow limit wrapped in GlassCard
+- `apps/web/app/dashboard/admin/page.tsx` — Main stats + activity feed (liquid) + quick actions + nested quick-action links all use GlassCard/glass-card
+**Verification**: tsc --noEmit ✓
+**Next**: Apply GlassCard to catalog, profile, settings, and remaining dashboard pages
+
 ## 2026-03-25 — Premium dark sidebar, teal focus states, stagger animations
 **Goal**: Unify dashboard visual language with the dark/teal login aesthetic; add entrance animations
 **Root cause**: Login was redesigned to dark-glassmorphic in 2026-03-21 but dashboard layout/pages were not brought into the same visual language, creating a jarring tonal shift post-login

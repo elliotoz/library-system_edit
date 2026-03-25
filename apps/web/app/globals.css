@@ -2,26 +2,128 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Color & Glass System ───────────────────────────────────────────── */
 :root {
   --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 249, 250, 251;
-  --background-end-rgb: 255, 255, 255;
+  --background-start-rgb: 240, 249, 255;
+  --background-end-rgb: 248, 250, 252;
+
+  /* Glass tokens — light mode */
+  --glass-bg:        rgba(255, 255, 255, 0.52);
+  --glass-border:    rgba(255, 255, 255, 0.78);
+  --glass-shadow:    0 8px 32px rgba(0, 0, 0, 0.07),
+                     0 2px 8px  rgba(0, 0, 0, 0.04),
+                     inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --glass-highlight: linear-gradient(135deg, rgba(255,255,255,0.68) 0%, transparent 58%);
+  --glass-rim:       rgba(255, 255, 255, 0.35);
+  --beam-rgb:        74, 191, 191;
 }
 
 .dark {
   --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 17, 24, 39;
-  --background-end-rgb: 31, 41, 55;
+  --background-start-rgb: 11, 17, 32;
+  --background-end-rgb:   13, 17, 23;
+
+  /* Glass tokens — dark mode */
+  --glass-bg:        rgba(11, 17, 32, 0.62);
+  --glass-border:    rgba(255, 255, 255, 0.07);
+  --glass-shadow:    0 8px 32px rgba(0, 0, 0, 0.5),
+                     0 2px 8px  rgba(0, 0, 0, 0.3),
+                     inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --glass-highlight: linear-gradient(135deg, rgba(74, 191, 191, 0.1) 0%, transparent 58%);
+  --glass-rim:       rgba(255, 255, 255, 0.04);
+  --beam-rgb:        74, 191, 191;
 }
 
 body {
   color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  background: rgb(var(--background-start-rgb));
+}
+
+/* ── Glass Card ─────────────────────────────────────────────────────── */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+  transform: translateZ(0); /* compositor layer — prevents repaints */
+}
+
+/* Specular highlight — light catch at top-left */
+.glass-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--glass-highlight);
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 0;
+}
+
+/* Bottom rim shadow for depth */
+.glass-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 1px;
+  background: var(--glass-rim);
+  pointer-events: none;
+}
+
+/* Ensure content renders above specular overlay */
+.glass-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Liquid glass — SVG turbulence distortion */
+.glass-liquid {
+  filter: url(#liquid-glass);
+}
+
+/* ── Traveling Beam Animations ──────────────────────────────────────── */
+@keyframes beam-top {
+  0%   { transform: translateX(-150%); }
+  100% { transform: translateX(350%);  }
+}
+@keyframes beam-right {
+  0%   { transform: translateY(-150%); }
+  100% { transform: translateY(350%);  }
+}
+@keyframes beam-bottom {
+  0%   { transform: translateX(150%);  }
+  100% { transform: translateX(-350%); }
+}
+@keyframes beam-left {
+  0%   { transform: translateY(150%);  }
+  100% { transform: translateY(-350%); }
+}
+
+.beam { position: absolute; }
+
+.beam-top {
+  top: 0; left: 0; height: 1px; width: 36%;
+  background: linear-gradient(to right, transparent, rgba(var(--beam-rgb), 0.85), transparent);
+  animation: beam-top 3.6s ease-in-out infinite;
+}
+.beam-right {
+  top: 0; right: 0; width: 1px; height: 36%;
+  background: linear-gradient(to bottom, transparent, rgba(var(--beam-rgb), 0.85), transparent);
+  animation: beam-right 3.6s ease-in-out 0.9s infinite;
+}
+.beam-bottom {
+  bottom: 0; right: 0; height: 1px; width: 36%;
+  background: linear-gradient(to left, transparent, rgba(var(--beam-rgb), 0.85), transparent);
+  animation: beam-bottom 3.6s ease-in-out 1.8s infinite;
+}
+.beam-left {
+  bottom: 0; left: 0; width: 1px; height: 36%;
+  background: linear-gradient(to top, transparent, rgba(var(--beam-rgb), 0.85), transparent);
+  animation: beam-left 3.6s ease-in-out 2.7s infinite;
 }
 
 /* Custom scrollbar */

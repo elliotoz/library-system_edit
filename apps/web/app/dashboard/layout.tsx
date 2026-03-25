@@ -4,6 +4,12 @@ import { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
+
+const WebGLBackground = dynamic(
+  () => import('@/components/ui/webgl-background').then((m) => ({ default: m.WebGLBackground })),
+  { ssr: false }
+);
 import {
   LayoutDashboard,
   BookOpen,
@@ -205,7 +211,20 @@ export default function DashboardLayout({
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-gray-50 dark:bg-[#0d1117]">
+      {/* SVG liquid-glass filter — referenced by .glass-liquid class */}
+      <svg aria-hidden="true" style={{ display: 'none' }}>
+        <defs>
+          <filter id="liquid-glass" x="-10%" y="-10%" width="120%" height="120%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.012 0.015" numOctaves="3" seed="5" result="noise" />
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" xChannelSelector="R" yChannelSelector="G" />
+          </filter>
+        </defs>
+      </svg>
+
+      <div className="min-h-screen dark:bg-[#0d1117]">
+        {/* WebGL animated mesh background */}
+        <WebGLBackground />
+
         <Toaster position="top-right" />
 
         {/* ── Header ── */}

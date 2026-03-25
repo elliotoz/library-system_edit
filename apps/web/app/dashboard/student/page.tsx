@@ -10,6 +10,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { fineApi } from '@/lib/api';
+import { GlassCard } from '@/components/ui/glass-card';
 
 interface StudentStats {
   borrowedBooks: number;
@@ -164,7 +165,7 @@ export default function StudentDashboard() {
           { label: 'Days Until Due', value: stats?.daysUntilDue ?? '—', icon: Clock, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/30', border: 'border-l-amber-500' },
           { label: 'Reading Streak', value: stats?.readingStreak ?? 0, icon: Flame, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/30', border: 'border-l-orange-500' },
         ].map((s, i) => (
-          <div key={i} className={cn('bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-100 dark:border-gray-700 border-l-4 shadow-sm animate-slide-up', s.border, `stagger-${i + 1}`)}>
+          <GlassCard key={i} className={cn('p-4 border-l-4 animate-slide-up', s.border, `stagger-${i + 1}`)}>
             <div className="flex items-center gap-3">
               <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0', s.bg)}>
                 <s.icon className={cn('w-5 h-5', s.color)} />
@@ -174,7 +175,7 @@ export default function StudentDashboard() {
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-tight">{s.label}</p>
               </div>
             </div>
-          </div>
+          </GlassCard>
         ))}
       </div>
 
@@ -186,7 +187,7 @@ export default function StudentDashboard() {
           { href: '/dashboard/reservations', icon: BookMarked, label: 'Reservations', desc: 'Check your pending pickups', color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/30', hover: 'hover:border-amber-300 dark:hover:border-amber-700' },
         ].map((a) => (
           <Link key={a.href} href={a.href}
-            className={cn('group flex items-center gap-4 bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all', a.hover)}>
+            className={cn('group flex items-center gap-4 glass-card p-4 hover:shadow-lg transition-all', a.hover)}>
             <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110', a.bg)}>
               <a.icon className={cn('w-5 h-5', a.color)} />
             </div>
@@ -200,7 +201,7 @@ export default function StudentDashboard() {
       </div>
 
       {/* ── Recommended Books ── */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
+      <GlassCard>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
           <h2 className="font-semibold text-gray-900 dark:text-white">
             Recommended for {user?.facultyName || 'You'}
@@ -244,11 +245,11 @@ export default function StudentDashboard() {
             })}
           </div>
         </div>
-      </div>
+      </GlassCard>
 
       {/* ── Current Borrows Table ── */}
       {borrows.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+        <GlassCard className="overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
             <h2 className="font-semibold text-gray-900 dark:text-white">Current Borrows</h2>
             <Link href="/dashboard/borrowed"
@@ -306,11 +307,11 @@ export default function StudentDashboard() {
               </tbody>
             </table>
           </div>
-        </div>
+        </GlassCard>
       )}
 
       {/* ── Borrow Limit ── */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm p-5">
+      <GlassCard className="p-5">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-purple-50 dark:bg-purple-900/30 rounded-xl flex items-center justify-center">
@@ -334,7 +335,7 @@ export default function StudentDashboard() {
             <span key={n} className="text-[10px] text-gray-400 dark:text-gray-600">{n}</span>
           ))}
         </div>
-      </div>
+      </GlassCard>
 
     </div>
   );
