@@ -400,16 +400,16 @@ export default function DashboardLayout({
         <aside
           className={cn(
             'fixed top-16 z-40 flex h-[calc(100vh-4rem)] w-64 flex-col transition-transform duration-300',
+            'bg-white dark:bg-[#0b1120]',
+            'border-r border-gray-200 dark:border-white/[0.06]',
             sidebarOpen ? 'translate-x-0' : '-translate-x-full',
             'lg:translate-x-0'
           )}
-          style={{ background: '#0b1120', borderRight: '1px solid rgba(255,255,255,0.06)' }}
         >
           <nav className="flex-1 overflow-y-auto px-3 py-4">
             {navSections.map((section) => (
               <div key={section.label} className="mb-5">
-                <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-widest"
-                  style={{ color: 'rgba(255,255,255,0.28)' }}>
+                <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-white/[0.28]">
                   {section.label}
                 </p>
                 <div className="space-y-0.5">
@@ -419,18 +419,18 @@ export default function DashboardLayout({
                       <Link
                         key={item.href}
                         href={item.href}
-                        className="group relative flex items-center gap-3 rounded-xl px-2 py-1.5 text-sm font-medium transition-colors duration-150"
-                        style={{ color: active ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.45)' }}
+                        className={cn(
+                          'group relative flex items-center gap-3 rounded-xl px-2 py-1.5 text-sm font-medium transition-colors duration-150',
+                          active
+                            ? 'text-teal-600 dark:text-white/95'
+                            : 'text-gray-500 dark:text-white/45'
+                        )}
                       >
                         {/* Framer Motion sliding glass active pill */}
                         {active && (
                           <motion.div
                             layoutId={`nav-active-${section.label}`}
-                            className="absolute inset-0 rounded-xl"
-                            style={{
-                              background: 'rgba(74,191,191,0.12)',
-                              border: '1px solid rgba(74,191,191,0.2)',
-                            }}
+                            className="absolute inset-0 rounded-xl bg-teal-50 dark:bg-teal-400/10 border border-teal-200 dark:border-teal-400/20"
                             transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                           />
                         )}
@@ -464,13 +464,10 @@ export default function DashboardLayout({
           </nav>
 
           {/* Logout */}
-          <div className="px-3 py-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="border-t border-gray-200 dark:border-white/[0.06] px-3 py-3">
             <button
               onClick={logout}
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150"
-              style={{ color: 'rgba(255,100,100,0.7)' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.1)'; (e.currentTarget as HTMLElement).style.color = '#f87171'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; (e.currentTarget as HTMLElement).style.color = 'rgba(255,100,100,0.7)'; }}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-500 dark:text-red-400 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
             >
               <LogOut className="h-4 w-4 shrink-0" />
               Log out
