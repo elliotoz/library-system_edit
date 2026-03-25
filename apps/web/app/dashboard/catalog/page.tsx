@@ -331,7 +331,7 @@ export default function CatalogPage() {
       {isLoading && viewMode === 'grid' && (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {[...Array(8)].map((_, i) => (
-            <div key={i} className="animate-pulse rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+            <div key={i} className="glass-card animate-pulse p-4">
               <div className="mb-4 aspect-[2/3] rounded-lg bg-gray-200 dark:bg-gray-700" />
               <div className="mb-2 h-4 rounded bg-gray-200 dark:bg-gray-700" />
               <div className="h-3 w-2/3 rounded bg-gray-200 dark:bg-gray-700" />
@@ -344,7 +344,7 @@ export default function CatalogPage() {
       {isLoading && viewMode === 'list' && (
         <div className="space-y-2">
           {[...Array(8)].map((_, i) => (
-            <div key={i} className="flex animate-pulse gap-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+            <div key={i} className="glass-card flex animate-pulse gap-4 p-4">
               <div className="h-16 w-12 shrink-0 rounded-lg bg-gray-200 dark:bg-gray-700" />
               <div className="flex-1 space-y-2 py-1">
                 <div className="h-4 w-3/4 rounded bg-gray-200 dark:bg-gray-700" />
@@ -357,7 +357,7 @@ export default function CatalogPage() {
 
       {/* Empty state */}
       {!isLoading && books.length === 0 && (
-        <div className="rounded-xl border border-dashed border-gray-200 bg-white py-16 text-center dark:border-gray-700 dark:bg-gray-800">
+        <div className="glass-card py-16 text-center">
           <BookOpen className="mx-auto mb-4 h-14 w-14 text-gray-300 dark:text-gray-600" />
           <h3 className="mb-1 text-base font-semibold text-gray-900 dark:text-white">No books found</h3>
           <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">Try adjusting your search or filters</p>
@@ -376,7 +376,7 @@ export default function CatalogPage() {
               <Link
                 key={book.id}
                 href={`/dashboard/catalog/${book.id}`}
-                className="group flex flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary-200 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-primary-700"
+                className="glass-card glass-card-interactive group flex flex-col p-4"
               >
                 <div className="mb-4 aspect-[2/3] w-full overflow-hidden rounded-lg">
                   <BookCover book={book} className="h-full w-full" />
@@ -422,7 +422,7 @@ export default function CatalogPage() {
               <Link
                 key={book.id}
                 href={`/dashboard/catalog/${book.id}`}
-                className="group flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-all duration-200 hover:border-primary-200 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-primary-700"
+                className="glass-card glass-card-interactive group flex items-center gap-4 p-3"
               >
                 <BookCover book={book} className="h-16 w-12 shrink-0" />
                 <div className="min-w-0 flex-1">

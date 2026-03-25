@@ -116,7 +116,7 @@ export default function AdminDashboard() {
       {/* ── Main Stats ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {mainStats.map((s, i) => (
-          <div key={i} className={cn('group bg-white dark:bg-gray-800/90 rounded-xl border border-gray-100 dark:border-gray-700/60 p-5 shadow-sm hover:shadow-md transition-all animate-slide-up', `stagger-${i + 1}`)}>
+          <div key={i} className={cn('glass-card glass-card-interactive group p-5 animate-slide-up', `stagger-${i + 1}`)}>
             <div className="flex items-center gap-4">
               <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center ring-1 ring-transparent group-hover:ring-primary-400/30 transition-all', s.light)}>
                 <s.icon className={cn('w-6 h-6', s.color)} />
@@ -134,7 +134,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {alertStats.map((s, i) => (
           <Link key={i} href={s.link}
-            className={cn('group rounded-xl border border-l-4 p-4 shadow-sm hover:shadow-md transition-all animate-slide-up', s.bg, s.border, `stagger-${i + 1}`)}>
+            className={cn('glass-card glass-card-interactive group border-l-4 p-4 animate-slide-up', s.border, `stagger-${i + 1}`)}>
             <div className="flex items-center gap-3">
               <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', s.iconBg)}>
                 <s.icon className={cn('w-5 h-5', s.color)} />
@@ -153,8 +153,8 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Activity Feed */}
-        <div className="bg-white dark:bg-gray-800/90 rounded-xl border border-gray-100 dark:border-gray-700/60 shadow-sm">
-          <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+        <div className="glass-card">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-black/[0.06] dark:border-white/[0.06]">
             <Activity className="w-4 h-4 text-gray-400" />
             <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Recent Activity</h2>
           </div>
@@ -194,14 +194,14 @@ export default function AdminDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-white dark:bg-gray-800/90 rounded-xl border border-gray-100 dark:border-gray-700/60 shadow-sm">
-          <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+        <div className="glass-card">
+          <div className="px-5 py-4 border-b border-black/[0.06] dark:border-white/[0.06]">
             <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Quick Actions</h2>
           </div>
           <div className="p-5 grid grid-cols-2 gap-3">
             {quickActions.map((a, i) => (
               <Link key={i} href={a.href}
-                className={cn('group flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 hover:shadow-md transition-all', a.hover)}>
+                className={cn('glass-card glass-card-interactive group flex flex-col items-center justify-center gap-2 p-4', a.hover)}>
                 <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110', a.bg)}>
                   <a.icon className={cn('w-5 h-5', a.color)} />
                 </div>

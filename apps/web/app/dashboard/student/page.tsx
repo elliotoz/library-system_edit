@@ -165,7 +165,7 @@ export default function StudentDashboard() {
           { label: 'Days Until Due', value: stats?.daysUntilDue ?? '—', icon: Clock, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/30', border: 'border-l-amber-500' },
           { label: 'Reading Streak', value: stats?.readingStreak ?? 0, icon: Flame, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/30', border: 'border-l-orange-500' },
         ].map((s, i) => (
-          <div key={i} className={cn('bg-white dark:bg-gray-800/90 rounded-xl p-4 border border-gray-100 dark:border-gray-700/60 border-l-4 shadow-sm animate-slide-up', s.border, `stagger-${i + 1}`)}>
+          <div key={i} className={cn('glass-card border-l-4 p-4 animate-slide-up', s.border, `stagger-${i + 1}`)}>
             <div className="flex items-center gap-3">
               <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0', s.bg)}>
                 <s.icon className={cn('w-5 h-5', s.color)} />
@@ -187,7 +187,7 @@ export default function StudentDashboard() {
           { href: '/dashboard/reservations', icon: BookMarked, label: 'Reservations', desc: 'Check your pending pickups', color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/30', hover: 'hover:border-amber-300 dark:hover:border-amber-700' },
         ].map((a) => (
           <Link key={a.href} href={a.href}
-            className={cn('group flex items-center gap-4 bg-white dark:bg-gray-800/90 rounded-xl p-4 border border-gray-100 dark:border-gray-700/60 shadow-sm hover:shadow-md transition-all', a.hover)}>
+            className={cn('glass-card glass-card-interactive group flex items-center gap-4 p-4', a.hover)}>
             <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110', a.bg)}>
               <a.icon className={cn('w-5 h-5', a.color)} />
             </div>
@@ -201,8 +201,8 @@ export default function StudentDashboard() {
       </div>
 
       {/* ── Recommended Books ── */}
-      <div className="bg-white dark:bg-gray-800/90 rounded-xl border border-gray-100 dark:border-gray-700/60 shadow-sm">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+      <div className="glass-card">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-black/[0.06] dark:border-white/[0.06]">
           <h2 className="font-semibold text-gray-900 dark:text-white">
             Recommended for {user?.facultyName || 'You'}
           </h2>
@@ -249,8 +249,8 @@ export default function StudentDashboard() {
 
       {/* ── Current Borrows Table ── */}
       {borrows.length > 0 && (
-        <div className="bg-white dark:bg-gray-800/90 rounded-xl border border-gray-100 dark:border-gray-700/60 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+        <div className="glass-card overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-black/[0.06] dark:border-white/[0.06]">
             <h2 className="font-semibold text-gray-900 dark:text-white">Current Borrows</h2>
             <Link href="/dashboard/borrowed"
               className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 flex items-center gap-1">
@@ -260,18 +260,18 @@ export default function StudentDashboard() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 dark:bg-gray-700/40">
+                <tr className="bg-black/[0.02] dark:bg-white/[0.03]">
                   <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-5 py-3">Book</th>
                   <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-5 py-3 hidden sm:table-cell">Due</th>
                   <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-5 py-3">Status</th>
                   <th className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-5 py-3 hidden md:table-cell">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+              <tbody className="divide-y divide-black/[0.05] dark:divide-white/[0.06]">
                 {borrows.map((borrow) => {
                   const st = getBorrowStatus(borrow);
                   return (
-                    <tr key={borrow.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-colors">
+                    <tr key={borrow.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors">
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-11 rounded bg-gradient-to-br from-primary-400 to-primary-600 flex-shrink-0 flex items-center justify-center">
@@ -311,7 +311,7 @@ export default function StudentDashboard() {
       )}
 
       {/* ── Borrow Limit ── */}
-      <div className="bg-white dark:bg-gray-800/90 rounded-xl border border-gray-100 dark:border-gray-700/60 shadow-sm p-5">
+      <div className="glass-card p-5">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-purple-50 dark:bg-purple-900/30 rounded-xl flex items-center justify-center">
@@ -326,7 +326,7 @@ export default function StudentDashboard() {
             {stats?.borrowedBooks ?? 0}<span className="text-gray-400 dark:text-gray-500 text-base font-normal">/5</span>
           </p>
         </div>
-        <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+        <div className="h-2 bg-black/[0.06] dark:bg-white/[0.08] rounded-full overflow-hidden">
           <div className={cn('h-full bg-gradient-to-r rounded-full transition-all duration-700', borrowColor)}
             style={{ width: `${borrowPct}%`, transitionDelay: '350ms' }} />
         </div>
