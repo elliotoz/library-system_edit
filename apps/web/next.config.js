@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
-  transpilePackages: ['three', '@react-three/fiber'],
+  transpilePackages: ['three', '@react-three/fiber', '@splinetool/react-spline', '@splinetool/runtime'],
   images: {
     domains: ['localhost'],
   },
