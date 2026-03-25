@@ -4,6 +4,18 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-25 — Premium dark sidebar, teal focus states, stagger animations
+**Goal**: Unify dashboard visual language with the dark/teal login aesthetic; add entrance animations
+**Root cause**: Login was redesigned to dark-glassmorphic in 2026-03-21 but dashboard layout/pages were not brought into the same visual language, creating a jarring tonal shift post-login
+**Changes**:
+- `apps/web/tailwind.config.ts` — added `slide-up`, `pulse-slow`, `glow` keyframes + animations
+- `apps/web/app/globals.css` — fixed focus ring from `#22c55e` (green) → `rgba(74,191,191,0.55)` (teal); added `.animate-slide-up` + `.stagger-1/2/3/4` utilities; added `.gradient-text-teal`
+- `apps/web/app/dashboard/layout.tsx` — dark `#0b1120` sidebar with `border-white/[0.06]`; teal left-bar active nav with glow; glassmorphic header (`bg-white/90 backdrop-blur-md`); upgraded loading screen to teal gradient
+- `apps/web/app/dashboard/student/page.tsx` — staggered slide-up on stat cards, breathing dot pattern on banner, shimmer sweep on book covers, borrow bar fill delay
+- `apps/web/app/dashboard/admin/page.tsx` — teal dot pattern banner, teal gradient timeline, staggered stat card entrances, group hover ring on icon cells
+**Verification**: tsc --noEmit ✓
+**Next**: Apply same dark sidebar treatment to any remaining auth-adjacent pages if needed
+
 ## 2026-03-22 — Spline 3D robot integration on login/signup
 **Goal**: Replace hand-coded SVG robot with interactive Spline 3D scene
 **Root cause**: User requested true 3D interactive robot (not flat SVG) using Spline
@@ -1434,3 +1446,13 @@ Implement reading list visibility/discovery system with instructor public profil
 - Default status is DRAFT (new lists not visible in feed until explicitly published)
 - Notification rate limiting not added (low volume expected)
 - Feed limited to 50 most recently updated lists
+
+## 2026-03-22 — Fix @react-three/drei monorepo module resolution error
+**Goal**: Remove @react-three/drei which caused `Module not found: Can't resolve '@react-three/fiber'` build failure
+**Root cause**: @react-spring/three (drei dep) lives in root node_modules and can't find @react-three/fiber installed only in apps/web/node_modules; transpilePackages doesn't bridge this
+**Changes**:
+- `apps/web/components/ui/robot-3d-scene.tsx` — removed OrbitControls import/usage, added slow Y-axis auto-rotation via `root.current.rotation.y += 0.003` in useFrame
+- `apps/web/next.config.js` — removed `@react-three/drei` and `@react-spring/three` from transpilePackages
+- `apps/web/package.json` — removed @react-three/drei, added @types/three (devDep)
+**Verification**: tsc --noEmit ✓  |  next build ✓
+**Next**: Robot 3D is fully functional with auto-rotation. Login, signup, and dashboard logo are all in place.

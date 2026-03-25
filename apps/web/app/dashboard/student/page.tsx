@@ -118,9 +118,9 @@ export default function StudentDashboard() {
     <div className="space-y-6">
 
       {/* ── Welcome Banner ── */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary-500 via-primary-600 to-primary-700 p-6 text-white shadow-lg">
-        <div className="absolute inset-0 opacity-10"
-          style={{ backgroundImage: 'radial-gradient(circle at 80% 50%, white 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary-500 via-primary-600 to-primary-700 p-6 text-white shadow-lg animate-slide-up stagger-1">
+        <div className="absolute inset-0 animate-pulse-slow"
+          style={{ backgroundImage: 'radial-gradient(circle at 80% 50%, white 1px, transparent 1px)', backgroundSize: '24px 24px', opacity: 0.1 }} />
         <div className="relative flex items-center justify-between">
           <div>
             <p className="text-primary-100 text-sm font-medium mb-1">{greeting()}</p>
@@ -164,7 +164,7 @@ export default function StudentDashboard() {
           { label: 'Days Until Due', value: stats?.daysUntilDue ?? '—', icon: Clock, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/30', border: 'border-l-amber-500' },
           { label: 'Reading Streak', value: stats?.readingStreak ?? 0, icon: Flame, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/30', border: 'border-l-orange-500' },
         ].map((s, i) => (
-          <div key={i} className={cn('bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-100 dark:border-gray-700 border-l-4 shadow-sm', s.border)}>
+          <div key={i} className={cn('bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-100 dark:border-gray-700 border-l-4 shadow-sm animate-slide-up', s.border, `stagger-${i + 1}`)}>
             <div className="flex items-center gap-3">
               <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0', s.bg)}>
                 <s.icon className={cn('w-5 h-5', s.color)} />
@@ -215,7 +215,8 @@ export default function StudentDashboard() {
             {(recommendations.length > 0 ? recommendations : Array(4).fill(null)).map((book, i) => {
               if (!book) return (
                 <Link key={i} href="/dashboard/catalog" className="group block">
-                  <div className={cn('aspect-[3/4] rounded-xl mb-3 flex flex-col items-center justify-center bg-gradient-to-br p-3 transition-all group-hover:shadow-lg group-hover:-translate-y-0.5', BOOK_GRADIENTS[i % 4])}>
+                  <div className={cn('relative aspect-[3/4] rounded-xl mb-3 flex flex-col items-center justify-center bg-gradient-to-br p-3 transition-all group-hover:shadow-lg group-hover:-translate-y-0.5 overflow-hidden', BOOK_GRADIENTS[i % 4])}>
+                    <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
                     <BookOpen className="w-10 h-10 text-white/80 mb-2" />
                     <p className="text-white/70 text-[10px] text-center">Introduction to Algorithms</p>
                   </div>
@@ -227,7 +228,8 @@ export default function StudentDashboard() {
               const badge = bookAvailabilityBadge(book);
               return (
                 <Link key={book.id} href={`/dashboard/catalog/${book.id}`} className="group block">
-                  <div className={cn('aspect-[3/4] rounded-xl mb-3 flex flex-col items-center justify-center bg-gradient-to-br p-3 transition-all group-hover:shadow-lg group-hover:-translate-y-0.5', BOOK_GRADIENTS[i % 4])}>
+                  <div className={cn('relative aspect-[3/4] rounded-xl mb-3 flex flex-col items-center justify-center bg-gradient-to-br p-3 transition-all group-hover:shadow-lg group-hover:-translate-y-0.5 overflow-hidden', BOOK_GRADIENTS[i % 4])}>
+                    <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
                     <BookOpen className="w-10 h-10 text-white/80 mb-2" />
                     <p className="text-white/70 text-[10px] text-center line-clamp-3">{book.title}</p>
                   </div>
@@ -324,8 +326,8 @@ export default function StudentDashboard() {
           </p>
         </div>
         <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-          <div className={cn('h-full bg-gradient-to-r rounded-full transition-all duration-500', borrowColor)}
-            style={{ width: `${borrowPct}%` }} />
+          <div className={cn('h-full bg-gradient-to-r rounded-full transition-all duration-700', borrowColor)}
+            style={{ width: `${borrowPct}%`, transitionDelay: '350ms' }} />
         </div>
         <div className="flex justify-between mt-1.5">
           {[0, 1, 2, 3, 4, 5].map((n) => (

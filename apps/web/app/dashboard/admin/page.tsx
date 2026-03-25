@@ -93,10 +93,12 @@ export default function AdminDashboard() {
     <div className="space-y-6">
 
       {/* ── Welcome Banner ── */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-800 via-gray-900 to-gray-950 dark:from-gray-900 dark:to-gray-950 p-6 text-white shadow-lg">
-        <div className="absolute inset-0 opacity-5"
-          style={{ backgroundImage: 'radial-gradient(circle at 70% 50%, white 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
-        <div className="absolute right-0 top-0 h-full w-48 bg-gradient-to-l from-primary-600/20 to-transparent" />
+      <div className="relative overflow-hidden rounded-2xl p-6 text-white shadow-lg animate-slide-up stagger-1"
+        style={{ background: 'linear-gradient(135deg,#0d1b2e 0%,#0f2336 60%,#0b1a2b 100%)' }}>
+        <div className="absolute inset-0 animate-pulse-slow"
+          style={{ backgroundImage: 'radial-gradient(circle at 70% 50%, rgba(74,191,191,0.6) 1px, transparent 1px)', backgroundSize: '28px 28px', opacity: 0.06 }} />
+        <div className="absolute right-0 top-0 h-full w-56 bg-gradient-to-l from-teal-500/20 to-transparent" />
+        <div className="absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-transparent via-teal-400/30 to-transparent" />
         <div className="relative flex items-center justify-between">
           <div>
             <p className="text-gray-400 text-sm font-medium mb-1">{greeting()}</p>
@@ -114,9 +116,9 @@ export default function AdminDashboard() {
       {/* ── Main Stats ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {mainStats.map((s, i) => (
-          <div key={i} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm hover:shadow-md transition-shadow">
+          <div key={i} className={cn('group bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm hover:shadow-lg transition-all animate-slide-up', `stagger-${i + 1}`)}>
             <div className="flex items-center gap-4">
-              <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', s.light)}>
+              <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center ring-1 ring-transparent group-hover:ring-primary-400/30 transition-all', s.light)}>
                 <s.icon className={cn('w-6 h-6', s.color)} />
               </div>
               <div>
@@ -132,7 +134,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {alertStats.map((s, i) => (
           <Link key={i} href={s.link}
-            className={cn('group rounded-xl border border-l-4 p-4 shadow-sm hover:shadow-md transition-all', s.bg, s.border)}>
+            className={cn('group rounded-xl border border-l-4 p-4 shadow-sm hover:shadow-md transition-all animate-slide-up', s.bg, s.border, `stagger-${i + 1}`)}>
             <div className="flex items-center gap-3">
               <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', s.iconBg)}>
                 <s.icon className={cn('w-5 h-5', s.color)} />
@@ -165,7 +167,7 @@ export default function AdminDashboard() {
             ) : (
               <div className="relative">
                 {/* Timeline line */}
-                <div className="absolute left-4 top-2 bottom-2 w-px bg-gray-100 dark:bg-gray-700" />
+                <div className="absolute left-4 top-2 bottom-2 w-px bg-gradient-to-b from-teal-400/40 via-teal-400/20 to-transparent" />
                 <div className="space-y-4">
                   {activities.slice(0, 5).map((a, i) => (
                     <div key={i} className="flex items-start gap-4 relative">

@@ -184,14 +184,18 @@ export default function DashboardLayout({
 
   if (isLoading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-500 text-white shadow-lg">
-            <Library className="h-6 w-6" />
+      <div className="flex min-h-screen items-center justify-center"
+        style={{ background: 'linear-gradient(135deg,#0b1120 0%,#0f1929 100%)' }}>
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-lg"
+            style={{ background: 'linear-gradient(135deg,#2A9D9D,#176666)', boxShadow: '0 0 32px rgba(42,157,157,0.4)' }}>
+            <Library className="h-7 w-7" />
           </div>
-          <div className="h-1 w-32 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-            <div className="h-full w-1/2 animate-pulse rounded-full bg-primary-400" />
+          <div className="h-1 w-36 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
+            <div className="h-full animate-pulse rounded-full"
+              style={{ width: '55%', background: 'linear-gradient(90deg,#2A9D9D,#4ABFBF)' }} />
           </div>
+          <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>Loading your library…</p>
         </div>
       </div>
     );
@@ -201,11 +205,11 @@ export default function DashboardLayout({
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0d1117]">
         <Toaster position="top-right" />
 
         {/* ── Header ── */}
-        <header className="fixed top-0 z-50 flex h-16 w-full items-center justify-between border-b border-gray-200 bg-white px-4 shadow-sm dark:border-gray-700/60 dark:bg-gray-800">
+        <header className="fixed top-0 z-50 flex h-16 w-full items-center justify-between border-b border-gray-200/80 bg-white/90 px-4 shadow-sm backdrop-blur-md dark:border-white/[0.06] dark:bg-[#0b1120]/90">
           {/* Left: hamburger + brand */}
           <div className="flex items-center gap-3">
             <button
@@ -353,7 +357,8 @@ export default function DashboardLayout({
         {/* ── Mobile backdrop ── */}
         {sidebarOpen && (
           <div
-            className="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm lg:hidden"
+            className="fixed inset-0 z-30 lg:hidden"
+            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
             onClick={() => setSidebarOpen(false)}
           />
         )}
@@ -361,15 +366,17 @@ export default function DashboardLayout({
         {/* ── Sidebar ── */}
         <aside
           className={cn(
-            'fixed top-16 z-40 flex h-[calc(100vh-4rem)] w-64 flex-col border-r border-gray-200 bg-white transition-transform duration-300 dark:border-gray-700/60 dark:bg-gray-800',
+            'fixed top-16 z-40 flex h-[calc(100vh-4rem)] w-64 flex-col transition-transform duration-300',
             sidebarOpen ? 'translate-x-0' : '-translate-x-full',
             'lg:translate-x-0'
           )}
+          style={{ background: '#0b1120', borderRight: '1px solid rgba(255,255,255,0.06)' }}
         >
           <nav className="flex-1 overflow-y-auto px-3 py-4">
             {navSections.map((section) => (
               <div key={section.label} className="mb-5">
-                <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-widest"
+                  style={{ color: 'rgba(255,255,255,0.28)' }}>
                   {section.label}
                 </p>
                 <div className="space-y-0.5">
@@ -380,23 +387,29 @@ export default function DashboardLayout({
                         key={item.href}
                         href={item.href}
                         className={cn(
-                          'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                          'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150',
                           active
-                            ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
-                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700/60 dark:hover:text-white'
+                            ? 'border-l-2 border-teal-400'
+                            : 'border-l-2 border-transparent'
                         )}
+                        style={active ? {
+                          background: 'rgba(74,191,191,0.1)',
+                          color: '#4ABFBF',
+                        } : {
+                          color: 'rgba(255,255,255,0.5)',
+                        }}
+                        onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.85)'; (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
+                        onMouseLeave={(e) => { if (!active) { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.5)'; (e.currentTarget as HTMLElement).style.background = ''; } }}
                       >
                         <item.icon
                           className={cn(
                             'h-4 w-4 shrink-0 transition-colors',
-                            active
-                              ? 'text-primary-500 dark:text-primary-400'
-                              : 'text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300'
+                            active ? 'text-teal-400' : ''
                           )}
                         />
                         <span className="flex-1 truncate">{item.label}</span>
                         {active && (
-                          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-primary-400 dark:text-primary-500" />
+                          <ChevronRight className="h-3.5 w-3.5 shrink-0" style={{ color: 'rgba(74,191,191,0.6)' }} />
                         )}
                       </Link>
                     );
@@ -407,10 +420,13 @@ export default function DashboardLayout({
           </nav>
 
           {/* Logout */}
-          <div className="border-t border-gray-200 px-3 py-3 dark:border-gray-700">
+          <div className="px-3 py-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
             <button
               onClick={logout}
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150"
+              style={{ color: 'rgba(255,100,100,0.7)' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.1)'; (e.currentTarget as HTMLElement).style.color = '#f87171'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; (e.currentTarget as HTMLElement).style.color = 'rgba(255,100,100,0.7)'; }}
             >
               <LogOut className="h-4 w-4 shrink-0" />
               Log out
