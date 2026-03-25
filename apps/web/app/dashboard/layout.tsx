@@ -5,6 +5,9 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
+import { motion, AnimatePresence } from 'framer-motion';
+import { GlassNavIcon } from '@/components/ui/glass-nav-icon';
+import { useContentAwareGlass } from '@/hooks/useContentAwareGlass';
 
 const WebGLBackground = dynamic(
   () => import('@/components/ui/webgl-background').then((m) => ({ default: m.WebGLBackground })),
@@ -71,6 +74,8 @@ export default function DashboardLayout({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const notificationRef = useRef<HTMLDivElement>(null);
+
+  const isDarkContent = useContentAwareGlass(80);
 
   useEffect(() => {
     const savedMode = localStorage.getItem('darkMode');
@@ -228,7 +233,16 @@ export default function DashboardLayout({
         <Toaster position="top-right" />
 
         {/* ── Header ── */}
-        <header className="fixed top-0 z-50 flex h-16 w-full items-center justify-between border-b border-gray-200/80 bg-white/90 px-4 shadow-sm backdrop-blur-md dark:border-white/[0.06] dark:bg-[#0b1120]/90">
+        <header
+          className="fixed top-0 z-50 flex h-16 w-full items-center justify-between px-4 glass-chrome"
+          style={{
+            borderBottom: '1px solid var(--glass-border)',
+            background: isDarkContent
+              ? 'rgba(255,255,255,0.72)'
+              : 'var(--glass-chrome-bg)',
+            transition: 'background 0.4s var(--spring-gentle)',
+          }}
+        >
           {/* Left: hamburger + brand */}
           <div className="flex items-center gap-3">
             <button
@@ -405,30 +419,41 @@ export default function DashboardLayout({
                       <Link
                         key={item.href}
                         href={item.href}
-                        className={cn(
-                          'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150',
-                          active
-                            ? 'border-l-2 border-teal-400'
-                            : 'border-l-2 border-transparent'
-                        )}
-                        style={active ? {
-                          background: 'rgba(74,191,191,0.1)',
-                          color: '#4ABFBF',
-                        } : {
-                          color: 'rgba(255,255,255,0.5)',
-                        }}
-                        onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.85)'; (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
-                        onMouseLeave={(e) => { if (!active) { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.5)'; (e.currentTarget as HTMLElement).style.background = ''; } }}
+                        className="group relative flex items-center gap-3 rounded-xl px-2 py-1.5 text-sm font-medium transition-colors duration-150"
+                        style={{ color: active ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.45)' }}
                       >
-                        <item.icon
-                          className={cn(
-                            'h-4 w-4 shrink-0 transition-colors',
-                            active ? 'text-teal-400' : ''
-                          )}
-                        />
-                        <span className="flex-1 truncate">{item.label}</span>
+                        {/* Framer Motion sliding glass active pill */}
                         {active && (
-                          <ChevronRight className="h-3.5 w-3.5 shrink-0" style={{ color: 'rgba(74,191,191,0.6)' }} />
+                          <motion.div
+                            layoutId={`nav-active-${section.label}`}
+                            className="absolute inset-0 rounded-xl"
+                            style={{
+                              background: 'rgba(74,191,191,0.12)',
+                              border: '1px solid rgba(74,191,191,0.2)',
+                            }}
+                            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                          />
+                        )}
+
+                        {/* Hover highlight (non-active) */}
+                        {!active && (
+                          <motion.div
+                            className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100"
+                            style={{ background: 'rgba(255,255,255,0.05)' }}
+                            transition={{ duration: 0.15 }}
+                          />
+                        )}
+
+                        {/* Layered glass icon */}
+                        <GlassNavIcon icon={item.icon} active={active} size={32} />
+
+                        <span className="relative z-10 flex-1 truncate">{item.label}</span>
+
+                        {active && (
+                          <ChevronRight
+                            className="relative z-10 h-3.5 w-3.5 shrink-0"
+                            style={{ color: 'rgba(74,191,191,0.6)' }}
+                          />
                         )}
                       </Link>
                     );

@@ -4,6 +4,22 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-26 — Liquid Glass Chrome system: correct architecture + Framer Motion morphing
+**Goal**: Correct overdone glass (cards → solid content), apply glass only to chrome layer (header/sidebar/bars/buttons/search). Add spring physics, Framer Motion sidebar morphing, content-aware glass, layered glass icons.
+**Root cause**: Previous session applied glass to all content cards violating Apple Liquid Glass philosophy — glass belongs to the floating chrome layer, not the content layer
+**Changes**:
+- `apps/web/components/ui/liquid-glass-button.tsx` — NEW: Framer Motion spring button (scale 0.93 on tap, 1.025 hover); primary variant = teal + beams; secondary = achromatic glass
+- `apps/web/components/ui/glass-nav-icon.tsx` — NEW: 4-layer SVG icon (gradient glow, frosted glass disc, crisp symbol, specular highlight); Framer Motion animate scale on active
+- `apps/web/components/ui/liquid-glass-search.tsx` — NEW: Expanding glass search pill (Framer Motion layout animation), spring clear button, staggered filter chip AnimatePresence
+- `apps/web/hooks/useContentAwareGlass.ts` — NEW: samples pixel luminance under header via elementsFromPoint; sets `--glass-adaptive-opacity` CSS var; updates on scroll + dark mode toggle
+- `apps/web/app/globals.css` — Added `.glass-chrome` (header/bars), `.glass-button` + `.glass-button-primary`, `.glass-search`; added `--spring` and `--spring-gentle` easing vars; complete variable sets for light/dark
+- `apps/web/app/dashboard/layout.tsx` — Framer Motion `layoutId` sliding active pill in sidebar; GlassNavIcon for all nav items; content-aware glass header (isDarkContent); framer-motion + AnimatePresence imports
+- `apps/web/app/dashboard/student/page.tsx` — All content cards reverted to solid white/dark; quick actions reverted to solid
+- `apps/web/app/dashboard/admin/page.tsx` — All content cards reverted to solid white/dark
+- `apps/web/app/dashboard/catalog/page.tsx` — LiquidGlassSearch replaces plain input; LiquidGlassButton for Filters toggle; search+filter bar wrapped in glass-chrome
+**Verification**: tsc --noEmit ✓
+**Next**: Apply LiquidGlassButton to remaining primary CTAs (borrow, reserve, submit buttons); extend glass-chrome to notification dropdown and modal sheets
+
 ## 2026-03-26 — WebGL animated background + Liquid Glass design system
 **Goal**: Full liquid glass UI with WebGL aurora mesh background, CSS glass cards, traveling beams, SVG liquid-distortion filter — uniform light & dark mode
 **Root cause**: Login had premium dark theme but dashboard used flat white cards with no visual depth or animation; light mode was stark and disconnected
