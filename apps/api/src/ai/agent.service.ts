@@ -25,19 +25,42 @@ export class AgentService {
     }
   }
 
+  // ── Conversations ──────────────────────────────────────────────
+
+  async getConversations(userId: string) {
+    return this.prisma.aiConversation.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      select: { id: true, title: true, createdAt: true, updatedAt: true },
+    });
+  }
+
+  async createConversation(userId: string) {
+    return this.prisma.aiConversation.create({
+      data: { userId, title: 'New Chat' },
+      select: { id: true, title: true, createdAt: true, updatedAt: true },
+    });
+  }
+
+  async deleteConversation(id: string, userId: string) {
+    await this.prisma.aiConversation.deleteMany({ where: { id, userId } });
+  }
+
   // ── History ────────────────────────────────────────────────────
 
-  async getHistory(userId: string) {
+  async getHistory(userId: string, conversationId?: string) {
     return this.prisma.aiMessage.findMany({
-      where: { userId },
+      where: conversationId ? { conversationId } : { userId, conversationId: null },
       orderBy: { createdAt: 'asc' },
-      take: 20,
+      take: 50,
       select: { id: true, role: true, content: true, createdAt: true },
     });
   }
 
-  async saveMessage(userId: string, role: string, content: string) {
-    return this.prisma.aiMessage.create({ data: { userId, role, content } });
+  async saveMessage(userId: string, role: string, content: string, conversationId?: string) {
+    return this.prisma.aiMessage.create({
+      data: { userId, role, content, ...(conversationId ? { conversationId } : {}) },
+    });
   }
 
   // ── System prompt ──────────────────────────────────────────────
@@ -56,9 +79,9 @@ export class AgentService {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
     });
 
-    return `You are ÜLIB — the AI assistant for Üsküdar University Library System.
+    return `You are OZ AI — the AI assistant for AI Integrated Library System.
 You are smart, academic, friendly, and precise.
-Respond in the same language the user writes in (Turkish or English).
+Respond in English by default. Only switch to Turkish if the user's message is written in Turkish.
 
 ## Current User
 Name: ${user.name}
@@ -70,16 +93,25 @@ Active Borrows: ${user.activeBorrowsCount ?? 0} / ${user.borrowPolicy?.maxActive
 Borrow Policy: ${user.borrowPolicy?.maxBorrowDays ?? 14} days, ${user.borrowPolicy?.maxExtensions ?? 2} extensions
 
 ## Your Capabilities
-You have tools to search the library catalog, get book details,
-read and summarise e-books, fetch web pages, and check borrow status.
+You have tools to search the library catalog, count catalog stats, get book details,
+read and summarise e-books, fetch web pages, check your own borrows, and — for staff/admin —
+view all active borrows and reservations across the library.
+You have direct, real-time access to the library database through these tools.
 
 ## Behaviour Rules
-- ALWAYS call search_catalog before saying a book is or is not available
-- For code questions, reply directly: "Yes, here is Hello World in Python:"
-  then immediately give the code block. Do not over-explain unless asked.
-- When summarising a book, call read_ebook first — never invent summaries
-- Use markdown: bullet points for lists, headings for long answers,
-  fenced code blocks with language tags for all code
+- ALWAYS use a tool to answer library data questions. NEVER guess or invent numbers.
+- To count books: call get_catalog_stats — it returns exact totals from the database.
+- To find a book by name: call search_catalog with the book title as the query.
+- When the user says "find/get/fetch [name]", treat [name] as a book title and call search_catalog.
+- When books are returned by any tool, always render the title as a markdown link: [Title](link)
+- To see active borrows or the most-borrowed book: call get_active_borrows.
+- To see active reservations: call get_active_reservations.
+- NEVER write Python, SQL, shell, or any code to answer a library question — call the tool.
+- NEVER use placeholder text like {{variable}} or <result> — always call the tool and use real data.
+- For code questions (user explicitly asking to write code), reply with a code block only.
+- When summarising a book, call read_ebook first — never invent summaries.
+- When the user sends an image, describe what you see in detail, then answer their question.
+- Use markdown: bullet points for lists, headings for long answers, fenced code blocks for code.
 - Be concise. Today is ${today}.`;
   }
 
@@ -148,7 +180,31 @@ read and summarise e-books, fetch web pages, and check borrow status.
         type: 'function',
         function: {
           name: 'get_my_borrows',
-          description: "Get the user's current active borrows and due dates.",
+          description: "Get the current user's own active borrows and due dates.",
+          parameters: { type: 'object', properties: {} },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'get_catalog_stats',
+          description: 'Get total book count, copy counts, and e-book count from the library catalog. Use this to answer "how many books" questions.',
+          parameters: { type: 'object', properties: {} },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'get_active_borrows',
+          description: 'Get all currently active borrows across the library, including which books are borrowed, by whom, and due dates. Also returns the top 5 most-borrowed books of all time.',
+          parameters: { type: 'object', properties: {} },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'get_active_reservations',
+          description: 'Get all active (pending or ready for pickup) reservations in the library.',
           parameters: { type: 'object', properties: {} },
         },
       },
@@ -179,7 +235,7 @@ read and summarise e-books, fetch web pages, and check borrow status.
             { headers },
           );
           if (!res.ok) return 'Catalog search failed.';
-          const data = await res.json() as { data?: Record<string, unknown>[] };
+          const data = await res.json() as { data?: Record<string, unknown>[]; total?: number };
           if (!data.data?.length) return 'No books found for that search.';
           const mapped = data.data.map((b: Record<string, unknown>) => ({
             id: b.id,
@@ -189,9 +245,10 @@ read and summarise e-books, fetch web pages, and check borrow status.
             available: b.isAvailable,
             copies: `${b.availableCopies}/${b.totalCopies}`,
             subjects: b.subjectTags,
+            link: `/dashboard/catalog/${b.id}`,
             description: typeof b.description === 'string' ? b.description.substring(0, 200) : undefined,
           }));
-          return JSON.stringify(mapped);
+          return JSON.stringify({ total: data.total ?? data.data.length, results: mapped });
         }
 
         case 'get_book_details': {
@@ -206,12 +263,13 @@ read and summarise e-books, fetch web pages, and check borrow status.
             isEbook: book.isEbookAvailable, ebookUrl: book.ebookUrl,
             availableCopies: book.availableCopies, totalCopies: book.totalCopies,
             isAvailable: book.isAvailable, subjects: book.subjectTags,
+            link: `/dashboard/catalog/${book.id}`,
           });
         }
 
         case 'read_ebook': {
           const res = await fetch(args.url as string, {
-            headers: { 'User-Agent': 'UskudarLibraryBot/1.0' },
+            headers: { 'User-Agent': 'LibraryBotAI/1.0' },
             signal: AbortSignal.timeout(15000),
           });
           const html = await res.text();
@@ -229,7 +287,7 @@ read and summarise e-books, fetch web pages, and check borrow status.
 
         case 'fetch_webpage': {
           const res = await fetch(args.url as string, {
-            headers: { 'User-Agent': 'UskudarLibraryBot/1.0' },
+            headers: { 'User-Agent': 'LibraryBotAI/1.0' },
             signal: AbortSignal.timeout(10000),
           });
           const html = await res.text();
@@ -264,6 +322,89 @@ read and summarise e-books, fetch web pages, and check borrow status.
           return JSON.stringify(mapped);
         }
 
+        case 'get_catalog_stats': {
+          const [totalBooks, totalCopies, availableCopies, borrowedCopies, ebookCount, activeborrows] =
+            await Promise.all([
+              this.prisma.book.count({ where: { isActive: true } }),
+              this.prisma.bookCopy.count(),
+              this.prisma.bookCopy.count({ where: { status: 'AVAILABLE' } }),
+              this.prisma.bookCopy.count({ where: { status: 'BORROWED' } }),
+              this.prisma.book.count({ where: { isEbookAvailable: true } }),
+              this.prisma.borrow.count({ where: { status: 'ACTIVE' } }),
+            ]);
+          return JSON.stringify({
+            totalBooks,
+            totalCopies,
+            availableCopies,
+            borrowedCopies,
+            ebookCount,
+            activeBorrows: activeborrows,
+          });
+        }
+
+        case 'get_active_borrows': {
+          const [activeBorrows, mostBorrowed] = await Promise.all([
+            this.prisma.borrow.findMany({
+              where: { status: 'ACTIVE' },
+              include: {
+                bookCopy: { include: { book: { select: { id: true, title: true } } } },
+                user: { select: { name: true, role: true } },
+              },
+              orderBy: { dueAt: 'asc' },
+              take: 20,
+            }),
+            this.prisma.$queryRaw<{ title: string; borrow_count: bigint }[]>`
+              SELECT b.title, COUNT(br.id) AS borrow_count
+              FROM borrows br
+              JOIN book_copies bc ON bc.id = br."bookCopyId"
+              JOIN books b ON b.id = bc."bookId"
+              GROUP BY b.id, b.title
+              ORDER BY borrow_count DESC
+              LIMIT 5
+            `,
+          ]);
+          const now = new Date();
+          return JSON.stringify({
+            activeBorrowCount: activeBorrows.length,
+            activeBorrows: activeBorrows.map((b) => ({
+              book: b.bookCopy.book.title,
+              borrower: b.user.name,
+              role: b.user.role,
+              dueAt: b.dueAt,
+              daysLeft: Math.ceil((new Date(b.dueAt).getTime() - now.getTime()) / 86400000),
+            })),
+            mostBorrowedBooks: mostBorrowed.map((r) => ({
+              title: r.title,
+              borrowCount: Number(r.borrow_count),
+            })),
+          });
+        }
+
+        case 'get_active_reservations': {
+          const reservations = await this.prisma.reservation.findMany({
+            where: { status: { in: ['PENDING', 'READY_FOR_PICKUP'] } },
+            include: {
+              bookCopy: { include: { book: { select: { title: true } } } },
+              user: { select: { name: true } },
+              branch: { select: { name: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 20,
+          });
+          if (!reservations.length) return 'No active reservations.';
+          return JSON.stringify({
+            count: reservations.length,
+            reservations: reservations.map((r) => ({
+              book: r.bookCopy.book.title,
+              user: r.user.name,
+              status: r.status,
+              branch: r.branch.name,
+              createdAt: r.createdAt,
+              pickupDeadline: r.pickupDeadline,
+            })),
+          });
+        }
+
         default:
           return 'Unknown tool.';
       }
@@ -283,6 +424,7 @@ read and summarise e-books, fetch web pages, and check borrow status.
     hasImage: boolean,
     imageBase64: string | null,
     cookieHeader: string,
+    conversationId?: string,
   ): AsyncGenerator<string> {
     // Load user context
     const user = await this.prisma.user.findUnique({
@@ -303,10 +445,8 @@ read and summarise e-books, fetch web pages, and check borrow status.
       return;
     }
 
-    // Fetch borrow policy by role (BorrowPolicy is keyed by Role enum, not userId)
     const policy = await this.prisma.borrowPolicy.findUnique({ where: { role: user.role } });
 
-    // Map borrows to { book: { title } } shape for buildSystemPrompt
     const borrowsForPrompt = user.borrows.map((b) => ({
       book: { title: b.bookCopy.book.title },
     }));
@@ -321,12 +461,27 @@ read and summarise e-books, fetch web pages, and check borrow status.
       borrows: borrowsForPrompt,
     });
 
+    // Auto-title conversation on first message
+    if (conversationId) {
+      const msgCount = await this.prisma.aiMessage.count({ where: { conversationId } });
+      if (msgCount === 0) {
+        const title = message.trim().substring(0, 60) || 'New Chat';
+        await this.prisma.aiConversation.update({
+          where: { id: conversationId },
+          data: { title },
+        });
+      }
+      await this.prisma.aiConversation.update({
+        where: { id: conversationId },
+        data: { updatedAt: new Date() },
+      });
+    }
+
     // Select model
     const codeKeywords = ['code', 'python', 'c++', 'javascript', 'typescript', 'function', 'class', 'implement', 'write a', 'syntax', 'algorithm'];
     const isCode = codeKeywords.some((kw) => message.toLowerCase().includes(kw));
     const model = hasImage ? 'llava:13b' : (isCode ? 'qwen2.5-coder:7b' : 'qwen2.5:14b');
 
-    // Build messages — Ollama Message has content:string and images?:string[]
     const userMsg: OllamaMessage = hasImage && imageBase64
       ? { role: 'user', content: message, images: [imageBase64] }
       : { role: 'user', content: message };
@@ -378,16 +533,22 @@ read and summarise e-books, fetch web pages, and check borrow status.
         }
       }
 
-      // Persist to DB
-      await this.saveMessage(userId, 'user', message);
-      await this.saveMessage(userId, 'assistant', fullResponse);
+      // Fallback for empty image response
+      if (!fullResponse && hasImage) {
+        const fallback = 'I received your image but could not analyse it. Make sure the llava model is running: `ollama pull llava:13b`.';
+        yield fallback;
+        fullResponse = fallback;
+      }
+
+      await this.saveMessage(userId, 'user', message, conversationId);
+      await this.saveMessage(userId, 'assistant', fullResponse, conversationId);
       return;
     }
 
     // Fallback if loop exhausted without final answer
     const fallback = 'I was unable to complete the request after multiple attempts. Please try again.';
     yield fallback;
-    await this.saveMessage(userId, 'user', message);
-    await this.saveMessage(userId, 'assistant', fallback);
+    await this.saveMessage(userId, 'user', message, conversationId);
+    await this.saveMessage(userId, 'assistant', fallback, conversationId);
   }
 }
