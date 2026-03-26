@@ -420,7 +420,7 @@ export default function ProfilePage() {
         )}
         <div className="flex flex-wrap gap-2">
           {interests.length === 0 ? (
-            <p className="text-gray-400">No interests added yet</p>
+            <p className="text-gray-400 text-sm">No interests added yet. Add some to get personalised book recommendations.</p>
           ) : (
             interests.map((interest, index) => (
               <span key={index} className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-full text-sm">
@@ -439,19 +439,19 @@ export default function ProfilePage() {
       <div className="glass-card p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Borrow Policy</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-gray-50 rounded-lg p-4">
+          <div className="glass-card p-4">
             <p className="text-sm text-gray-500">Max Books</p>
             <p className="text-2xl font-bold text-gray-900">
               {profile.role === 'STUDENT' ? '5' : profile.role === 'INSTRUCTOR' ? '10' : profile.role === 'ADMIN' ? '20' : '5'}
             </p>
           </div>
-          <div className="bg-gray-50 rounded-lg p-4">
+          <div className="glass-card p-4">
             <p className="text-sm text-gray-500">Borrow Duration</p>
             <p className="text-2xl font-bold text-gray-900">
               {profile.role === 'STUDENT' ? '14' : profile.role === 'INSTRUCTOR' ? '30' : profile.role === 'ADMIN' ? '60' : '14'} days
             </p>
           </div>
-          <div className="bg-gray-50 rounded-lg p-4">
+          <div className="glass-card p-4">
             <p className="text-sm text-gray-500">Max Extensions</p>
             <p className="text-2xl font-bold text-gray-900">
               {profile.role === 'STUDENT' ? '2' : profile.role === 'INSTRUCTOR' ? '3' : profile.role === 'ADMIN' ? '5' : '2'}

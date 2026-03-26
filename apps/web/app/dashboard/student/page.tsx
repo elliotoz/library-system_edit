@@ -38,6 +38,20 @@ interface Borrow {
   book: { id: string; title: string; authors: string[] };
 }
 
+const getDeptSearchTerm = (facultyName?: string | null): string => {
+  if (!facultyName) return '';
+  const f = facultyName.toLowerCase();
+  if (f.includes('engineer') || f.includes('computer') || f.includes('software')) return 'algorithms programming';
+  if (f.includes('natural science') || f.includes('physics') || f.includes('chemistry')) return 'science mathematics';
+  if (f.includes('medic') || f.includes('health') || f.includes('nurs')) return 'medicine biology';
+  if (f.includes('law') || f.includes('legal') || f.includes('hukuk')) return 'law justice';
+  if (f.includes('business') || f.includes('manag') || f.includes('econom')) return 'business management';
+  if (f.includes('psycho') || f.includes('social') || f.includes('socio')) return 'psychology sociology';
+  if (f.includes('education') || f.includes('pedagog')) return 'education pedagogy';
+  if (f.includes('art') || f.includes('design') || f.includes('architect')) return 'art design';
+  return '';
+};
+
 const BOOK_GRADIENTS = [
   'from-teal-400 to-teal-600',
   'from-blue-400 to-blue-600',
@@ -60,14 +74,20 @@ export default function StudentDashboard() {
   const [borrows, setBorrows] = useState<Borrow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [pendingFineTotal, setPendingFineTotal] = useState(0);
+  const [totalBorrowed, setTotalBorrowed] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, booksRes, borrowsRes] = await Promise.all([
+        const deptTerm = getDeptSearchTerm(user?.facultyName);
+        const booksUrl = deptTerm
+          ? `/api/books?pageSize=4&search=${encodeURIComponent(deptTerm)}`
+          : '/api/books?pageSize=4';
+        const [statsRes, booksRes, borrowsRes, historyRes] = await Promise.all([
           fetch('/api/dashboard/student', { credentials: 'include' }).catch(() => null),
-          fetch('/api/books?pageSize=4', { credentials: 'include' }).catch(() => null),
+          fetch(booksUrl, { credentials: 'include' }).catch(() => null),
           fetch('/api/borrows/my', { credentials: 'include' }).catch(() => null),
+          fetch('/api/borrows/history?pageSize=1', { credentials: 'include' }).catch(() => null),
         ]);
 
         fineApi.getMyFines().then((fines) => {
@@ -78,6 +98,7 @@ export default function StudentDashboard() {
         if (statsRes?.ok) setStats(await statsRes.json());
         if (booksRes?.ok) { const d = await booksRes.json(); setRecommendations(d.data || []); }
         if (borrowsRes?.ok) { const d = await borrowsRes.json(); setBorrows(d.filter((b: Borrow) => b.status === 'ACTIVE').slice(0, 5)); }
+        if (historyRes?.ok) { const d = await historyRes.json(); setTotalBorrowed(d.meta?.total ?? 0); }
       } catch (e) {
         console.error(e);
       } finally {
@@ -160,10 +181,10 @@ export default function StudentDashboard() {
       {/* ── Stat Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Books Borrowed', value: stats?.borrowedBooks ?? 0, icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/30', border: 'border-l-blue-500' },
+          { label: 'Currently Borrowed', value: stats?.borrowedBooks ?? 0, icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/30', border: 'border-l-blue-500' },
           { label: 'Reservations', value: stats?.activeReservations ?? 0, icon: Calendar, color: 'text-primary-500', bg: 'bg-primary-50 dark:bg-primary-900/30', border: 'border-l-primary-500' },
-          { label: 'Days Until Due', value: stats?.daysUntilDue ?? '—', icon: Clock, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/30', border: 'border-l-amber-500' },
-          { label: 'Reading Streak', value: stats?.readingStreak ?? 0, icon: Flame, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/30', border: 'border-l-orange-500' },
+          { label: 'Days Until Due', value: stats?.daysUntilDue != null ? stats.daysUntilDue : 'None due', icon: Clock, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/30', border: 'border-l-amber-500' },
+          { label: 'Total Borrowed', value: totalBorrowed, icon: Flame, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/30', border: 'border-l-orange-500' },
         ].map((s, i) => (
           <div key={i} className={cn('glass-card border-l-4 p-4 animate-slide-up', s.border, `stagger-${i + 1}`)}>
             <div className="flex items-center gap-3">

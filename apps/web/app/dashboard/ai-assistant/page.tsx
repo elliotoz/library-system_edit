@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Send, Sparkles, User, Bot, Loader2, ImageIcon, X, BookOpen, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { aiApi } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Message {
   id: string;
@@ -24,12 +25,55 @@ interface BookContext {
   category: string | null;
 }
 
-const suggestedQuestions = [
-  'What books do you recommend for learning algorithms?',
-  'Can you help me find books about psychology?',
-  'How do I borrow or reserve a book?',
-  'Tell me about reading lists',
-];
+const DEPT_SUGGESTIONS: Record<string, string[]> = {
+  engineering: [
+    'Recommend books on algorithms and data structures',
+    'What programming books do you have for beginners?',
+    'Find me resources on software architecture',
+    'How do I borrow or reserve a book?',
+  ],
+  science: [
+    'Recommend books on mathematics and physics',
+    'What science textbooks are available?',
+    'Find resources on chemistry and biology',
+    'How do I borrow or reserve a book?',
+  ],
+  medicine: [
+    'Recommend medical textbooks for students',
+    'Find books on anatomy and physiology',
+    'What health sciences resources do you have?',
+    'How do I borrow or reserve a book?',
+  ],
+  law: [
+    'Recommend books on constitutional law',
+    'Find resources on legal research and writing',
+    'What law journals are in the catalog?',
+    'How do I borrow or reserve a book?',
+  ],
+  business: [
+    'Recommend books on economics and finance',
+    'Find resources on business management',
+    'What marketing and strategy books do you have?',
+    'How do I borrow or reserve a book?',
+  ],
+  default: [
+    'What books do you recommend for me?',
+    'How do I borrow or reserve a book?',
+    'What are the most popular books right now?',
+    'Tell me about reading lists',
+  ],
+};
+
+function getSuggestedQuestions(facultyName?: string | null): string[] {
+  if (!facultyName) return DEPT_SUGGESTIONS.default;
+  const f = facultyName.toLowerCase();
+  if (f.includes('engineer') || f.includes('computer') || f.includes('software')) return DEPT_SUGGESTIONS.engineering;
+  if (f.includes('natural science') || f.includes('physics') || f.includes('chemistry') || f.includes('math')) return DEPT_SUGGESTIONS.science;
+  if (f.includes('medic') || f.includes('health') || f.includes('nurs') || f.includes('pharm')) return DEPT_SUGGESTIONS.medicine;
+  if (f.includes('law') || f.includes('legal') || f.includes('hukuk')) return DEPT_SUGGESTIONS.law;
+  if (f.includes('business') || f.includes('manag') || f.includes('econom') || f.includes('finance')) return DEPT_SUGGESTIONS.business;
+  return DEPT_SUGGESTIONS.default;
+}
 
 // Minimal markdown renderer — handles bold, italic, inline code, links, bullet lists, numbered lists
 function renderMarkdown(text: string): React.ReactNode[] {
@@ -120,6 +164,8 @@ async function compressImage(file: File): Promise<string> {
 }
 
 export default function AIAssistantPage() {
+  const { user } = useAuth();
+  const suggestedQuestions = getSuggestedQuestions(user?.facultyName);
   const searchParams = useSearchParams();
   const bookId = searchParams.get('book');
 

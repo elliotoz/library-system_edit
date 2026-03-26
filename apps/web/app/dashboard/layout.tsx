@@ -168,6 +168,7 @@ export default function DashboardLayout({
           { label: 'My Borrowed Books', href: '/dashboard/borrowed', icon: BookMarked },
           { label: 'My Reservations', href: '/dashboard/reservations', icon: Clock },
           { label: 'Borrow History', href: '/dashboard/history', icon: History },
+          { label: 'My Fines', href: '/dashboard/fines', icon: DollarSign },
           { label: 'AI Assistant', href: '/dashboard/ai-assistant', icon: Sparkles },
         ],
       },

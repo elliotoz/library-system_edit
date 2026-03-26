@@ -12,6 +12,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { fineApi, MyFine } from '@/lib/api';
 
 interface BorrowHistory {
   id: string;
@@ -39,6 +40,7 @@ export default function BorrowHistoryPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [fineMap, setFineMap] = useState<Map<string, MyFine>>(new Map());
 
   const fetchHistory = async () => {
     setIsLoading(true);
@@ -66,6 +68,17 @@ export default function BorrowHistoryPage() {
   };
 
   useEffect(() => {
+    fineApi.getMyFines().then((fines) => {
+      const map = new Map<string, MyFine>();
+      fines.forEach((f) => {
+        const key = `${f.borrow.bookCopy.book.id}-${f.borrow.dueAt}`;
+        map.set(key, f);
+      });
+      setFineMap(map);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     fetchHistory();
   }, [page]);
 
@@ -88,7 +101,7 @@ export default function BorrowHistoryPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div className="glass-card p-4">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-primary-100 p-2 dark:bg-primary-900/30">
               <History className="h-5 w-5 text-primary-600 dark:text-primary-400" />
@@ -106,7 +119,7 @@ export default function BorrowHistoryPage() {
       </div>
 
       {/* History List */}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+      <div className="glass-card overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
@@ -166,12 +179,27 @@ export default function BorrowHistoryPage() {
                 </div>
 
                 {/* Status */}
-                <div className="flex-shrink-0">
+                <div className="flex flex-shrink-0 flex-col items-end gap-1">
                   {wasOverdue(item.dueAt, item.returnedAt) ? (
-                    <div className="flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                      Returned Late
-                    </div>
+                    <>
+                      <div className="flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        Returned Late
+                      </div>
+                      {(() => {
+                        const fine = fineMap.get(`${item.book.id}-${item.dueAt}`);
+                        if (!fine) return null;
+                        const isPaid = fine.status === 'PAID' || fine.status === 'WAIVED';
+                        return (
+                          <span className={cn(
+                            'text-[11px] font-medium',
+                            isPaid ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400',
+                          )}>
+                            ₺{Number(fine.amount).toFixed(2)} · {isPaid ? 'Paid' : 'Unpaid'}
+                          </span>
+                        );
+                      })()}
+                    </>
                   ) : (
                     <div className="flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
                       <CheckCircle className="h-3.5 w-3.5" />

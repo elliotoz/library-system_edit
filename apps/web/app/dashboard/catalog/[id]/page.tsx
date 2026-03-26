@@ -409,7 +409,7 @@ export default function BookDetailPage() {
           </div>
 
           {/* ── Availability Card ── */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="glass-card p-5">
             <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
               Availability
             </h3>
@@ -700,7 +700,7 @@ export default function BookDetailPage() {
 
           {/* Description */}
           {book.description && (
-            <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+            <div className="glass-card p-6">
               <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                 <FileText className="h-4 w-4" />
                 Description
@@ -713,7 +713,7 @@ export default function BookDetailPage() {
 
           {/* Subject Tags */}
           {book.subjectTags && book.subjectTags.length > 0 && (
-            <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+            <div className="glass-card p-6">
               <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                 <Tag className="h-4 w-4" />
                 Subjects
@@ -733,7 +733,7 @@ export default function BookDetailPage() {
 
           {/* Campus Availability */}
           {book.availability && book.availability.length > 0 && (
-            <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+            <div className="glass-card p-6">
               <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                 <MapPin className="h-4 w-4" />
                 Campus Availability

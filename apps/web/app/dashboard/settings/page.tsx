@@ -110,6 +110,9 @@ export default function SettingsPage() {
               </div>
             </div>
             <button
+              role="switch"
+              aria-checked={settings.darkMode}
+              aria-label="Dark Mode"
               onClick={() => handleToggle('darkMode')}
               className={cn(
                 'relative w-12 h-6 rounded-full transition-colors',
@@ -174,6 +177,9 @@ export default function SettingsPage() {
               </div>
             </div>
             <button
+              role="switch"
+              aria-checked={settings.emailNotifications}
+              aria-label="Email Notifications"
               onClick={() => handleToggle('emailNotifications')}
               className={cn(
                 'relative w-12 h-6 rounded-full transition-colors',
@@ -201,6 +207,9 @@ export default function SettingsPage() {
               </div>
             </div>
             <button
+              role="switch"
+              aria-checked={settings.pushNotifications}
+              aria-label="Push Notifications"
               onClick={() => handleToggle('pushNotifications')}
               className={cn(
                 'relative w-12 h-6 rounded-full transition-colors',
@@ -228,6 +237,9 @@ export default function SettingsPage() {
               </div>
             </div>
             <button
+              role="switch"
+              aria-checked={settings.dueDateReminders}
+              aria-label="Due Date Reminders"
               onClick={() => handleToggle('dueDateReminders')}
               className={cn(
                 'relative w-12 h-6 rounded-full transition-colors',
@@ -255,6 +267,9 @@ export default function SettingsPage() {
               </div>
             </div>
             <button
+              role="switch"
+              aria-checked={settings.reservationAlerts}
+              aria-label="Reservation Alerts"
               onClick={() => handleToggle('reservationAlerts')}
               className={cn(
                 'relative w-12 h-6 rounded-full transition-colors',

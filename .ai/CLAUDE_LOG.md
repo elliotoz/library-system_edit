@@ -4,6 +4,24 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-26 — Student UX Audit Phase B: fines, dept recommendations, history cross-ref, a11y, AI suggestions
+
+**Goal**: Implement 30-issue student UX audit for Efe Demir — fines page, dept-based recommendations, history fine cross-referencing, settings toggle a11y, AI dynamic suggestions, glass sweep on profile/history/catalog.
+**Root cause**: Student-facing pages lacked fines visibility, recommendations were generic (not dept-filtered), late returns showed no fine amount, toggles had no ARIA roles, AI suggestions were hardcoded.
+**Changes**:
+- `apps/web/app/dashboard/fines/page.tsx` — NEW: student fines page with summary cards (Outstanding/Total Paid), pending notice banner, fine list with book thumbnails, status badges (Unpaid/Paid/Waived)
+- `apps/web/app/dashboard/layout.tsx` — added "My Fines" nav link (DollarSign icon) after Borrow History
+- `apps/web/app/dashboard/student/page.tsx` — `getDeptSearchTerm` helper for dept-keyed book search; `totalBorrowed` from history meta; stat labels: "Currently Borrowed", "Days Until Due" (None due instead of —), "Total Borrowed" (replaced Reading Streak)
+- `apps/web/app/dashboard/history/page.tsx` — fetches `fineApi.getMyFines()` on mount, builds Map keyed `bookId-dueAt`; shows fine amount + paid/unpaid under "Returned Late" badge; flat stat card + list wrapper → glass-card
+- `apps/web/app/dashboard/profile/page.tsx` — 3 borrow policy cards `bg-gray-50 rounded-lg` → `glass-card`; empty interests text improved with actionable copy
+- `apps/web/app/dashboard/settings/page.tsx` — all 5 toggle buttons get `role="switch"`, `aria-checked`, `aria-label`
+- `apps/web/app/dashboard/ai-assistant/page.tsx` — imports `useAuth`; `getSuggestedQuestions()` generates dept-tailored suggestions from `user.facultyName`; 6 faculty categories mapped
+- `apps/web/app/dashboard/catalog/[id]/page.tsx` — availability card + 3 right-column panels → `glass-card`
+**Verification**: tsc --noEmit ✓  |  nest build ✓
+**Next**: Phase 4 improvements (#27 recently borrowed, #29 reading list filter) — lower priority
+
+---
+
 ## 2026-03-26 — Deferred audit fixes: glass sweep + reports auto-generate
 
 **Goal**: Fix 5 deferred audit issues: statistics page, reports page, materials page, import-books page, and duplicate-book / reading-list pre-fill (both already correct — no change needed).
