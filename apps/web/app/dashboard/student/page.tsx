@@ -74,7 +74,6 @@ export default function StudentDashboard() {
   const [borrows, setBorrows] = useState<Borrow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [pendingFineTotal, setPendingFineTotal] = useState(0);
-  const [totalBorrowed, setTotalBorrowed] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -83,11 +82,10 @@ export default function StudentDashboard() {
         const booksUrl = deptTerm
           ? `/api/books?pageSize=4&search=${encodeURIComponent(deptTerm)}`
           : '/api/books?pageSize=4';
-        const [statsRes, booksRes, borrowsRes, historyRes] = await Promise.all([
+        const [statsRes, booksRes, borrowsRes] = await Promise.all([
           fetch('/api/dashboard/student', { credentials: 'include' }).catch(() => null),
           fetch(booksUrl, { credentials: 'include' }).catch(() => null),
           fetch('/api/borrows/my', { credentials: 'include' }).catch(() => null),
-          fetch('/api/borrows/history?pageSize=1', { credentials: 'include' }).catch(() => null),
         ]);
 
         fineApi.getMyFines().then((fines) => {
@@ -98,7 +96,6 @@ export default function StudentDashboard() {
         if (statsRes?.ok) setStats(await statsRes.json());
         if (booksRes?.ok) { const d = await booksRes.json(); setRecommendations(d.data || []); }
         if (borrowsRes?.ok) { const d = await borrowsRes.json(); setBorrows(d.filter((b: Borrow) => b.status === 'ACTIVE').slice(0, 5)); }
-        if (historyRes?.ok) { const d = await historyRes.json(); setTotalBorrowed(d.meta?.total ?? 0); }
       } catch (e) {
         console.error(e);
       } finally {
@@ -184,7 +181,7 @@ export default function StudentDashboard() {
           { label: 'Currently Borrowed', value: stats?.borrowedBooks ?? 0, icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/30', border: 'border-l-blue-500' },
           { label: 'Reservations', value: stats?.activeReservations ?? 0, icon: Calendar, color: 'text-primary-500', bg: 'bg-primary-50 dark:bg-primary-900/30', border: 'border-l-primary-500' },
           { label: 'Days Until Due', value: stats?.daysUntilDue != null ? stats.daysUntilDue : 'None due', icon: Clock, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/30', border: 'border-l-amber-500' },
-          { label: 'Total Borrowed', value: totalBorrowed, icon: Flame, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/30', border: 'border-l-orange-500' },
+          { label: 'Reading Streak', value: stats?.readingStreak ?? 0, icon: Flame, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/30', border: 'border-l-orange-500' },
         ].map((s, i) => (
           <div key={i} className={cn('glass-card border-l-4 p-4 animate-slide-up', s.border, `stagger-${i + 1}`)}>
             <div className="flex items-center gap-3">
