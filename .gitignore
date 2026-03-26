@@ -44,7 +44,11 @@ apps/api/prisma/*.db
 # Uploaded / generated files
 ############################################
 uploads/
-apps/api/uploads/
+apps/api/uploads/*
+!apps/api/uploads/avatars/
+!apps/api/uploads/avatars/.gitkeep
+!apps/api/uploads/materials/
+!apps/api/uploads/materials/.gitkeep
 
 ############################################
 # Logs

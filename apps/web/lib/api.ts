@@ -1,6 +1,6 @@
 // lib/api.ts
 import axios, { AxiosError, AxiosInstance } from 'axios';
-import { User, LoginCredentials, UserProfile, ApiError, ReadingList, FollowedInstructor, FollowersCount, FollowingStatus, InstructorProfile, ReadingListVisibility } from '@/types';
+import { User, LoginCredentials, UserProfile, ApiError, ReadingList, FollowedInstructor, InstructorFollower, FollowersCount, FollowingStatus, InstructorProfile, ReadingListVisibility } from '@/types';
 
 // Always use the same-origin /api path so requests go through the Next.js
 // rewrite proxy. This ensures LAN devices don't try to reach localhost:3001.
@@ -177,6 +177,9 @@ export const followersApi = {
 
   unfollow: async (instructorId: string) =>
     (await api.delete(`/instructor-followers/${instructorId}/unfollow`)).data,
+
+  getMyFollowers: async (): Promise<InstructorFollower[]> =>
+    (await api.get<InstructorFollower[]>('/instructor-followers/my-followers')).data,
 
   getFollowersCount: async (instructorId: string): Promise<FollowersCount> =>
     (await api.get<FollowersCount>(`/instructor-followers/${instructorId}/followers-count`)).data,

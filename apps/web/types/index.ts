@@ -207,6 +207,19 @@ export interface FollowedInstructor {
   };
 }
 
+export interface InstructorFollower {
+  id: string;
+  followerId: string;
+  instructorId: string;
+  createdAt: string;
+  follower: {
+    id: string;
+    name: string;
+    avatarUrl: string | null;
+    role: string;
+  };
+}
+
 export interface FollowersCount {
   instructorId: string;
   count: number;

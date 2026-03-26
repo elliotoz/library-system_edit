@@ -4,11 +4,30 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-26 — Instructor dashboard: new-list flow, share-research, followers widget, uploads gitkeep
+
+**Goal**: Fix 4 diagnosed instructor dashboard issues.
+**Root cause**: "New List" modal was a dead-end 4-step flow; "Contact Library Admin" button fired a fake toast; followers widget was missing; uploads directory wasn't tracked in git so avatars failed on fresh clone.
+**Changes**:
+- `apps/web/app/dashboard/instructor/page.tsx` — replaced modal+handleCreateList with handleNewList (creates blank draft, redirects to manage page); removed showContactModal/handleSendMessage/both modal JSX blocks; replaced "Contact Library Admin" button with two Links (Submit Research, View My Submissions); added followers state + fetch; added Followers/Following widget
+- `apps/web/app/dashboard/instructor/reading-lists/[id]/page.tsx` — isNew detection; welcome banner; autoFocus + placeholder on title input; title initialized to '' for new lists
+- `apps/api/src/instructor-followers/instructor-followers.service.ts` — added getMyFollowers(instructorId) method
+- `apps/api/src/instructor-followers/instructor-followers.controller.ts` — added GET my-followers endpoint
+- `apps/web/types/index.ts` — added InstructorFollower interface
+- `apps/web/lib/api.ts` — added followersApi.getMyFollowers()
+- `apps/api/uploads/avatars/.gitkeep` + `uploads/materials/.gitkeep` — directories now tracked for fresh clones
+- `.gitignore` — switched to per-file ignore with .gitkeep exceptions
+**Verification**: tsc --noEmit ✓  |  nest build ✓
+**Next**: No outstanding instructor issues.
+
+---
+
 ## 2026-03-26 — Student UX Audit Phase B: fines, dept recommendations, history cross-ref, a11y, AI suggestions
 
 **Goal**: Implement 30-issue student UX audit for Efe Demir — fines page, dept-based recommendations, history fine cross-referencing, settings toggle a11y, AI dynamic suggestions, glass sweep on profile/history/catalog.
 **Root cause**: Student-facing pages lacked fines visibility, recommendations were generic (not dept-filtered), late returns showed no fine amount, toggles had no ARIA roles, AI suggestions were hardcoded.
 **Changes**:
+
 - `apps/web/app/dashboard/fines/page.tsx` — NEW: student fines page with summary cards (Outstanding/Total Paid), pending notice banner, fine list with book thumbnails, status badges (Unpaid/Paid/Waived)
 - `apps/web/app/dashboard/layout.tsx` — added "My Fines" nav link (DollarSign icon) after Borrow History
 - `apps/web/app/dashboard/student/page.tsx` — `getDeptSearchTerm` helper for dept-keyed book search; `totalBorrowed` from history meta; stat labels: "Currently Borrowed", "Days Until Due" (None due instead of —), "Total Borrowed" (replaced Reading Streak)
@@ -17,8 +36,8 @@ Purpose: Track every change, why it was done, and how it was verified.
 - `apps/web/app/dashboard/settings/page.tsx` — all 5 toggle buttons get `role="switch"`, `aria-checked`, `aria-label`
 - `apps/web/app/dashboard/ai-assistant/page.tsx` — imports `useAuth`; `getSuggestedQuestions()` generates dept-tailored suggestions from `user.facultyName`; 6 faculty categories mapped
 - `apps/web/app/dashboard/catalog/[id]/page.tsx` — availability card + 3 right-column panels → `glass-card`
-**Verification**: tsc --noEmit ✓  |  nest build ✓
-**Next**: Phase 4 improvements (#27 recently borrowed, #29 reading list filter) — lower priority
+  **Verification**: tsc --noEmit ✓ | nest build ✓
+  **Next**: Phase 4 improvements (#27 recently borrowed, #29 reading list filter) — lower priority
 
 ---
 
@@ -27,12 +46,13 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal**: Fix 5 deferred audit issues: statistics page, reports page, materials page, import-books page, and duplicate-book / reading-list pre-fill (both already correct — no change needed).
 **Root cause**: Statistics/reports/materials/import-books pages still used `bg-white dark:bg-gray-800 rounded-xl border` flat cards. Reports page required manual Generate click; stats had no empty state for zero trends; materials had generic empty text. Duplicate-books dedup was already implemented in `external-books.service.ts`; reading-list pre-fill was already on line 49.
 **Changes**:
+
 - `apps/web/app/dashboard/admin/statistics/page.tsx` — replaced all 6 flat card patterns with `glass-card`; added empty state inside Monthly Trends when `trends.length === 0`
 - `apps/web/app/dashboard/admin/reports/page.tsx` — added `useEffect` to auto-call `handleGenerate()` on mount with default 30-day range; glass-card all panels (controls, summary metrics, top books table, users-by-role, empty state)
 - `apps/web/app/dashboard/materials/page.tsx` — glass-card material result cards, pagination bar, and empty state; improved empty state copy to distinguish no approved materials from filtered-no-match
 - `apps/web/app/dashboard/admin/import-books/page.tsx` — glass-card skeleton cards and book result cards
-**Verification**: tsc --noEmit ✓  |  nest build ✓
-**Next**: No outstanding audit issues. All dashboard pages are fully glass-consistent.
+  **Verification**: tsc --noEmit ✓ | nest build ✓
+  **Next**: No outstanding audit issues. All dashboard pages are fully glass-consistent.
 
 ---
 
@@ -41,6 +61,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal**: Fix sidebar icon visibility in light mode; apply glass-card to all remaining dashboard pages; dynamic copyright year; glass settings page.
 **Root cause**: GlassNavIcon had white icon colors hardcoded — invisible on light glass sidebar. 13 dashboard pages still using flat `bg-white dark:bg-gray-800` cards.
 **Changes**:
+
 - `components/ui/glass-nav-icon.tsx` — added `darkMode` prop; light mode uses dark-gray inactive icons + teal active, dark mode keeps white
 - `app/dashboard/layout.tsx` — passes `darkMode` to GlassNavIcon; hover highlight uses dark tint in light mode
 - `app/dashboard/settings/page.tsx` — three section panels, language select, Save button → glass
@@ -53,8 +74,8 @@ Purpose: Track every change, why it was done, and how it was verified.
 - `app/dashboard/instructors/[id]/page.tsx` — all 5 flat panels → glass-card
 - `app/dashboard/admin/reading-lists/page.tsx` — glass-card
 - All 5 auth pages — `© 2025` → `© {new Date().getFullYear()}`
-**Verification**: tsc --noEmit ✓ (3 commits)
-**Next**: Profile page, reservations page, book detail action buttons still need glass treatment. Backend: duplicate books deduplication, reading list edit pre-fill.
+  **Verification**: tsc --noEmit ✓ (3 commits)
+  **Next**: Profile page, reservations page, book detail action buttons still need glass treatment. Backend: duplicate books deduplication, reading list edit pre-fill.
 
 ## 2026-03-26 — Liquid Glass Chrome system: correct architecture + Framer Motion morphing
 

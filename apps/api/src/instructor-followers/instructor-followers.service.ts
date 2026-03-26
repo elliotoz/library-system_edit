@@ -79,6 +79,23 @@ export class InstructorFollowersService {
     return { message: 'Unfollowed successfully' };
   }
 
+  async getMyFollowers(instructorId: string) {
+    return this.prisma.instructorFollower.findMany({
+      where: { instructorId },
+      include: {
+        follower: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            role: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async getFollowersCount(instructorId: string) {
     const count = await this.prisma.instructorFollower.count({
       where: { instructorId },

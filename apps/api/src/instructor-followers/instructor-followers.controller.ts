@@ -18,6 +18,13 @@ export class InstructorFollowersController {
     return this.service.getMyFollowing(userId);
   }
 
+  @Get('my-followers')
+  @ApiOperation({ summary: 'Get users who follow me' })
+  @ApiResponse({ status: 200, description: 'List of followers' })
+  async getMyFollowers(@CurrentUser('id') userId: string) {
+    return this.service.getMyFollowers(userId);
+  }
+
   @Post(':instructorId/follow')
   @ApiOperation({ summary: 'Follow an instructor' })
   @ApiResponse({ status: 201, description: 'Followed successfully' })
