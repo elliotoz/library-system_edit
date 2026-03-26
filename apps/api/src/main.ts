@@ -2,7 +2,7 @@ import { NestFactory } from "@nestjs/core";
 import { Logger, ValidationPipe } from "@nestjs/common";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import { NestExpressApplication } from "@nestjs/platform-express";
-import { join } from "path";
+import { join, resolve } from "path";
 import { AppModule } from "./app.module";
 import { GlobalExceptionFilter } from "./common/filters/global-exception.filter";
 
@@ -26,8 +26,9 @@ async function bootstrap() {
   });
 
   app.use(helmet({
-    contentSecurityPolicy: false, // CSP managed by Next.js frontend
-    crossOriginEmbedderPolicy: false, // allow Swagger UI assets
+    contentSecurityPolicy: false,       // CSP managed by Next.js frontend
+    crossOriginEmbedderPolicy: false,   // allow Swagger UI assets
+    crossOriginResourcePolicy: false,   // allow cross-origin loading of uploads (avatars, materials)
   }));
 
   app.use(cookieParser());
@@ -42,10 +43,15 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Serve uploaded files (ebooks, research materials, covers)
-  app.useStaticAssets(join(__dirname, "..", "uploads"), {
-    prefix: "/uploads/",
-  });
+  // Serve uploaded files (avatars, materials, ebooks)
+  // Use process.cwd() so the path resolves correctly regardless of whether
+  // the app is run via ts-node (src/) or compiled (dist/).
+  // Both NestJS start modes run from the apps/api/ directory as CWD.
+  const uploadsDir = resolve(process.cwd(), "uploads");
+  const logger = new Logger("Bootstrap");
+  logger.log(`Uploads dir: ${uploadsDir}`);
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  app.getHttpAdapter().getInstance().use("/uploads", require("express").static(uploadsDir));
 
   // Global exception filter
   app.useGlobalFilters(new GlobalExceptionFilter());
@@ -78,7 +84,6 @@ async function bootstrap() {
   const port = process.env.PORT || 3001;
   await app.listen(port);
 
-  const logger = new Logger("Bootstrap");
   logger.log(
     `Server: http://localhost:${port} | Docs: http://localhost:${port}/api/docs`,
   );
