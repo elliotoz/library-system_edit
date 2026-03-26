@@ -486,17 +486,23 @@ export default function DashboardLayout({
                           <motion.div
                             className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100"
                             style={{
-                              background: 'rgba(255,255,255,0.50)',
+                              background: darkMode
+                                ? 'rgba(255,255,255,0.08)'
+                                : 'rgba(0,0,0,0.05)',
                               backdropFilter: 'blur(8px)',
-                              border: '1px solid rgba(255,255,255,0.45)',
-                              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 2px 8px rgba(0,0,0,0.06)',
+                              border: darkMode
+                                ? '1px solid rgba(255,255,255,0.12)'
+                                : '1px solid rgba(0,0,0,0.07)',
+                              boxShadow: darkMode
+                                ? 'inset 0 1px 0 rgba(255,255,255,0.08)'
+                                : 'inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 8px rgba(0,0,0,0.04)',
                             }}
                             transition={{ duration: 0.15 }}
                           />
                         )}
 
                         {/* Layered glass icon */}
-                        <GlassNavIcon icon={item.icon} active={active} size={32} />
+                        <GlassNavIcon icon={item.icon} active={active} size={32} darkMode={darkMode} />
 
                         <span className="relative z-10 flex-1 truncate">{item.label}</span>
 

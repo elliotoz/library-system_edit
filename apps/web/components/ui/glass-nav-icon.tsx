@@ -11,6 +11,8 @@ interface GlassNavIconProps {
   /** Size in px — defaults to 36 */
   size?: number;
   className?: string;
+  /** Pass current dark mode state so icon contrast is correct in both modes */
+  darkMode?: boolean;
 }
 
 /**
@@ -20,7 +22,21 @@ interface GlassNavIconProps {
  *   3. Crisp Lucide icon symbol
  *   4. Specular highlight arc (top edge)
  */
-export function GlassNavIcon({ icon: Icon, active = false, size = 36, className }: GlassNavIconProps) {
+export function GlassNavIcon({ icon: Icon, active = false, size = 36, className, darkMode = false }: GlassNavIconProps) {
+  // Icon color: dark mode keeps white; light mode uses teal (active) or dark gray (inactive)
+  const iconColor = active
+    ? darkMode ? 'rgba(255,255,255,0.95)' : 'rgba(20,140,140,1)'
+    : darkMode ? 'rgba(255,255,255,0.45)' : 'rgba(70,85,105,0.75)';
+
+  // Disc bg: dark mode uses white overlay; light mode uses subtle dark overlay
+  const discBg = active
+    ? 'rgba(255,255,255,0.15)'
+    : darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
+
+  const discBorder = active
+    ? 'rgba(255,255,255,0.25)'
+    : darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+
   return (
     <motion.div
       className={cn('relative flex-shrink-0 flex items-center justify-center rounded-xl', className)}
@@ -32,7 +48,9 @@ export function GlassNavIcon({ icon: Icon, active = false, size = 36, className 
       <motion.div
         className="absolute inset-0 rounded-xl"
         style={{
-          background: 'linear-gradient(135deg, rgba(42,157,157,0.9) 0%, rgba(23,102,102,0.95) 100%)',
+          background: darkMode
+            ? 'linear-gradient(135deg, rgba(42,157,157,0.9) 0%, rgba(23,102,102,0.95) 100%)'
+            : 'linear-gradient(135deg, rgba(42,157,157,0.18) 0%, rgba(23,102,102,0.22) 100%)',
           filter: 'blur(0px)',
         }}
         animate={{ opacity: active ? 1 : 0 }}
@@ -43,14 +61,10 @@ export function GlassNavIcon({ icon: Icon, active = false, size = 36, className 
       <div
         className="absolute inset-0 rounded-xl"
         style={{
-          background: active
-            ? 'rgba(255,255,255,0.15)'
-            : 'rgba(255,255,255,0.06)',
+          background: discBg,
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
-          border: active
-            ? '1px solid rgba(255,255,255,0.25)'
-            : '1px solid rgba(255,255,255,0.08)',
+          border: `1px solid ${discBorder}`,
           transition: 'background 0.2s, border-color 0.2s',
         }}
       />
@@ -61,7 +75,7 @@ export function GlassNavIcon({ icon: Icon, active = false, size = 36, className 
         style={{
           width: size * 0.44,
           height: size * 0.44,
-          color: active ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.45)',
+          color: iconColor,
           transition: 'color 0.2s',
         }}
       />

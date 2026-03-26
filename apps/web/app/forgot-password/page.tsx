@@ -223,7 +223,7 @@ export default function ForgotPasswordPage() {
           </div>
 
           <p className="text-center text-xs mt-6" style={{ color: 'rgba(255,255,255,0.18)' }}>
-            © 2025 Üsküdar University Library System
+            © {new Date().getFullYear()} Üsküdar University Library System
           </p>
         </div>
       </div>
