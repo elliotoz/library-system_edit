@@ -86,8 +86,8 @@ export default function SettingsPage() {
       </div>
 
       {/* Appearance */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="glass-card overflow-hidden">
+        <div className="p-4 border-b border-black/[0.06] dark:border-white/[0.06]">
           <div className="flex items-center gap-2">
             <Palette className="w-5 h-5 text-gray-400" />
             <h2 className="font-semibold text-gray-900 dark:text-white">Appearance</h2>
@@ -139,7 +139,12 @@ export default function SettingsPage() {
             <select
               value={settings.language}
               onChange={(e) => handleLanguageChange(e.target.value)}
-              className="px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-primary-500"
+              className="px-3 py-2 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-400/50"
+              style={{
+                background: 'var(--glass-btn-bg)',
+                border: '1px solid var(--glass-border)',
+                backdropFilter: 'blur(12px)',
+              }}
             >
               <option value="en">English</option>
               <option value="tr">Türkçe</option>
@@ -149,8 +154,8 @@ export default function SettingsPage() {
       </div>
 
       {/* Notifications */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="glass-card overflow-hidden">
+        <div className="p-4 border-b border-black/[0.06] dark:border-white/[0.06]">
           <div className="flex items-center gap-2">
             <Bell className="w-5 h-5 text-gray-400" />
             <h2 className="font-semibold text-gray-900 dark:text-white">Notifications</h2>
@@ -268,8 +273,8 @@ export default function SettingsPage() {
       </div>
 
       {/* Privacy & Security */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="glass-card overflow-hidden">
+        <div className="p-4 border-b border-black/[0.06] dark:border-white/[0.06]">
           <div className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-gray-400" />
             <h2 className="font-semibold text-gray-900 dark:text-white">Privacy & Security</h2>
@@ -320,10 +325,8 @@ export default function SettingsPage() {
           onClick={handleSave}
           disabled={isSaving}
           className={cn(
-            'flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors',
-            saved
-              ? 'bg-green-500 text-white'
-              : 'bg-primary-500 text-white hover:bg-primary-600'
+            'glass-button glass-button-primary flex items-center gap-2 px-6 py-3 font-medium transition-all disabled:opacity-50',
+            saved && 'bg-green-500/80 border-green-400/30'
           )}
         >
           {saved ? (

@@ -205,7 +205,7 @@ export default function NotificationsPage() {
 
       {/* Notifications List */}
       {filteredNotifications.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-12 text-center">
+        <div className="glass-card p-12 text-center">
           <Bell className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
             {filter === 'unread' ? 'No unread notifications' : 'No notifications'}
@@ -222,8 +222,11 @@ export default function NotificationsPage() {
             <div
               key={notification.id}
               className={cn(
-                'rounded-xl border border-gray-200 dark:border-gray-700 p-4 transition-colors',
-                getBgColor(notification.type, notification.read)
+                'glass-card p-4',
+                !notification.read && notification.type === 'warning' && 'border-l-4 border-l-amber-400',
+                !notification.read && notification.type === 'success' && 'border-l-4 border-l-green-400',
+                !notification.read && notification.type === 'error' && 'border-l-4 border-l-red-400',
+                !notification.read && notification.type === 'info' && 'border-l-4 border-l-blue-400',
               )}
             >
               <div className="flex items-start gap-4">

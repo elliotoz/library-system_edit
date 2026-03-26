@@ -40,7 +40,7 @@ export default function ReadingListsFeedPage() {
       </div>
 
       {lists.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-8 text-center">
+        <div className="glass-card p-8 text-center">
           <FileText className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
           <p className="text-gray-500 dark:text-gray-400">No reading lists available yet.</p>
         </div>
@@ -49,7 +49,7 @@ export default function ReadingListsFeedPage() {
           {lists.map((list) => (
             <div
               key={list.id}
-              className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-5 hover:border-primary-200 dark:hover:border-primary-800 transition-colors"
+              className="glass-card glass-card-interactive p-5"
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1 min-w-0">

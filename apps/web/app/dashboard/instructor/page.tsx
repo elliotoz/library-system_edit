@@ -169,11 +169,11 @@ export default function InstructorDashboard() {
             </div>
           );
           return s.href ? (
-            <Link key={i} href={s.href} className={cn('bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-100 dark:border-gray-700 border-l-4 shadow-sm hover:shadow-md transition-shadow', s.border)}>
+            <Link key={i} href={s.href} className={cn('glass-card glass-card-interactive p-4 border-l-4', s.border)}>
               {inner}
             </Link>
           ) : (
-            <div key={i} className={cn('bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-100 dark:border-gray-700 border-l-4 shadow-sm', s.border)}>
+            <div key={i} className={cn('glass-card p-4 border-l-4', s.border)}>
               {inner}
             </div>
           );
@@ -181,8 +181,8 @@ export default function InstructorDashboard() {
       </div>
 
       {/* ── Course Reading Lists ── */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+      <div className="glass-card overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-black/[0.06] dark:border-white/[0.06]">
           <h2 className="font-semibold text-gray-900 dark:text-white">Course Reading Lists</h2>
           <button onClick={() => setShowNewListModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-xs font-medium transition-colors">
@@ -267,7 +267,7 @@ export default function InstructorDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {quickActions.map((a) => (
           <Link key={a.href} href={a.href}
-            className={cn('group flex items-center gap-4 bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all', a.hover)}>
+            className={cn('glass-card glass-card-interactive group flex items-center gap-4 p-4')}>
             <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110', a.bg)}>
               <a.icon className={cn('w-5 h-5', a.color)} />
             </div>
