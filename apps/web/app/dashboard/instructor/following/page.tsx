@@ -65,7 +65,7 @@ export default function FollowingPage() {
       </div>
 
       {following.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-8 text-center">
+        <div className="glass-card p-8 text-center">
           <Users className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
           <p className="text-gray-500 dark:text-gray-400">You are not following any instructors yet.</p>
           <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
@@ -77,7 +77,7 @@ export default function FollowingPage() {
           {following.map((entry) => (
             <div
               key={entry.id}
-              className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4 flex items-center gap-4"
+              className="glass-card p-4 flex items-center gap-4"
             >
               {entry.instructor.avatarUrl ? (
                 <img

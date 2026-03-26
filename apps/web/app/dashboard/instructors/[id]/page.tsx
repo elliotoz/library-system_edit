@@ -69,7 +69,7 @@ export default function InstructorProfilePage() {
         <Link href="/dashboard/reading-lists" className="flex items-center gap-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
           <ArrowLeft className="w-4 h-4" /> Back
         </Link>
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-8 text-center">
+        <div className="glass-card p-8 text-center">
           <p className="text-gray-500 dark:text-gray-400">{error || 'Not found'}</p>
         </div>
       </div>
@@ -86,7 +86,7 @@ export default function InstructorProfilePage() {
       </Link>
 
       {/* Instructor header */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6 flex items-center gap-5">
+      <div className="glass-card p-6 flex items-center gap-5">
         {instructor.avatarUrl ? (
           <img src={instructor.avatarUrl} alt={instructor.name} className="w-16 h-16 rounded-full object-cover" />
         ) : (
@@ -132,7 +132,7 @@ export default function InstructorProfilePage() {
 
       {/* Bio, Department, Courses */}
       {(instructor.bio || instructor.department || (instructor.courses && instructor.courses.length > 0)) && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6 space-y-4">
+        <div className="glass-card p-6 space-y-4">
           {instructor.bio && (
             <div>
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">About</h3>
@@ -167,7 +167,7 @@ export default function InstructorProfilePage() {
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Reading Lists</h2>
         {profile.readingLists.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-8 text-center">
+          <div className="glass-card p-8 text-center">
             <BookOpen className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
             <p className="text-gray-500 dark:text-gray-400">No reading lists published yet.</p>
           </div>
@@ -176,7 +176,7 @@ export default function InstructorProfilePage() {
             {profile.readingLists.map((list) => (
               <div
                 key={list.id}
-                className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4"
+                className="glass-card p-4"
               >
                 <div className="flex items-start justify-between mb-2">
                   <Link

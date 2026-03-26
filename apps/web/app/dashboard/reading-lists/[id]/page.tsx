@@ -72,7 +72,7 @@ export default function ReadingListDetailPage() {
         <Link href="/dashboard/reading-lists" className="flex items-center gap-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
           <ArrowLeft className="w-4 h-4" /> Back to feed
         </Link>
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-8 text-center">
+        <div className="glass-card p-8 text-center">
           <p className="text-gray-500 dark:text-gray-400">{error || 'Not found'}</p>
         </div>
       </div>
@@ -87,7 +87,7 @@ export default function ReadingListDetailPage() {
         <ArrowLeft className="w-4 h-4" /> Back to feed
       </Link>
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6">
+      <div className="glass-card p-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{list.title}</h1>
         {list.description && (
           <p className="text-gray-500 dark:text-gray-400 mt-2">{list.description}</p>
@@ -161,7 +161,7 @@ export default function ReadingListDetailPage() {
           {list.items.map((item, index) => (
             <div
               key={item.id}
-              className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4 flex items-center gap-4"
+              className="glass-card p-4 flex items-center gap-4"
             >
               <span className="text-sm font-medium text-gray-400 w-6 text-center">{index + 1}</span>
               <Link

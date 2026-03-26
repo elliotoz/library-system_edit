@@ -48,7 +48,7 @@ export default function ManageReadingListsPage() {
       </div>
 
       {lists.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-8 text-center">
+        <div className="glass-card p-8 text-center">
           <p className="text-gray-500 dark:text-gray-400">No reading lists yet. Create one from the dashboard.</p>
         </div>
       ) : (
@@ -57,7 +57,7 @@ export default function ManageReadingListsPage() {
             <Link
               key={list.id}
               href={`/dashboard/instructor/reading-lists/${list.id}`}
-              className="block bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4 hover:border-primary-200 dark:hover:border-primary-800 transition-colors"
+              className="block glass-card glass-card-interactive p-4"
             >
               <div className="flex items-center justify-between">
                 <div>
