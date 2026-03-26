@@ -4,6 +4,20 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-26 — Deferred audit fixes: glass sweep + reports auto-generate
+
+**Goal**: Fix 5 deferred audit issues: statistics page, reports page, materials page, import-books page, and duplicate-book / reading-list pre-fill (both already correct — no change needed).
+**Root cause**: Statistics/reports/materials/import-books pages still used `bg-white dark:bg-gray-800 rounded-xl border` flat cards. Reports page required manual Generate click; stats had no empty state for zero trends; materials had generic empty text. Duplicate-books dedup was already implemented in `external-books.service.ts`; reading-list pre-fill was already on line 49.
+**Changes**:
+- `apps/web/app/dashboard/admin/statistics/page.tsx` — replaced all 6 flat card patterns with `glass-card`; added empty state inside Monthly Trends when `trends.length === 0`
+- `apps/web/app/dashboard/admin/reports/page.tsx` — added `useEffect` to auto-call `handleGenerate()` on mount with default 30-day range; glass-card all panels (controls, summary metrics, top books table, users-by-role, empty state)
+- `apps/web/app/dashboard/materials/page.tsx` — glass-card material result cards, pagination bar, and empty state; improved empty state copy to distinguish no approved materials from filtered-no-match
+- `apps/web/app/dashboard/admin/import-books/page.tsx` — glass-card skeleton cards and book result cards
+**Verification**: tsc --noEmit ✓  |  nest build ✓
+**Next**: No outstanding audit issues. All dashboard pages are fully glass-consistent.
+
+---
+
 ## 2026-03-26 — UX Audit fixes: icon visibility, copyright, glass sweep
 
 **Goal**: Fix sidebar icon visibility in light mode; apply glass-card to all remaining dashboard pages; dynamic copyright year; glass settings page.
