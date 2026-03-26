@@ -183,13 +183,15 @@ export default function MaterialsPage() {
           <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
         </div>
       ) : materials.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white py-12 text-center dark:border-gray-700 dark:bg-gray-800">
+        <div className="glass-card py-12 text-center">
           <FileText className="mx-auto mb-4 h-12 w-12 text-gray-300 dark:text-gray-600" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white">
             No materials found
           </h3>
           <p className="mt-1 text-gray-500 dark:text-gray-400">
-            Try adjusting your search or filters
+            {search || typeFilter
+              ? 'Try adjusting your search or filters'
+              : 'No approved academic materials have been published yet'}
           </p>
         </div>
       ) : (
@@ -197,7 +199,7 @@ export default function MaterialsPage() {
           {materials.map((material) => (
             <div
               key={material.id}
-              className="rounded-xl border border-gray-200 bg-white p-5 transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+              className="glass-card glass-card-interactive p-5"
             >
               {/* Type Badge */}
               <div className="mb-3 flex items-center justify-between">
@@ -293,7 +295,7 @@ export default function MaterialsPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex items-center justify-between glass-card px-4 py-3">
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Page {page} of {totalPages}
           </p>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FileDown, FileSpreadsheet, BarChart3 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { reportsApi } from '@/lib/api';
@@ -24,6 +24,11 @@ export default function ReportsPage() {
   const [to, setTo] = useState(today);
   const [summary, setSummary] = useState<ReportSummary | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    handleGenerate();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleGenerate = async () => {
     if (!from || !to) {
@@ -60,7 +65,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Controls */}
-      <div className="flex flex-wrap items-end gap-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+      <div className="flex flex-wrap items-end gap-4 glass-card p-4">
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
             From
@@ -117,7 +122,7 @@ export default function ReportsPage() {
             ].map((m) => (
               <div
                 key={m.label}
-                className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
+                className="glass-card p-4"
               >
                 <p className="text-sm text-gray-500 dark:text-gray-400">{m.label}</p>
                 <p className={`mt-1 text-2xl font-bold ${m.color}`}>{m.value}</p>
@@ -127,7 +132,7 @@ export default function ReportsPage() {
 
           {/* Top Books */}
           {summary.topBooks.length > 0 && (
-            <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+            <div className="glass-card">
               <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                 <h2 className="font-semibold text-gray-900 dark:text-white">
                   Top Borrowed Books
@@ -179,7 +184,7 @@ export default function ReportsPage() {
 
       {/* Empty state */}
       {!summary && !loading && (
-        <div className="rounded-xl border border-gray-200 bg-white p-12 text-center dark:border-gray-700 dark:bg-gray-800">
+        <div className="glass-card p-12 text-center">
           <BarChart3 className="mx-auto mb-4 h-12 w-12 text-gray-300" />
           <p className="text-gray-500">Select a date range and generate a summary</p>
         </div>

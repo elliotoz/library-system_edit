@@ -203,7 +203,7 @@ export default function ImportBooksPage() {
       {isSearching && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {Array.from({ length: 10 }).map((_, i) => (
-            <div key={i} className="bg-white border border-gray-100 rounded-xl p-3 animate-pulse">
+            <div key={i} className="glass-card p-3 animate-pulse">
               <div className="w-full h-40 bg-gray-200 rounded-lg mb-3" />
               <div className="h-4 bg-gray-200 rounded mb-2 w-3/4" />
               <div className="h-3 bg-gray-100 rounded w-1/2" />
@@ -224,7 +224,7 @@ export default function ImportBooksPage() {
             return (
               <div
                 key={key}
-                className="bg-white border border-gray-100 rounded-xl p-3 flex flex-col shadow-sm hover:shadow-md transition-shadow"
+                className="glass-card glass-card-interactive p-3 flex flex-col"
               >
                 {/* Cover */}
                 <div className="w-full h-40 bg-gray-50 rounded-lg mb-3 overflow-hidden flex items-center justify-center">

@@ -165,7 +165,7 @@ export default function AdminStatisticsPage() {
         stats && (
           <>
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+              <div className="glass-card p-4">
                 <div className="flex items-center gap-3">
                   <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
                     <BookOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -181,7 +181,7 @@ export default function AdminStatisticsPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+              <div className="glass-card p-4">
                 <div className="flex items-center gap-3">
                   <div className="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
                     <Clock className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -197,7 +197,7 @@ export default function AdminStatisticsPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+              <div className="glass-card p-4">
                 <div className="flex items-center gap-3">
                   <div className="rounded-lg bg-red-100 p-2 dark:bg-red-900/30">
                     <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
@@ -213,7 +213,7 @@ export default function AdminStatisticsPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+              <div className="glass-card p-4">
                 <div className="flex items-center gap-3">
                   <div
                     className={cn(
@@ -253,7 +253,7 @@ export default function AdminStatisticsPage() {
             </div>
 
             {/* Most Borrowed Books */}
-            <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+            <div className="glass-card p-6">
               <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
                 Most Borrowed Books
               </h2>
@@ -293,11 +293,16 @@ export default function AdminStatisticsPage() {
             </div>
 
             {/* Monthly Trends */}
-            <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+            <div className="glass-card p-6">
               <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
                 Monthly Trends
               </h2>
               <div className="space-y-2">
+                {stats.trends.length === 0 && (
+                  <p className="py-4 text-center text-gray-500 dark:text-gray-400">
+                    No trend data available
+                  </p>
+                )}
                 {stats.trends.map((trend) => {
                   const maxBorrowed = Math.max(
                     ...stats.trends.map((t) => t.borrowed),
@@ -331,7 +336,7 @@ export default function AdminStatisticsPage() {
       )}
 
       {/* Borrow History Section */}
-      <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+      <div className="glass-card">
         <div className="border-b border-gray-200 p-4 dark:border-gray-700">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
