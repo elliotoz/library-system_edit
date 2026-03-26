@@ -504,21 +504,6 @@ export default function BookDetailPage() {
               </div>
             )}
 
-            {/* Ebook-only: inline read button */}
-            {(!book.availability || book.availability.length === 0) &&
-              book.isEbookAvailable &&
-              book.ebookUrl && (
-                <a
-                  href={book.ebookUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-600"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Read E-book Online
-                </a>
-              )}
-
             {/* Branch selection & Reserve */}
             {book.availability && book.availability.length > 0 && (
               <div className="space-y-3">

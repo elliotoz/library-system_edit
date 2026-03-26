@@ -239,7 +239,7 @@ export default function LoginPage() {
                             onFocus={() => setFocusedInput('email')}
                             onBlur={() => setFocusedInput(null)}
                             placeholder="your@email.com"
-                            className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-white placeholder-white/20 transition-all duration-200 focus:outline-none"
+                            className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-white placeholder-white/20 auth-input transition-all duration-200 focus:outline-none"
                             style={{
                               background: focusedInput === 'email' ? 'rgba(42,157,157,0.1)' : 'rgba(255,255,255,0.05)',
                               border: focusedInput === 'email' ? '1px solid rgba(74,191,191,0.55)' : '1px solid rgba(255,255,255,0.08)',
@@ -267,7 +267,7 @@ export default function LoginPage() {
                             onFocus={() => setFocusedInput('password')}
                             onBlur={() => setFocusedInput(null)}
                             placeholder="••••••••"
-                            className="w-full pl-10 pr-12 py-3 rounded-xl text-sm text-white placeholder-white/20 transition-all duration-200 focus:outline-none"
+                            className="w-full pl-10 pr-12 py-3 rounded-xl text-sm text-white placeholder-white/20 auth-input transition-all duration-200 focus:outline-none"
                             style={{
                               background: focusedInput === 'password' ? 'rgba(42,157,157,0.1)' : 'rgba(255,255,255,0.05)',
                               border: focusedInput === 'password' ? '1px solid rgba(74,191,191,0.55)' : '1px solid rgba(255,255,255,0.08)',

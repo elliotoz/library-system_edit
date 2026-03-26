@@ -388,6 +388,26 @@ button {
 .stagger-3 { animation-delay: 0.19s; }
 .stagger-4 { animation-delay: 0.26s; }
 
+/* Auth page inputs — dark-background pages need white text.
+   The global input rule above has specificity 0,5,1 which beats
+   Tailwind's .text-white (0,1,0), so we override with !important. */
+.auth-input {
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+.auth-input::placeholder {
+  color: rgba(255, 255, 255, 0.35) !important;
+}
+.auth-input:focus {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* Sidebar swipe — allow vertical scroll, capture horizontal swipe */
+aside nav {
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+}
+
 /* Gradient text — teal brand */
 .gradient-text-teal {
   background: linear-gradient(135deg, #4ABFBF 0%, #2A9D9D 100%);

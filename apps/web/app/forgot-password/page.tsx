@@ -180,7 +180,7 @@ export default function ForgotPasswordPage() {
                           onBlur={() => setFocusedInput(false)}
                           placeholder="your@email.com"
                           autoFocus
-                          className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-white placeholder-white/20 transition-all duration-200 focus:outline-none"
+                          className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-white placeholder-white/20 auth-input transition-all duration-200 focus:outline-none"
                           style={{
                             background: focusedInput ? 'rgba(42,157,157,0.1)' : 'rgba(255,255,255,0.05)',
                             border: focusedInput ? '1px solid rgba(74,191,191,0.55)' : '1px solid rgba(255,255,255,0.08)',

@@ -231,7 +231,7 @@ export default function SignupPage() {
                             onFocus={() => setFocusedInput('name')}
                             onBlur={() => setFocusedInput(null)}
                             placeholder="Your full name"
-                            className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-white placeholder-white/20 transition-all duration-200 focus:outline-none"
+                            className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-white placeholder-white/20 auth-input transition-all duration-200 focus:outline-none"
                             style={inputStyle('name')}
                             disabled={isSubmitting}
                           />
@@ -254,7 +254,7 @@ export default function SignupPage() {
                             onFocus={() => setFocusedInput('email')}
                             onBlur={() => setFocusedInput(null)}
                             placeholder="your@email.com"
-                            className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-white placeholder-white/20 transition-all duration-200 focus:outline-none"
+                            className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-white placeholder-white/20 auth-input transition-all duration-200 focus:outline-none"
                             style={inputStyle('email')}
                             disabled={isSubmitting}
                           />
@@ -279,7 +279,7 @@ export default function SignupPage() {
                             onFocus={() => setFocusedInput('password')}
                             onBlur={() => setFocusedInput(null)}
                             placeholder="At least 6 characters"
-                            className="w-full pl-10 pr-12 py-3 rounded-xl text-sm text-white placeholder-white/20 transition-all duration-200 focus:outline-none"
+                            className="w-full pl-10 pr-12 py-3 rounded-xl text-sm text-white placeholder-white/20 auth-input transition-all duration-200 focus:outline-none"
                             style={inputStyle('password')}
                             disabled={isSubmitting}
                           />
@@ -309,7 +309,7 @@ export default function SignupPage() {
                             onFocus={() => setFocusedInput('confirmPassword')}
                             onBlur={() => setFocusedInput(null)}
                             placeholder="Re-enter your password"
-                            className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-white placeholder-white/20 transition-all duration-200 focus:outline-none"
+                            className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-white placeholder-white/20 auth-input transition-all duration-200 focus:outline-none"
                             style={inputStyle('confirmPassword')}
                             disabled={isSubmitting}
                           />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -76,6 +76,27 @@ export default function DashboardLayout({
   const notificationRef = useRef<HTMLDivElement>(null);
 
   const isDarkContent = useContentAwareGlass(80);
+
+  // ── Swipe-to-close sidebar (touch) ──────────────────────────────────
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const SWIPE_CLOSE_THRESHOLD = 60;
+
+  const handleSidebarTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  }, []);
+
+  const handleSidebarTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
+    if (Math.abs(dx) > SWIPE_CLOSE_THRESHOLD && Math.abs(dx) > dy * 1.5 && dx < 0) {
+      setSidebarOpen(false);
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  }, []);
 
   useEffect(() => {
     const savedMode = localStorage.getItem('darkMode');
@@ -396,8 +417,28 @@ export default function DashboardLayout({
           />
         )}
 
+        {/* Swipe-to-open edge zone (mobile only) */}
+        <div
+          className="fixed top-16 left-0 z-30 h-[calc(100vh-4rem)] w-5 lg:hidden touch-pan-y"
+          aria-hidden="true"
+          onTouchStart={(e) => {
+            const startX = e.touches[0].clientX;
+            const handleMove = (ev: TouchEvent) => {
+              if (ev.touches[0].clientX - startX > 40) {
+                setSidebarOpen(true);
+                window.removeEventListener('touchmove', handleMove);
+              }
+            };
+            window.addEventListener('touchmove', handleMove, { passive: true });
+            window.addEventListener('touchend', () =>
+              window.removeEventListener('touchmove', handleMove), { once: true });
+          }}
+        />
+
         {/* ── Sidebar ── */}
         <aside
+          onTouchStart={handleSidebarTouchStart}
+          onTouchEnd={handleSidebarTouchEnd}
           className={cn(
             'fixed top-16 z-40 flex h-[calc(100vh-4rem)] w-64 flex-col transition-transform duration-300',
             'bg-white dark:bg-[#0b1120]',
@@ -433,6 +474,11 @@ export default function DashboardLayout({
                             className="absolute inset-0 rounded-xl bg-teal-50 dark:bg-teal-400/10 border border-teal-200 dark:border-teal-400/20"
                             transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                           />
+                        )}
+
+                        {/* Teal left indicator bar */}
+                        {active && (
+                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-gradient-to-b from-teal-400 to-teal-600 shadow-[0_0_8px_rgba(74,191,191,0.6)] z-20" />
                         )}
 
                         {/* Hover highlight (non-active) */}
