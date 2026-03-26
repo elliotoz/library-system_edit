@@ -183,7 +183,7 @@ export default function ProfilePage() {
     return (
       <div className="space-y-6 animate-pulse">
         <div className="h-8 w-48 bg-gray-200 rounded" />
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="glass-card p-6">
           <div className="flex gap-6">
             <div className="w-24 h-24 bg-gray-200 rounded-full" />
             <div className="flex-1 space-y-3">
@@ -209,7 +209,7 @@ export default function ProfilePage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="glass-card p-6">
         <div className="flex flex-col sm:flex-row gap-6">
           <div className="flex-shrink-0">
             {profile.avatarUrl ? (
@@ -387,7 +387,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="glass-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Tag className="w-5 h-5 text-primary-500" />
@@ -436,7 +436,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="glass-card p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Borrow Policy</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-gray-50 rounded-lg p-4">

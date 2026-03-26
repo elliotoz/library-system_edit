@@ -118,7 +118,7 @@ export default function ManageFinesPage() {
             </p>
             <p className="text-xs text-green-500">{totals.paid.count} records</p>
           </div>
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
             <p className="text-sm text-gray-500 dark:text-gray-400">Waived</p>
             <p className="text-2xl font-bold text-gray-700 dark:text-gray-300">
               ₺{totals.waived.total.toFixed(2)}
@@ -152,12 +152,12 @@ export default function ManageFinesPage() {
           <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
         </div>
       ) : fines.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center dark:border-gray-700 dark:bg-gray-800">
+        <div className="glass-card p-8 text-center">
           <DollarSign className="mx-auto mb-4 h-12 w-12 text-gray-300" />
           <p className="text-gray-500">No fine records found</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+        <div className="overflow-x-auto glass-card">
           <table className="w-full text-sm">
             <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50">
               <tr>

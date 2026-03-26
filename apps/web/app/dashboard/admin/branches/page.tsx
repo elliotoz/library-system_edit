@@ -157,7 +157,7 @@ export default function ManageBranchesPage() {
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+      <div className="overflow-hidden glass-card">
         {isLoading ? (
           <div className="p-8 text-center">
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />

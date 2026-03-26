@@ -4,10 +4,32 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-26 — UX Audit fixes: icon visibility, copyright, glass sweep
+
+**Goal**: Fix sidebar icon visibility in light mode; apply glass-card to all remaining dashboard pages; dynamic copyright year; glass settings page.
+**Root cause**: GlassNavIcon had white icon colors hardcoded — invisible on light glass sidebar. 13 dashboard pages still using flat `bg-white dark:bg-gray-800` cards.
+**Changes**:
+- `components/ui/glass-nav-icon.tsx` — added `darkMode` prop; light mode uses dark-gray inactive icons + teal active, dark mode keeps white
+- `app/dashboard/layout.tsx` — passes `darkMode` to GlassNavIcon; hover highlight uses dark tint in light mode
+- `app/dashboard/settings/page.tsx` — three section panels, language select, Save button → glass
+- `app/dashboard/borrowed/page.tsx` — stat cards, empty state, borrow items → glass-card
+- `app/dashboard/instructor/page.tsx` — stat cards, reading lists panel, quick actions → glass-card
+- `app/dashboard/notifications/page.tsx` — cards with colored left border for unread state
+- `app/dashboard/reading-lists/page.tsx` + `[id]/page.tsx` — glass-card
+- `app/dashboard/staff/page.tsx` — stat cards, recommended books, quick actions → glass-card
+- `app/dashboard/instructor/following/page.tsx`, `reading-lists/page.tsx` → glass-card
+- `app/dashboard/instructors/[id]/page.tsx` — all 5 flat panels → glass-card
+- `app/dashboard/admin/reading-lists/page.tsx` — glass-card
+- All 5 auth pages — `© 2025` → `© {new Date().getFullYear()}`
+**Verification**: tsc --noEmit ✓ (3 commits)
+**Next**: Profile page, reservations page, book detail action buttons still need glass treatment. Backend: duplicate books deduplication, reading list edit pre-fill.
+
 ## 2026-03-26 — Liquid Glass Chrome system: correct architecture + Framer Motion morphing
+
 **Goal**: Correct overdone glass (cards → solid content), apply glass only to chrome layer (header/sidebar/bars/buttons/search). Add spring physics, Framer Motion sidebar morphing, content-aware glass, layered glass icons.
 **Root cause**: Previous session applied glass to all content cards violating Apple Liquid Glass philosophy — glass belongs to the floating chrome layer, not the content layer
 **Changes**:
+
 - `apps/web/components/ui/liquid-glass-button.tsx` — NEW: Framer Motion spring button (scale 0.93 on tap, 1.025 hover); primary variant = teal + beams; secondary = achromatic glass
 - `apps/web/components/ui/glass-nav-icon.tsx` — NEW: 4-layer SVG icon (gradient glow, frosted glass disc, crisp symbol, specular highlight); Framer Motion animate scale on active
 - `apps/web/components/ui/liquid-glass-search.tsx` — NEW: Expanding glass search pill (Framer Motion layout animation), spring clear button, staggered filter chip AnimatePresence
@@ -17,65 +39,75 @@ Purpose: Track every change, why it was done, and how it was verified.
 - `apps/web/app/dashboard/student/page.tsx` — All content cards reverted to solid white/dark; quick actions reverted to solid
 - `apps/web/app/dashboard/admin/page.tsx` — All content cards reverted to solid white/dark
 - `apps/web/app/dashboard/catalog/page.tsx` — LiquidGlassSearch replaces plain input; LiquidGlassButton for Filters toggle; search+filter bar wrapped in glass-chrome
-**Verification**: tsc --noEmit ✓
-**Next**: Apply LiquidGlassButton to remaining primary CTAs (borrow, reserve, submit buttons); extend glass-chrome to notification dropdown and modal sheets
+  **Verification**: tsc --noEmit ✓
+  **Next**: Apply LiquidGlassButton to remaining primary CTAs (borrow, reserve, submit buttons); extend glass-chrome to notification dropdown and modal sheets
 
 ## 2026-03-26 — WebGL animated background + Liquid Glass design system
+
 **Goal**: Full liquid glass UI with WebGL aurora mesh background, CSS glass cards, traveling beams, SVG liquid-distortion filter — uniform light & dark mode
 **Root cause**: Login had premium dark theme but dashboard used flat white cards with no visual depth or animation; light mode was stark and disconnected
 **Changes**:
+
 - `apps/web/components/ui/webgl-background.tsx` — NEW: Three.js canvas (dynamic import, no SSR); vertex displacement + 2D Perlin noise fragment shader; 3 animated light orbs; MutationObserver for dark/light mode color swap; visibility pause; resize handling
 - `apps/web/components/ui/glass-card.tsx` — NEW: Reusable glass card component; `beams` prop adds 4 traveling teal border animations; `liquid` prop activates SVG turbulence filter
 - `apps/web/app/globals.css` — Full glass token system (--glass-bg, --glass-border, --glass-shadow, --glass-highlight, --beam-rgb); light & dark CSS variable sets; `.glass-card` with specular ::before + rim ::after; `.glass-liquid`; global beam keyframes + `.beam-*` classes
 - `apps/web/app/dashboard/layout.tsx` — Dynamic WebGLBackground injection; inline SVG `<filter id="liquid-glass">` feTurbulence defs; removed flat bg-gray-50 in light mode
 - `apps/web/app/dashboard/student/page.tsx` — All cards converted to GlassCard; quick actions use `glass-card` class on Link; borrows table + borrow limit wrapped in GlassCard
 - `apps/web/app/dashboard/admin/page.tsx` — Main stats + activity feed (liquid) + quick actions + nested quick-action links all use GlassCard/glass-card
-**Verification**: tsc --noEmit ✓
-**Next**: Apply GlassCard to catalog, profile, settings, and remaining dashboard pages
+  **Verification**: tsc --noEmit ✓
+  **Next**: Apply GlassCard to catalog, profile, settings, and remaining dashboard pages
 
 ## 2026-03-25 — Premium dark sidebar, teal focus states, stagger animations
+
 **Goal**: Unify dashboard visual language with the dark/teal login aesthetic; add entrance animations
 **Root cause**: Login was redesigned to dark-glassmorphic in 2026-03-21 but dashboard layout/pages were not brought into the same visual language, creating a jarring tonal shift post-login
 **Changes**:
+
 - `apps/web/tailwind.config.ts` — added `slide-up`, `pulse-slow`, `glow` keyframes + animations
 - `apps/web/app/globals.css` — fixed focus ring from `#22c55e` (green) → `rgba(74,191,191,0.55)` (teal); added `.animate-slide-up` + `.stagger-1/2/3/4` utilities; added `.gradient-text-teal`
 - `apps/web/app/dashboard/layout.tsx` — dark `#0b1120` sidebar with `border-white/[0.06]`; teal left-bar active nav with glow; glassmorphic header (`bg-white/90 backdrop-blur-md`); upgraded loading screen to teal gradient
 - `apps/web/app/dashboard/student/page.tsx` — staggered slide-up on stat cards, breathing dot pattern on banner, shimmer sweep on book covers, borrow bar fill delay
 - `apps/web/app/dashboard/admin/page.tsx` — teal dot pattern banner, teal gradient timeline, staggered stat card entrances, group hover ring on icon cells
-**Verification**: tsc --noEmit ✓
-**Next**: Apply same dark sidebar treatment to any remaining auth-adjacent pages if needed
+  **Verification**: tsc --noEmit ✓
+  **Next**: Apply same dark sidebar treatment to any remaining auth-adjacent pages if needed
 
 ## 2026-03-22 — Spline 3D robot integration on login/signup
+
 **Goal**: Replace hand-coded SVG robot with interactive Spline 3D scene
 **Root cause**: User requested true 3D interactive robot (not flat SVG) using Spline
 **Changes**:
+
 - `apps/web/components/ui/spline-scene.tsx` — lazy Spline wrapper with teal spinner fallback
 - `apps/web/components/ui/spotlight.tsx` — Aceternity Spotlight SVG component
 - `apps/web/app/login/page.tsx` — left panel replaced with SplineScene + Spotlight; robot keyframes removed
 - `apps/web/app/signup/page.tsx` — same treatment on compact left panel
 - `apps/web/tailwind.config.ts` — added `animate-spotlight` keyframe
 - `apps/web/package.json` — added @splinetool/react-spline, @splinetool/runtime, framer-motion
-**Verification**: tsc --noEmit ✓
-**Next**: —
+  **Verification**: tsc --noEmit ✓
+  **Next**: —
 
 ---
 
 ## 2026-03-21 — 3D login & signup redesign with AI robot animation
+
 **Goal**: Redesign login and signup pages with dark/space theme, 3D animated AI robot on left panel, glassmorphism form card with traveling border beams and 3D tilt
 **Root cause**: Old pages used a simple teal gradient panel + white card — no depth or motion
 **Changes**:
+
 - `apps/web/app/login/page.tsx` — Full rewrite: deep space background, starfield, 58% left panel with full-height SVG robot (floating, glowing eyes, scan line, orbital rings, chest lights), 42% right glassmorphism card (3D CSS tilt on hover, traveling teal border beams, grid texture, input focus glow), all original auth logic preserved
 - `apps/web/app/signup/page.tsx` — Full rewrite: same theme, compact robot on 38% left panel, wider right panel with 4-field glass card, same beam/tilt effects, all original registration logic preserved
 - No new npm dependencies — pure SVG + CSS keyframes + Tailwind
-**Verification**: tsc --noEmit ✓
-**Next**: Nothing pending
+  **Verification**: tsc --noEmit ✓
+  **Next**: Nothing pending
 
 ---
 
 ## 2026-03-21 — Fix AI Study Help flow, book deep-links, image upload in chat
+
 **Goal**: (1) "Get AI Study Help" passes book context to AI assistant. (2) AI-suggested books link to detail pages. (3) Image upload in chat. (4) Improved chat UI.
 **Root cause**: AI assistant page never read `?book=` param; catalog-search formatted books as plain text with no per-book links; `ChatDto` and pipeline had no image path.
 **Changes**:
+
 - `apps/api/src/ai/ollama.service.ts` — Added `images?: string[]` to `OllamaMessage`
 - `apps/api/src/ai/dto/chat.dto.ts` — Added optional `image?: string` field
 - `apps/api/src/ai/ai.controller.ts` — Passes `dto.image` to `aiService.chat()`
@@ -83,30 +115,34 @@ Purpose: Track every change, why it was done, and how it was verified.
 - `apps/api/src/ai/catalog-search.service.ts` — Book titles now link to `/dashboard/catalog/${b.id}`
 - `apps/web/lib/api.ts` — `aiApi.chat()` accepts optional `image`
 - `apps/web/app/dashboard/ai-assistant/page.tsx` — Full rewrite: reads `?book=` param, fetches book info, shows dismissible context banner, auto-sends study help message; image upload with canvas compression; markdown renderer (bold/italic/code/links/lists); typing dots; source pills as internal Links; dark mode
-**Verification**: nest build ✓ | tsc --noEmit ✓
-**Next**: Nothing pending
+  **Verification**: nest build ✓ | tsc --noEmit ✓
+  **Next**: Nothing pending
 
 ---
 
 ## 2026-03-21 — Fix fine display bug and auto-settle fine on admin return
+
 **Goal**: Fix `₺0101010` string concatenation bug and stop fines showing as pending after admin returns book
 **Root cause**: (1) Prisma `Decimal` serializes as string in JSON — `reduce` with `+` concatenated instead of summing. (2) `returnBook()` created fine with `FineStatus.PENDING`; admin return did not settle it.
 **Changes**:
+
 - `apps/api/src/borrows/borrows.service.ts` — Changed `status: FineStatus.PENDING` to `FineStatus.PAID` and added `paidAt: now` in both `create` and `update` of `finePayment.upsert` — admin processing a return is the point of collection
 - `apps/web/app/dashboard/borrowed/page.tsx` — `Number(f.amount)` cast in `reduce` to avoid string concat
 - `apps/web/app/dashboard/student/page.tsx` — same `Number(f.amount)` cast
-**Verification**: nest build ✓ | tsc --noEmit ✓
-**Next**: Nothing pending on fine system
+  **Verification**: nest build ✓ | tsc --noEmit ✓
+  **Next**: Nothing pending on fine system
 
 ---
 
 ## 2026-03-21 — Fine system: overdue scheduler, fine display, student fine endpoint
+
 **Goal**: Students see their fines and get automatic overdue/due-soon notifications
 **Root cause**:
+
 - `notifyOverdue()` / `notifyDueSoon()` existed but were never triggered — no scheduler
 - `estimatedFine` / `overdueDays` returned by API but not rendered on borrowed page
 - All fine endpoints were ADMIN-only — students had no way to query their own fines
-**Changes**:
+  **Changes**:
 - `apps/api/src/borrows/borrow-scheduler.service.ts` — new `OnModuleInit` service; runs every hour; for each ACTIVE borrow sends BORROW_OVERDUE or BORROW_DUE_SOON notification with 22h dedup window (Prisma check on notifications table); no new npm dependencies
 - `apps/api/src/borrows/borrows.module.ts` — registered `BorrowSchedulerService`
 - `apps/api/src/fine-payments/fine-payments.service.ts` — added `findMyFines(userId)`
@@ -114,18 +150,20 @@ Purpose: Track every change, why it was done, and how it was verified.
 - `apps/web/lib/api.ts` — added `MyFine` interface and `fineApi.getMyFines()`
 - `apps/web/app/dashboard/borrowed/page.tsx` — added `estimatedFine`/`overdueDays` to Borrow interface; red fine line on each overdue card; pending fines banner showing total outstanding; fetches fines on load
 - `apps/web/app/dashboard/student/page.tsx` — fetches pending fines on load; shows red warning card with total fine + "View details" link to borrowed page
-**Verification**: nest build ✓ | tsc --noEmit ✓
-**Next**: Scheduler runs on server start (10s delay) then every hour. No DB migration needed.
+  **Verification**: nest build ✓ | tsc --noEmit ✓
+  **Next**: Scheduler runs on server start (10s delay) then every hour. No DB migration needed.
 
 ---
 
 ## 2026-03-21 — AI: per-user conversation memory, status indicator, gemma3 cover scanner
+
 **Goal**: Fix three AI stubs and add new gemma3:4b book cover scanning feature
 **Root cause**:
+
 - Memory: `ollama.generate()` is stateless; no history passed between turns
 - Status: `isAvailable()` only checked at startup; UI had no degradation signal
 - Cover scanner: gemma3:4b multimodal capability was unused
-**Changes**:
+  **Changes**:
 - `apps/api/src/ai/ollama.service.ts` — added `OllamaMessage`, `BookScanResult` interfaces; added `chat()` method using `/api/chat` (multi-turn); `scanBookCover()` using `/api/generate` with `gemma3:4b` + images array + JSON extraction; `this.available` now updated on every generate/chat success or failure
 - `apps/api/src/ai/ai.service.ts` — added `sessions: Map<userId, OllamaMessage[]>` (max 20 messages per user); `ollamaChat()` now builds per-user message history array and calls `ollama.chat()` instead of `ollama.generate()`
 - `apps/api/src/ai/ai.controller.ts` — added `GET /ai/status` (returns `{ available }`); added `POST /ai/scan-cover` (ADMIN only, RolesGuard)
@@ -133,79 +171,91 @@ Purpose: Track every change, why it was done, and how it was verified.
 - `apps/web/lib/api.ts` — added `aiApi.getStatus()`, `aiApi.scanCover()`
 - `apps/web/app/dashboard/ai-assistant/page.tsx` — fetches status on mount; shows "AI Online" (green) or "Basic Mode" (amber) pill badge in header
 - `apps/web/app/dashboard/admin/books/new/page.tsx` — "Scan Cover" button with hidden file input; `compressImage()` helper (Canvas API, max 1024×1024, JPEG 80%, no deps); calls scanCover API, auto-fills title/authors/isbn/publisher/year in formData
-**Verification**: nest build ✓ | tsc --noEmit ✓
-**Next**: Session memory lives in-memory only (clears on server restart — acceptable for demo). pgvector embedding search remains a future upgrade.
+  **Verification**: nest build ✓ | tsc --noEmit ✓
+  **Next**: Session memory lives in-memory only (clears on server restart — acceptable for demo). pgvector embedding search remains a future upgrade.
 
 ## 2026-03-17 — Dashboard layout redesign
+
 **Goal**: Polish the dashboard shell — header, sidebar, and mobile UX
 **Root cause**: Layout was minimal — no branding, no section labels, no mobile backdrop, no transitions
 **Changes**:
+
 - `apps/web/app/dashboard/layout.tsx` — branded header with Library icon + wordmark, user name/role chip, properly sized icon buttons with hover rings, drop shadow; sidebar with named section groups, left-accent active state, ChevronRight indicator, smooth `transition-transform` slide, right border; semi-transparent mobile backdrop; loading state with animated bar; nav sections refactored from flat arrays to `NavSection[]` objects
-**Verification**: tsc --noEmit ✓
-**Next**: Individual dashboard home pages could receive a stats/summary redesign
+  **Verification**: tsc --noEmit ✓
+  **Next**: Individual dashboard home pages could receive a stats/summary redesign
 
 ---
 
 ## 2026-03-17 — Catalog page visual redesign
+
 **Goal**: Improve catalog listing page design without changing logic
 **Root cause**: Page lacked dark mode, had plain card design, basic pagination, no filter chips
 **Changes**:
+
 - `apps/web/app/dashboard/catalog/page.tsx` — full dark mode support, card hover-lift animation, spine-style cover placeholder, inline dismissible filter chips, numbered pagination with ellipsis, polished header with total count badge, improved skeleton and empty state
-**Verification**: tsc --noEmit ✓  |  next build N/A (tsc used per project convention)
-**Next**: Book detail page could receive similar polish pass if desired
+  **Verification**: tsc --noEmit ✓ | next build N/A (tsc used per project convention)
+  **Next**: Book detail page could receive similar polish pass if desired
 
 ---
 
 ## 2026-03-17 — Fix book catalog: availability filter, list view, ebook-only UX, dedup
+
 **Goal**: Fix all broken catalog features reported after browser testing.
 **Root cause**: Availability filter was never applied in Prisma query; list view had no render code; ebook-only books showed as "Unavailable"; Gutendex re-import created duplicates; no descriptions saved for imported books.
 **Changes**:
+
 - `apps/api/src/books/dto/books.dto.ts` — added `'ebook-only'` to availability union
-- `apps/api/src/books/books.service.ts` — implemented availability filter at DB level using Prisma `copies` relation (`some`/`none`/`AND NOT`); fixed author sort (String[] unorderable → falls back to `createdAt`)
+- `apps/api/src/books/books.service.ts` — implemented availability filter at DB level using Prisma `copies` relation (`some`/`none`/`AND NOT`); fixed author sort (String\[] unorderable → falls back to `createdAt`)
 - `apps/api/src/external-books/external-books.service.ts` — title+source duplicate check for non-ISBN books; added `first_sentence` to OL fields + `extractOLDescription` helper; Gutendex subjects as description
 - `apps/web/app/dashboard/catalog/page.tsx` — full list view implementation; three-state badge (Available/E-book Only/Unavailable); filter options renamed; `isEbookAvailable` added to interface
 - `apps/web/app/dashboard/catalog/[id]/page.tsx` — ebook-only books get blue status; inline read button in availability card; amber warning hidden for ebook-only
-**Verification**: nest build ✓ | tsc --noEmit ✓
-**Commit**: `5fa7baa` fix(catalog): availability filter, list view, ebook-only UX, and dedup
-**Next**: Watch for edge cases on books that have both physical copies AND ebook — currently show green badge + small blue "E-book" pill
+  **Verification**: nest build ✓ | tsc --noEmit ✓
+  **Commit**: `5fa7baa` fix(catalog): availability filter, list view, ebook-only UX, and dedup
+  **Next**: Watch for edge cases on books that have both physical copies AND ebook — currently show green badge + small blue "E-book" pill
 
 ---
 
 ## 2026-03-17 — External ebook integration: dual bulk import + persistent import state
+
 **Goal**: Add bulk Open Library import (was missing), make imported state survive page reloads.
 **Root cause**: Only Gutendex bulk endpoint existed; imported Set was React state only (lost on reload).
 **Changes**:
+
 - `apps/api/src/external-books/external-books.service.ts` — added `checkExisting()` (ISBN + title+source), `bulkImportOpenLibrary()`
 - `apps/api/src/external-books/external-books.controller.ts` — added `POST /external-books/check-existing`, `POST /external-books/import/openlibrary`
 - `apps/web/lib/api.ts` — added `checkExisting()`, `bulkImportOpenLibrary()` to `externalBooksApi`
 - `apps/web/app/dashboard/admin/import-books/page.tsx` — rewritten: dual bulk buttons, source filter tabs, `checkExisting` call after search pre-populates imported Set from DB, 409 treated as already-imported
-**Verification**: nest build ✓ | tsc --noEmit ✓
-**Commit**: `123dcce` feat(external-books): add bulk open library import and persistent import state
-**Next**: —
+  **Verification**: nest build ✓ | tsc --noEmit ✓
+  **Commit**: `123dcce` feat(external-books): add bulk open library import and persistent import state
+  **Next**: —
 
 ---
 
 ## 2026-03-17 — Add UI/UX Pro Max design skills + 21st.dev MCP
+
 **Goal**: Enhance Claude's UI/UX capabilities with design intelligence skills and 21st.dev component library access.
 **Changes**:
+
 - `local-notes/skills/` — added 7 skill folders from ui-ux-pro-max-skill repo (ui-ux-pro-max, design-system, ui-styling, brand, banner-design, slides, design)
 - `~/.claude.json` — registered 21st.dev magic MCP server (user-scoped)
 - Skipped external local-notes.md to preserve project instructions
-**Verification**: No code changes — skills are reference-only
-**Next**: Claude agents will auto-apply design rules when building UI components
+  **Verification**: No code changes — skills are reference-only
+  **Next**: Claude agents will auto-apply design rules when building UI components
 
 ---
 
 ## 2026-03-17 — Add 8 test books with real data and e-book URLs
+
 **Goal**: Add 8 specific books to the database with real metadata, cover images, e-book URLs, and random campus assignments.
 **Root cause**: Need realistic test data with e-book support for development and demo.
 **Changes**:
+
 - `apps/api/prisma/add-books.ts` — standalone script to upsert 8 books (Clean Code, Art of War, Think Python, Pro Git, Intro to Algorithms, Eloquent JavaScript, Linux Command Line, Frankenstein) with full metadata, cover images, and e-book URLs where available
 - 2 existing books updated (Clean Code, Intro to Algorithms) with richer data; all copies set to AVAILABLE
 - 6 new books created with 3 copies each at randomly assigned campuses
 - 7/8 books have `isEbookAvailable: true` with read-only e-book URLs
-**Verification**: nest build ✓ | next build ✓ | script executed successfully
-**Next**: Books are live in the database; verify in the UI
+  **Verification**: nest build ✓ | next build ✓ | script executed successfully
+  **Next**: Books are live in the database; verify in the UI
 
 ---
 
@@ -214,6 +264,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal**: Add external book search and import from Open Library and Gutendex (free, no-key APIs only).
 
 **Changes**:
+
 - `apps/api/src/external-books/dto/external-books.dto.ts` — ImportBookDto, NormalizedBook interface
 - `apps/api/src/external-books/external-books.service.ts` — fetchOpenLibraryBooks, fetchGutendexBooks, normalizeGutendexResults, importBook (with duplicate ISBN guard), bulkImportGutendex; uses Node.js built-in `https` module, no new deps
 - `apps/api/src/external-books/external-books.controller.ts` — GET /external-books/search, POST /external-books/import (ADMIN), POST /external-books/import/gutendex (ADMIN)
@@ -234,9 +285,10 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 **Goal**: Fix Google OAuth callback hardcoding `/dashboard/student` for all users regardless of role.
 
-**Root cause**: `auth.controller.ts` line 188 had `res.redirect(\`${this.frontendUrl}/dashboard/student\`)` — no role check, so ADMINs and INSTRUCTORs landing via Google OAuth were sent to the student dashboard.
+**Root cause**: `auth.controller.ts` line 188 had `res.redirect(\`\${this.frontendUrl}/dashboard/student\`)\` — no role check, so ADMINs and INSTRUCTORs landing via Google OAuth were sent to the student dashboard.
 
 **Changes**:
+
 - `apps/api/src/auth/auth.controller.ts` — replaced hardcoded path with a `roleDashboards` map keyed on `user.role`
 
 **Verification**: nest build ✓
@@ -250,12 +302,14 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal**: Fix silent SMTP failure hiding from users, add authenticated-user redirect on signup, improve login error messages, remove irrelevant InjectedWalletErrorGuard component.
 
 **Root cause**:
+
 - `mail.service.ts` swallowed SMTP errors silently — users saw "Registration successful" but never received a code
 - `signup/page.tsx` had no check for already-authenticated users (unlike login page)
 - `login/page.tsx` showed generic toasts regardless of error type
 - `InjectedWalletErrorGuard` was a crypto wallet noise suppressor with no relevance to the app
 
 **Changes**:
+
 - `apps/api/src/mail/mail.service.ts` — `send()` now throws `ServiceUnavailableException` when transporter is null or sendMail fails; removed `logFallback()` silent swallow
 - `apps/api/src/auth/auth.service.ts` — `register()` catches email failure, returns `emailSent: boolean` flag; in dev mode includes the verification code in the response message
 - `apps/web/lib/api.ts` — updated `register()` return type to include `emailSent: boolean`
@@ -275,6 +329,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Root Cause**: The axios response interceptor redirected to /login on ANY 401 error, except when already on /login. When visiting /signup, AuthProvider called getMe() which returned 401, triggering the redirect.
 
 **Changes**:
+
 - `apps/web/lib/api.ts`: Added PUBLIC_ROUTES array and updated 401 interceptor to skip redirect for /login, /signup, /verify-email, /forgot-password, /reset-password
 - `README.md`: Added Gmail App Password documentation for SMTP configuration
 
@@ -289,6 +344,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal**: Make feature configuration visible via `/auth/config` endpoint and show disabled note when Google OAuth is off.
 
 **Changes**:
+
 - `apps/api/src/ai/ollama.service.ts`: Added `available` flag set in `onModuleInit`, exposed via `isAvailable()` getter
 - `apps/api/src/ai/ai.module.ts`: Export `OllamaService` for use in AuthModule
 - `apps/api/src/auth/auth.module.ts`: Import `MailModule` and `AiModule`
@@ -311,6 +367,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Definition**: Consecutive calendar days (backward from today) where the student had at least one ACTIVE/OVERDUE borrow covering that day.
 
 **Changes**:
+
 - `apps/api/src/dashboard/dashboard.service.ts`:
   - Added `activeBorrows` query fetching ACTIVE/OVERDUE borrows with borrowedAt, returnedAt
   - Added `calculateReadingStreak()` helper method
@@ -328,6 +385,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal**: Harden auth/mail configuration so the app is production-ready and does not expose non-working Google OAuth or rely on overloaded env vars.
 
 **Changes**:
+
 - `apps/api/src/mail/mail.service.ts`: Use `FRONTEND_URL` for password reset links, falls back to first `CORS_ORIGIN`
 - `apps/api/src/auth/auth.controller.ts`:
   - Inject `ConfigService`, use `FRONTEND_URL` for Google OAuth redirect
@@ -340,6 +398,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 - `README.md`: Add "Production Auth & Mail Setup" section with Google OAuth, SMTP, and FRONTEND_URL guidance
 
 **Files modified**:
+
 - `apps/api/src/mail/mail.service.ts`
 - `apps/api/src/auth/auth.controller.ts`
 - `apps/api/src/main.ts`
@@ -358,6 +417,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal**: Admin can generate/export operational reports in PDF and Excel.
 
 **Changes**:
+
 - Installed `pdfkit`, `exceljs`, `@types/pdfkit`
 - `apps/api/src/reports/`: New module — service (aggregate queries, top books, users by role), controller (GET /reports/summary, GET /reports/export?format=pdf|excel)
 - PDF: pdfkit text/table summary with metrics, top books, users by role
@@ -379,6 +439,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal**: Track overdue fines and allow admin to mark paid/waived.
 
 **Changes**:
+
 - `prisma/schema.prisma`: Added `FineStatus` enum, `FinePayment` model with relations to Borrow (unique), User, and admin paidBy
 - Migration: `add_fine_payment_tracking`
 - `apps/api/src/fine-payments/`: New module — controller (GET list, GET totals, GET :id, PATCH :id/pay, PATCH :id/waive), service, DTO
@@ -398,6 +459,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal**: Sidebar nav overflows on short viewports, logout unreachable; System Settings link is a 404.
 
 **Changes**:
+
 - `apps/web/app/dashboard/layout.tsx`:
   - Aside: `h-full p-4` → `h-[calc(100vh-4rem)] flex flex-col`, padding moved to inner elements
   - Nav groups wrapped in `<nav className="flex-1 overflow-y-auto p-4">`
@@ -415,6 +477,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal**: Allow ADMIN to view and update role-based borrow policies from admin dashboard.
 
 **Changes**:
+
 - Created `apps/api/src/borrow-policies/` — module, controller, service, DTO
   - `GET /borrow-policies` — list all policies
   - `PATCH /borrow-policies/:role` — update by role with validation (min/max limits)
@@ -435,6 +498,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal**: Allow ADMIN to manage library branches (CRUD + activate/deactivate) from admin dashboard.
 
 **Changes**:
+
 - Created `apps/api/src/branches/dto/branches.dto.ts` — CreateBranchDto, UpdateBranchDto with validation
 - Created `apps/api/src/branches/branches.service.ts` — findAll, create, update, activate, deactivate with 409 for duplicate codes
 - Created `apps/api/src/branches/branches.controller.ts` — ADMIN-guarded endpoints: GET/POST/PATCH /branches
@@ -458,6 +522,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal**: Add liveness and readiness health endpoints to close the Error Logging & Monitoring item.
 
 **Changes**:
+
 - Created `apps/api/src/health/health.controller.ts` — `GET /health/live` (200 always), `GET /health/ready` (DB + optional Ollama checks, 200/503)
 - Created `apps/api/src/health/health.module.ts` — imports PrismaModule
 - Updated `apps/api/src/app.module.ts` — imported HealthModule
@@ -477,6 +542,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal**: Add pagination, query shaping, and compound indexes to reduce unbounded query risk and improve response efficiency.
 
 **Changes**:
+
 - `borrows.service.ts` — `findAllBorrows()`: added full pagination (page/pageSize/count); `findMyBorrows()`: added `take: 50` cap; `findActiveBorrows()`: narrowed includes to select only needed fields
 - `borrows.controller.ts` — pass page/pageSize query params to `findAllBorrows()`
 - `reservations.service.ts` — `findMyReservations()`: `take: 50`; `findPendingReservations()`: `take: 100`; `findReadyForPickup()`: `take: 100`
@@ -485,6 +551,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 - `README.md` — Performance Optimization section, roadmap item marked complete
 
 **Before/After observations**:
+
 - `GET /borrows` (admin, no filters): Before = unbounded `findMany` fetching ALL rows with full `book` + `branch` includes. After = paginated (default 20, max 100) with shaped selects — query cost capped at O(pageSize) instead of O(total_rows)
 - `Notification.findUnreadCount(userId)`: Before = seq scan on `read` column + filter by `userId`. After = compound index `(userId, read)` enables index-only lookup
 
@@ -501,6 +568,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal**: Add baseline production API hardening — Helmet, CORS allowlist, rate limiting on auth + AI endpoints.
 
 **Changes**:
+
 - Installed `helmet` and `@nestjs/throttler`
 - Updated `apps/api/src/main.ts` — added Helmet middleware (CSP disabled, COEP disabled for Swagger), trimmed CORS origins
 - Updated `apps/api/src/app.module.ts` — registered `ThrottlerModule.forRootAsync()` with env-driven TTL/limit
@@ -522,6 +590,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal**: Add S3 upload support with automatic local-disk fallback, wired into existing avatar and material upload flows.
 
 **Changes**:
+
 - Installed `@aws-sdk/client-s3` dependency
 - Created `apps/api/src/storage/storage.service.ts` — S3/local abstraction with `uploadImage()` and `uploadFile()` methods; reads `STORAGE_PROVIDER` env to decide backend
 - Created `apps/api/src/storage/storage.module.ts` — global module exporting `StorageService`
@@ -546,6 +615,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal**: Add structured logging, request correlation IDs, and a global exception filter to the API.
 
 **Changes**:
+
 - Created `apps/api/src/common/middleware/request-id.middleware.ts` — generates/forwards `x-request-id` UUID per request
 - Created `apps/api/src/common/middleware/request-logger.middleware.ts` — structured request/response logging (method, path, status, duration, requestId), gated by `ENABLE_REQUEST_LOGGING` env
 - Created `apps/api/src/common/filters/global-exception.filter.ts` — normalizes error payloads, logs full stack server-side, never leaks internals to clients
@@ -569,6 +639,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal:** Replace console-only email delivery with real SMTP transport, feature-flagged with dev fallback.
 
 **Changes:**
+
 1. `mail/mail.service.ts` — **NEW** — Nodemailer-based MailService:
    - `sendVerificationEmail(email, code)` — HTML + text email with 6-digit code
    - `sendPasswordResetEmail(email, token)` — HTML + text email with reset link button
@@ -599,6 +670,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal:** Improve deterministic output quality, guardrails, and role-aware context usage in both services. No schema changes.
 
 **LearningPathService changes:**
+
 - Topic extraction fallback chain: parsed words → user interests → faculty name → "general topics"
 - Topic length sanitized to 120 chars (anti-prompt-injection)
 - `buildSearchIntent` enriches vague queries with borrow history categories as secondary signals
@@ -611,6 +683,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 - LLM output now includes role intro and role tip (matching rule-based output structure)
 
 **ResearchAssistantService changes:**
+
 - `audienceLevel` now role-aware: `advanced` for instructors/admins, `null` (all levels) for students/staff
 - Topic length sanitized to 120 chars
 - Added `priorReadingNote()` — cross-references results with borrow history, flags already-read books
@@ -634,11 +707,13 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal:** Validate semantic search refactor preserved ChatResponse schema, run builds, update README.
 
 **Verification:**
+
 1. Schema check — traced all return points across 5 services (`ai`, `catalog-search`, `learning-path`, `research-assistant`, `role-response`). Every path returns `{ reply: string, modelUsed: string, sources?: string[] }` matching `ChatResponse`.
 2. `npx nest build` ✅
 3. `npx next build` ✅
 
 **Changes:**
+
 - `README.md` — Added "Embeddings-Ready Semantic Search Abstraction" to Phase 3 completed items
 
 **Files:** `README.md`
@@ -650,6 +725,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal:** Extract semantic search logic into a clean abstraction with extension points for future embeddings, keeping current behavior unchanged.
 
 **Changes:**
+
 1. `types/search.types.ts` — **NEW** — Extracted `SearchIntent`, `BookCandidate`, `RankedBookResult`, `SearchContext`, `ReadingListResult` into a shared types file, breaking circular import between `catalog-search` → `semantic-search`
 2. `semantic-search.service.ts` — Refactored with strategy pattern:
    - Three search paths: `keywordSearch()` (current production), `embeddingSearch()` (stub → falls back to keyword), `hybridSearch()` (stub → falls back to keyword)
@@ -677,6 +753,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal:** Bring README.md up to date with all implemented features through Phase 3.
 
 **Changes:**
+
 - Updated Roadmap: Phase 3 (AI Integration) marked as completed — Natural Language Search, Learning Paths, Research Assistant all checked off
 - Added AI Assistant section with architecture diagram, capabilities table, context data sources, and Ollama model mapping
 - Updated Project Structure to include all 13 modules (ai, reading-lists, instructor-followers, dashboard, etc.)
@@ -701,6 +778,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal:** Add personalized learning path generation and research assistant as new AI chat intents.
 
 **Changes:**
+
 1. `context-builder.service.ts` — Added `borrowHistory` to `AiContext` interface + `getBorrowHistory()` method (queries returned borrows for personalization)
 2. `learning-path.service.ts` — **NEW** — Intent detection (`isLearningPathQuery`) + `generatePath()` that searches books, groups by difficulty (foundations/core/advanced), optional Ollama enhancement
 3. `research-assistant.service.ts` — **NEW** — Intent detection (`isResearchQuery`) + `assist()` that searches books + reading lists, role-specific next steps, optional Ollama enhancement
@@ -721,12 +799,14 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal:** Extract search+rank logic into pluggable SemanticSearchService for future embeddings integration.
 
 **Changes:**
+
 1. Created `semantic-search.service.ts` with `searchBooks(intent, context)` and `rankBooks(candidates, intent, context)` — moved all Prisma query building and hybrid scoring logic here
 2. Updated `catalog-search.service.ts` — now delegates candidate fetching and ranking to SemanticSearchService; retains intent parsing, reading-list search, and formatting
 3. Updated `ai.module.ts` — registered SemanticSearchService
 4. Updated `.env.example` — added `AI_SEMANTIC_MODE=hybrid` and `AI_EMBEDDINGS_ENABLED=false`
 
 **Files changed:**
+
 - `apps/api/src/ai/semantic-search.service.ts` (new)
 - `apps/api/src/ai/catalog-search.service.ts`
 - `apps/api/src/ai/ai.module.ts`
@@ -743,6 +823,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal:** Improve book retrieval quality using hybrid query understanding + ranking without external vector DB.
 
 **Changes:**
+
 1. `catalog-search.service.ts` — Major rewrite:
    - Extended `SearchIntent` with `audienceLevel` (introductory/advanced) and `facultyHint`
    - Added `extractAudienceLevel()` and `extractFacultyHint()` intent extractors
@@ -753,6 +834,7 @@ Purpose: Track every change, why it was done, and how it was verified.
    - Added more noise words to `extractKeywords()` for cleaner intent parsing
 
 **Files changed:**
+
 - `apps/api/src/ai/catalog-search.service.ts`
 
 **Commands:** `npx nest build` pass, `npx next build` pass
@@ -766,6 +848,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal:** Extract per-role prompt templates, add source-grounding to Ollama prompts, normalize ChatResponse.modelUsed across all code paths, display model label in frontend.
 
 **Changes:**
+
 1. `ai.service.ts` — Replaced monolithic `buildSystemPrompt()` with `basePrompt()` + `studentPrompt()` / `instructorPrompt()` / `staffPrompt()` / `adminPrompt()`. Added `sourceGroundingBlock()` listing available dashboard paths per role. Added `extractLinkedSources()` regex to pull `/dashboard/...` paths from Ollama responses and merge+dedupe with static sources. Made `modelUsed` required in `ChatResponse`. All interest save/update paths return `modelUsed: 'system'`.
 2. `role-response.service.ts` — Added `modelUsed: 'rule-based'` to every `ChatResponse` return (28 return sites).
 3. `catalog-search.service.ts` — Added `modelUsed: 'search'` to both return sites (empty query + formatted results).
@@ -773,6 +856,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 5. `ai-assistant/page.tsx` — Added `modelUsed` to Message interface, stored from API response, rendered as `text-[10px]` label next to timestamp on assistant messages (fallback: `'unknown'`).
 
 **Files changed:**
+
 - `apps/api/src/ai/ai.service.ts`
 - `apps/api/src/ai/role-response.service.ts`
 - `apps/api/src/ai/catalog-search.service.ts`
@@ -790,6 +874,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal:** Integrate Ollama LLM backend with model routing, add PATCH /ai/interests and GET /ai/context endpoints, startup connectivity check.
 
 **Changes:**
+
 1. Added `OLLAMA_BASE_URL` to `.env.example`
 2. Created `ollama.service.ts` — Ollama HTTP client with `generate()`, `listTags()`, `isAvailable()`, role-based model routing (STAFF->phi3, STUDENT/INSTRUCTOR->qwen2.5, ADMIN->llama3), deep-reasoning/simple overrides, OnModuleInit connectivity check
 3. Created `dto/update-interests.dto.ts` — validates string array with min/max size
@@ -798,6 +883,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 6. Updated `ai.module.ts` — registered `OllamaService`
 
 **Files changed:**
+
 - `apps/api/.env.example`
 - `apps/api/src/ai/ollama.service.ts` (new)
 - `apps/api/src/ai/dto/update-interests.dto.ts` (new)
@@ -812,6 +898,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 ### Patch — Pre-commit fixes
 
 **Fixes applied:**
+
 1. **Permission safety** — admin action guard runs deterministically before Ollama call, reuses `RoleResponseService.isAdminAction()` (made public)
 2. **Query complexity routing** — `classifyQuery()` classifies deep-reasoning (analytics/compare/trend/why/forecast) vs simple (policy/how-do-i) prompts, passes to `ollama.getModel(role, queryType)`
 3. **Removed per-message /api/tags** — deleted `isAvailable()` from OllamaService; `ollamaChat()` attempts generate directly, catches errors and falls back to rules
@@ -825,6 +912,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal:** Add follow/catalog navigation to reading-list detail, View Profile CTAs, instructor bio/department/courses schema+API+UI, and profile edit fields for instructors.
 
 **Changes:**
+
 1. **Schema**: Added `bio`, `department`, `courses` fields to User model + migration
 2. **DTO**: Added bio (MaxLength 500), department, courses (IsArray) to UpdateProfileDto
 3. **Service**: Handle 3 new fields in `updateProfile()`
@@ -836,11 +924,12 @@ Purpose: Track every change, why it was done, and how it was verified.
 9. **Instructor profile page**: Bio paragraph, department label, courses chips sections
 10. **Profile page**: Bio textarea, department input, courses tag input (INSTRUCTOR role only)
 
-**Files:** schema.prisma, migration, update-profile.dto.ts, users.service.ts, users.controller.ts, reading-lists.service.ts, types/index.ts, reading-lists/[id]/page.tsx, reading-lists/page.tsx, instructors/[id]/page.tsx, profile/page.tsx
+**Files:** schema.prisma, migration, update-profile.dto.ts, users.service.ts, users.controller.ts, reading-lists.service.ts, types/index.ts, reading-lists/\[id]/page.tsx, reading-lists/page.tsx, instructors/\[id]/page.tsx, profile/page.tsx
 
 **Commands:** `npx prisma migrate dev`, `npx nest build`, `npx next build` — all pass
 
 **Commits:**
+
 - `bda6733` feat(api): add instructor public profile fields (bio, department, courses)
 - `9f8e625` feat(web): reading-list UX and instructor profile improvements
 
@@ -851,6 +940,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal:** Fix routing bug where `/dashboard/instructors/:id` was blocked for students due to loose prefix matching, and add instructor profile CTA.
 
 **Changes:**
+
 1. **middleware.ts**: Changed `pathname.startsWith(route)` to `pathname === route || pathname.startsWith(route + '/')` for boundary-safe matching. Added `/dashboard/reading-lists` and `/dashboard/instructors` to ROUTE_PERMISSIONS with all roles.
 2. **instructor/page.tsx**: Added "Create Profile" / "Manage Profile" CTA card in quick actions grid, fetching profile completeness on mount.
 
@@ -867,6 +957,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal:** Fix instructor profile update failing because FormData sends `courses` as a JSON string, which fails `@IsArray()` validation before the controller can parse it.
 
 **Changes:**
+
 1. **update-profile.dto.ts**: Added `@Transform` from class-transformer to parse courses JSON string into array before validation runs.
 2. **users.controller.ts**: Removed redundant controller-side JSON parsing (now handled by Transform).
 3. **profile/page.tsx**: Surface backend validation error messages in toast instead of generic "Failed to update profile".
@@ -884,6 +975,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal:** Add backend AI chat endpoint and connect frontend AI assistant page to it.
 
 **Changes:**
+
 1. **apps/api/src/ai/**: New module — dto/chat.dto.ts, ai.service.ts (rule-based responses), ai.controller.ts (POST /ai/chat, JWT-guarded), ai.module.ts
 2. **app.module.ts**: Register AiModule
 3. **apps/web/lib/api.ts**: Add `aiApi.chat()` function
@@ -902,6 +994,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal:** Upgrade AI chat from generic keyword-based to role-aware, context-driven responses using live system data.
 
 **Changes:**
+
 1. **context-builder.service.ts** (new): Builds `AiContext` with user profile, borrow policy, active borrows, reservations, catalog snapshot, reading list stats, admin stats
 2. **role-response.service.ts** (new): Role-specific response strategies — Student (personal status, faculty recs), Instructor (course/reading-list guidance), Staff (interest bootstrap + personalized), Admin (operational insights). Refuses admin actions from non-admins.
 3. **ai.service.ts**: Orchestrates context build → role response → staff interest save flow
@@ -921,6 +1014,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Goal:** Add AI intent for natural-language catalog/reading-list queries, returning actionable links with search results.
 
 **Changes:**
+
 1. **catalog-search.service.ts** (new): Intent detection (`isSearchQuery`), parsing (`parseIntent` → keywords, availability filter, category hints), Prisma book+reading-list search, formatted response with availability status, catalog links with search params, role-aware tips
 2. **ai.service.ts**: Integrated catalog search before role-based fallback; refactored staff interest save into private method
 3. **ai.module.ts**: Registered CatalogSearchService
@@ -940,11 +1034,13 @@ Purpose: Track every change, why it was done, and how it was verified.
 **Changes**:
 
 ### Backend
+
 - `reading-lists.service.ts` — `lockedPreview()` helper, publish guard (400 on 0 books), ARCHIVED owner-only, `removeItem` notifications, `findAllForModeration()`, `create()` accepts status
 - `reading-lists.dto.ts` — Added `status` to `CreateReadingListDto`
 - `reading-lists.controller.ts` — Added `GET admin/all` endpoint
 
 ### Frontend
+
 - Instructor create modal: "Save Draft" + "Publish Now" buttons (publish blocked for 0-book lists)
 - NEW: `/dashboard/instructor/reading-lists` manage index page
 - NEW: `/dashboard/instructor/reading-lists/[id]` manage detail page (book search/add/remove, visibility/status)
@@ -963,6 +1059,7 @@ Purpose: Track every change, why it was done, and how it was verified.
 Replace the avatar URL text input with actual image file upload on the profile edit page. The backend already had a Multer-based upload pattern in the materials module — replicated it for avatars.
 
 **Changes:**
+
 1. **DTO** — Removed `@IsUrl()` validator from `avatarUrl` field since it now stores local paths (`/uploads/avatars/uuid.jpg`) instead of external URLs.
 2. **Controller** — Added `FileInterceptor('avatar', ...)` to `PATCH /users/profile` with:
    - `diskStorage` writing to `./uploads/avatars` with UUID filenames
@@ -977,13 +1074,15 @@ Replace the avatar URL text input with actual image file upload on the profile e
 4. **Filesystem** — Created `apps/api/uploads/avatars/` directory
 
 **Files:**
+
 - `apps/api/src/users/dto/update-profile.dto.ts` — removed `@IsUrl()` import and decorator
 - `apps/api/src/users/users.controller.ts` — added multer imports, `avatarStorage` config, `FileInterceptor` + `@UploadedFile()` on profile endpoint
 - `apps/web/app/dashboard/profile/page.tsx` — added `useRef`, `Camera` icon, file state, file picker UI, FormData submission
 - `apps/api/uploads/avatars/` — new directory (gitignored via existing uploads rule)
 
 **Commands run:**
-```bash
+
+```Shell
 mkdir -p apps/api/uploads/avatars
 cd apps/api && npx nest build        # success, no errors
 cd apps/web && npx next build        # success, no errors
@@ -993,6 +1092,7 @@ cd apps/web && npx next build        # success, no errors
 Both API and web builds pass cleanly. The profile page now shows an image picker with preview instead of a URL text field. Uploaded avatars are stored on disk and served via the existing `/uploads/` static asset route and Next.js proxy.
 
 **Next:**
+
 - Manual testing: log in → profile → edit → select image → save → verify avatar displays after refresh
 - Consider adding old avatar cleanup (delete previous file on re-upload) if disk usage becomes a concern
 
@@ -1004,14 +1104,17 @@ Both API and web builds pass cleanly. The profile page now shows an image picker
 Avatar image uploaded and saved successfully, but disappeared on page reload. The uploaded file was stored on disk and the database was updated correctly — the issue was that the `/api/auth/me` endpoint did not return `avatarUrl` in its response.
 
 **Changes:**
+
 1. **Root cause**: `GET /api/auth/me` in `auth.controller.ts` manually constructed a response object with only 6 fields (`id`, `email`, `name`, `role`, `facultyId`, `facultyName`). The full user object (including `avatarUrl`) was already available via `@CurrentUser()` from the JWT strategy, but was being filtered out.
 2. **Fix**: Added `avatarUrl` (and other missing profile fields: `studentId`, `staffId`, `interests`, `isActive`, `createdAt`, `faculty`) to the `getMe` response so the profile page has all the data it needs.
 
 **Files:**
-- `apps/api/src/auth/auth.controller.ts` (line ~73) — added missing fields to `getMe` return object
+
+- `apps/api/src/auth/auth.controller.ts` (line \~73) — added missing fields to `getMe` return object
 
 **Commands run:**
-```bash
+
+```Shell
 cd apps/api && npx nest build   # success, no errors
 ```
 
@@ -1019,6 +1122,7 @@ cd apps/api && npx nest build   # success, no errors
 API builds cleanly. The `/api/auth/me` endpoint now returns `avatarUrl` along with all other profile fields, so the avatar persists across page reloads.
 
 **Next:**
+
 - Verify manually: upload avatar → save → reload → avatar should still display
 
 ---
@@ -1029,16 +1133,19 @@ API builds cleanly. The `/api/auth/me` endpoint now returns `avatarUrl` along wi
 After uploading a profile avatar, show it in: (1) the dashboard header next to the bell icon (with initials fallback), and (2) ensure the header updates immediately after save without requiring a page reload.
 
 **Changes:**
-1. **layout.tsx** (line ~343) — Added conditional: if `user.avatarUrl` exists, render `<img>` with `rounded-full object-cover`; else keep existing initials circle. No layout redesign.
+
+1. **layout.tsx** (line \~343) — Added conditional: if `user.avatarUrl` exists, render `<img>` with `rounded-full object-cover`; else keep existing initials circle. No layout redesign.
 2. **profile/page.tsx** — Imported `useAuth`, called `await refreshUser()` after successful profile save so the auth context (and thus the header avatar) updates immediately without reload.
 3. **useAuth.tsx** — No changes needed. `refreshUser()` already existed and works correctly (calls `authApi.getMe()` which now returns `avatarUrl` per the previous fix).
 
 **Files:**
+
 - `apps/web/app/dashboard/layout.tsx` — avatar image conditional in header user badge area
 - `apps/web/app/dashboard/profile/page.tsx` — import `useAuth`, call `refreshUser()` after save
 
 **Commands run:**
-```bash
+
+```Shell
 cd apps/web && npx next build   # success, no errors
 ```
 
@@ -1046,6 +1153,7 @@ cd apps/web && npx next build   # success, no errors
 Web build passes. The header now shows the uploaded avatar image (or initials fallback). After saving a new avatar on the profile page, the header updates immediately via `refreshUser()`.
 
 **Next:**
+
 - Manual test: upload avatar → save → header should update instantly → reload → both header and profile page should show avatar
 - No backend changes were needed
 
@@ -1057,12 +1165,14 @@ Web build passes. The header now shows the uploaded avatar image (or initials fa
 Replace "User Self-Registration with Admin Approval" roadmap item with email/password signup requiring email verification. This is Slice 1: backend-only foundation. No Google OAuth (Slice 2), no frontend (Slice 3).
 
 **Changes:**
+
 1. **Schema** — Added `AuthProvider` enum (`LOCAL`/`GOOGLE`), plus `emailVerifiedAt`, `emailVerificationToken`, `emailVerificationExpiry` fields on User model. Ran migration. Backfilled all existing users as verified.
 2. **DTOs** — Added `RegisterDto` (name, email, password, optional studentId), `VerifyEmailDto` (email, code), `ResendVerificationDto` (email).
 3. **Service** — Added `register()` (hash password, generate 6-digit code, 15min expiry, console.log code in dev), `verifyEmail()` (validate code/expiry, set `emailVerifiedAt`, clear token), `resendVerification()` (rate-limit 60s, regenerate code). Added unverified-email check in `validateUser()` — login fails with clear message if `emailVerifiedAt` is null.
 4. **Controller** — Added three public endpoints: `POST /auth/register`, `POST /auth/verify-email`, `POST /auth/resend-verification`.
 
 **Files:**
+
 - `apps/api/prisma/schema.prisma` — `AuthProvider` enum, 4 new fields on User
 - `apps/api/prisma/migrations/20260303000948_add_email_verification_and_auth_provider/migration.sql` — auto-generated
 - `apps/api/src/auth/dto/auth.dto.ts` — 3 new DTO classes
@@ -1070,7 +1180,8 @@ Replace "User Self-Registration with Admin Approval" roadmap item with email/pas
 - `apps/api/src/auth/auth.controller.ts` — 3 new endpoints
 
 **Commands run:**
-```bash
+
+```Shell
 npx prisma migrate dev --name add_email_verification_and_auth_provider  # success
 npx prisma db execute (backfill existing users as verified)             # success
 cd apps/api && npx nest build                                           # success
@@ -1082,6 +1193,7 @@ node -e "PrismaClient query to verify new fields"                       # confir
 Both builds pass. New fields present in DB. Existing users backfilled as verified so login still works. Three new public endpoints available. Verification codes logged to console in dev mode.
 
 **Next:**
+
 - Slice 2: Google OAuth (passport-google-oauth20, GOOGLE auth provider, auto-verified on OAuth)
 - Slice 3: Frontend registration/verification pages + login page updates
 
@@ -1093,23 +1205,27 @@ Both builds pass. New fields present in DB. Existing users backfilled as verifie
 Audit and tighten Slice 1 email verification implementation before proceeding to Slice 2. Five checks performed.
 
 **Findings:**
-| Check | Status | Detail |
-|-------|--------|--------|
-| 1. Register duplicates | Fixed | Race condition: concurrent requests could bypass `findUnique` — second `create` threw unhandled Prisma P2002 (500). Now caught. |
-| 2. verify-email | OK | Rejects expired/invalid, clears token, early-returns on replay |
-| 3. resend-verification | Fixed | (a) `"Email is already verified"` leaked account status — now returns same generic message for non-existent and already-verified. (b) Rate limit logic simplified from convoluted expiry math to clear `sentAt = expiry - 15min` |
-| 4. Login gate | OK | Blocks unverified LOCAL users; backfilled users pass through |
-| 5. Migration backfill | OK | All existing users have `emailVerifiedAt = NOW()` |
+
+| Check                  | Status | Detail                                                                                                                                                                                                                           |
+| ---------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Register duplicates | Fixed  | Race condition: concurrent requests could bypass `findUnique` — second `create` threw unhandled Prisma P2002 (500). Now caught.                                                                                                  |
+| 2. verify-email        | OK     | Rejects expired/invalid, clears token, early-returns on replay                                                                                                                                                                   |
+| 3. resend-verification | Fixed  | (a) `"Email is already verified"` leaked account status — now returns same generic message for non-existent and already-verified. (b) Rate limit logic simplified from convoluted expiry math to clear `sentAt = expiry - 15min` |
+| 4. Login gate          | OK     | Blocks unverified LOCAL users; backfilled users pass through                                                                                                                                                                     |
+| 5. Migration backfill  | OK     | All existing users have `emailVerifiedAt = NOW()`                                                                                                                                                                                |
 
 **Changes:**
+
 1. **Register** — Wrapped `prisma.user.create()` in try/catch for Prisma error code `P2002` (unique constraint violation), re-throws as `ConflictException`.
 2. **resendVerification** — Collapsed `!user` and `user.emailVerifiedAt` branches into single generic response to prevent account enumeration. Simplified rate limit to `sentAt = expiry - 15min; if (now - sentAt < 60s) reject`.
 
 **Files:**
+
 - `apps/api/src/auth/auth.service.ts` — `register()` P2002 catch, `resendVerification()` anti-enumeration + rate limit cleanup
 
 **Commands run:**
-```bash
+
+```Shell
 cd apps/api && npx nest build   # success, no errors
 ```
 
@@ -1117,6 +1233,7 @@ cd apps/api && npx nest build   # success, no errors
 API builds cleanly. Both edge cases hardened. No schema or migration changes needed.
 
 **Next:**
+
 - Slice 2: Google OAuth backend
 
 ---
@@ -1127,6 +1244,7 @@ API builds cleanly. Both edge cases hardened. No schema or migration changes nee
 Add Google OAuth sign-in/sign-up so users can authenticate via Google. Backend only — no frontend UI changes in this slice.
 
 **Changes:**
+
 1. **Google Strategy** (new file) — `passport-google-oauth20` strategy that extracts email/name/avatar from Google profile, calls `findOrCreateGoogleUser()`. Safe fallback values (`'not-configured'`) if env vars are empty so app boots without Google credentials.
 2. **Google Auth Guard** (new file) — Simple `AuthGuard('google')` wrapper.
 3. **Auth Service** — Added `findOrCreateGoogleUser()`: finds user by email or creates new one with `authProvider: GOOGLE`, `emailVerifiedAt: now()`, random placeholder password. If existing LOCAL user found, links to Google (upgrades `authProvider`, auto-verifies email). Added `generateTokenForUser()` helper to issue JWT for OAuth callback (same token shape as login).
@@ -1135,6 +1253,7 @@ Add Google OAuth sign-in/sign-up so users can authenticate via Google. Backend o
 6. **Env** — Added `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL` to `.env.example` and `.env` (empty placeholders).
 
 **Files:**
+
 - `apps/api/src/auth/strategies/google.strategy.ts` — new
 - `apps/api/src/auth/guards/google-auth.guard.ts` — new
 - `apps/api/src/auth/auth.service.ts` — `findOrCreateGoogleUser()`, `generateTokenForUser()`
@@ -1144,7 +1263,8 @@ Add Google OAuth sign-in/sign-up so users can authenticate via Google. Backend o
 - `apps/api/.env` — placeholder values
 
 **Commands run:**
-```bash
+
+```Shell
 npm install passport-google-oauth20 @types/passport-google-oauth20
 cd apps/api && npx nest build    # success
 cd apps/web && npx next build    # success
@@ -1154,6 +1274,7 @@ cd apps/web && npx next build    # success
 Both builds pass. Google OAuth flow is wired up. When real Google credentials are configured, `GET /auth/google` redirects to Google consent screen, callback creates/links user and sets JWT cookie.
 
 **Next:**
+
 - Slice 3: Frontend — register/verify pages, login page Google button, update login form for unverified error handling
 
 ---
@@ -1164,19 +1285,22 @@ Both builds pass. Google OAuth flow is wired up. When real Google credentials ar
 Add frontend pages for signup, email verification, and Google sign-in entry. No backend changes.
 
 **Changes:**
+
 1. **Login page** — Added "Continue with Google" button (links to `/api/auth/google`), "or" divider, and "Don't have an account? Sign up" link.
 2. **Signup page** (new) — Form with name, email, password, confirm password. Client-side validation (name min 2 chars, password min 6, confirm match). Calls `authApi.register()`, redirects to `/verify-email?email=...` on success.
 3. **Verify-email page** (new) — 6-digit code input (numeric only, centered monospace). Pre-fills email from query param. Resend button with 60s countdown cooldown. On success, shows checkmark and redirects to `/login` after 2s. Wrapped in `Suspense` for `useSearchParams`.
 4. **API client** — Added `register`, `verifyEmail`, `resendVerification` methods to `authApi`.
 
 **Files:**
+
 - `apps/web/app/login/page.tsx` — Google button, divider, signup link
 - `apps/web/app/signup/page.tsx` — new
 - `apps/web/app/verify-email/page.tsx` — new
 - `apps/web/lib/api.ts` — 3 new auth methods
 
 **Commands run:**
-```bash
+
+```Shell
 cd apps/web && npx next build   # success — /signup and /verify-email compiled
 cd apps/api && npx nest build   # success — no regression
 ```
@@ -1185,6 +1309,7 @@ cd apps/api && npx nest build   # success — no regression
 Both builds pass. Full signup → verify → login flow is wired up frontend-to-backend.
 
 **Next:**
+
 - Test end-to-end: signup → check console for code → verify → login
 - Configure real Google OAuth credentials and test Google flow
 - Consider adding Toaster to signup/verify pages (currently available via layout)
@@ -1197,6 +1322,7 @@ Both builds pass. Full signup → verify → login flow is wired up frontend-to-
 Add forgot/reset password flow with one-time token, anti-enumeration, and frontend pages.
 
 **Changes:**
+
 1. **Schema** — Added `passwordResetToken` and `passwordResetExpiry` fields to User model. Migration applied.
 2. **DTOs** — Added `ForgotPasswordDto` (email) and `ResetPasswordDto` (token + password with min 6 chars).
 3. **Service** — `forgotPassword()`: always returns generic message (anti-enumeration), skips non-LOCAL and unverified accounts, generates 32-byte hex token with 1h expiry, rate-limited (60s), logs reset link in dev. `resetPassword()`: finds user by token + expiry check, hashes new password, clears token (one-time use).
@@ -1204,6 +1330,7 @@ Add forgot/reset password flow with one-time token, anti-enumeration, and fronte
 5. **Frontend** — Forgot-password page (email input → success state), reset-password page (token from URL query, new password + confirm, redirects to login on success), "Forgot password?" link on login page, API client methods.
 
 **Files:**
+
 - `apps/api/prisma/schema.prisma` — 2 new fields on User
 - `apps/api/prisma/migrations/20260303005327_add_password_reset_fields/` — new
 - `apps/api/src/auth/dto/auth.dto.ts` — 2 new DTO classes
@@ -1215,7 +1342,8 @@ Add forgot/reset password flow with one-time token, anti-enumeration, and fronte
 - `apps/web/app/reset-password/page.tsx` — new
 
 **Commands run:**
-```bash
+
+```Shell
 npx prisma migrate dev --name add_password_reset_fields  # success
 cd apps/api && npx nest build                             # success
 cd apps/web && npx next build                             # success
@@ -1225,6 +1353,7 @@ cd apps/web && npx next build                             # success
 Both builds pass. Full forgot → reset → login flow working. Token logged to console in dev.
 
 **Next:**
+
 - SMTP integration for sending actual emails (verification codes + reset links)
 - End-to-end manual test of all auth flows
 
@@ -1236,6 +1365,7 @@ Both builds pass. Full forgot → reset → login flow working. Token logged to 
 Add instructor-owned reading lists with CRUD backend. Slice 1: schema + list/create endpoints only.
 
 **Changes:**
+
 1. **Schema** — Added `ReadingList` model (title, description, ownerId) and `ReadingListItem` model (order, notes, readingListId, bookId with unique constraint per list+book). Added relations on User and Book models. Migration applied.
 2. **DTO** — `CreateReadingListDto` with title (required) and description (optional).
 3. **Service** — `findMyLists()` returns user's lists with items (including book title/authors/cover), ordered by most recently updated. `create()` creates an empty list.
@@ -1243,6 +1373,7 @@ Add instructor-owned reading lists with CRUD backend. Slice 1: schema + list/cre
 5. **Module** — `ReadingListsModule` registered in `AppModule`.
 
 **Files:**
+
 - `apps/api/prisma/schema.prisma` — ReadingList + ReadingListItem models, User/Book relations
 - `apps/api/prisma/migrations/20260303182419_add_reading_lists/` — new
 - `apps/api/src/reading-lists/dto/reading-lists.dto.ts` — new
@@ -1252,7 +1383,8 @@ Add instructor-owned reading lists with CRUD backend. Slice 1: schema + list/cre
 - `apps/api/src/app.module.ts` — registered ReadingListsModule
 
 **Commands run:**
-```bash
+
+```Shell
 npx prisma migrate dev --name add_reading_lists  # success
 cd apps/api && npx nest build                     # success
 cd apps/web && npx next build                     # success
@@ -1262,6 +1394,7 @@ cd apps/web && npx next build                     # success
 Both builds pass. Reading list endpoints available for instructors/admins.
 
 **Next:**
+
 - Slice 2: PATCH/DELETE list, add/remove items (POST/DELETE /reading-lists/:id/items)
 - Slice 3: Frontend reading list management page
 
@@ -1273,12 +1406,14 @@ Both builds pass. Reading list endpoints available for instructors/admins.
 Align the ReadingList schema with user's specification (add `courseCode`, `semester`, `isActive` fields; rename `order` to `orderIndex`) and implement full CRUD backend (Slice 2: update, delete list; add/remove items).
 
 **Changes:**
+
 1. **Schema** — Added `courseCode String?`, `semester String?`, `isActive Boolean @default(true)` to ReadingList. Renamed `order` to `orderIndex` on ReadingListItem. Migration applied.
 2. **DTOs** — Added `UpdateReadingListDto` (all fields optional + isActive), `AddReadingListItemDto` (bookId required, notes optional). Updated `CreateReadingListDto` with courseCode/semester.
 3. **Service** — Added `findOne()` (by ID with owner info), `update()` (ownership check), `remove()` (ownership check, cascade delete), `addItem()` (book existence check, auto-increment orderIndex, P2002 duplicate catch), `removeItem()` (ownership + item existence checks). Both add/remove touch `updatedAt`.
 4. **Controller** — Added `GET :id`, `PATCH :id`, `DELETE :id`, `POST :id/items`, `DELETE :id/items/:itemId`. All guarded with INSTRUCTOR/ADMIN roles.
 
 **Files:**
+
 - `apps/api/prisma/schema.prisma` — 3 new fields on ReadingList, renamed order→orderIndex
 - `apps/api/prisma/migrations/20260303183651_add_reading_list_fields/` — new
 - `apps/api/src/reading-lists/dto/reading-lists.dto.ts` — UpdateReadingListDto, AddReadingListItemDto
@@ -1286,7 +1421,8 @@ Align the ReadingList schema with user's specification (add `courseCode`, `semes
 - `apps/api/src/reading-lists/reading-lists.controller.ts` — 5 new endpoints
 
 **Commands run:**
-```bash
+
+```Shell
 npx prisma migrate dev --name add_reading_list_fields  # success
 cd apps/api && npx nest build                           # success
 cd apps/web && npx next build                           # success
@@ -1296,6 +1432,7 @@ cd apps/web && npx next build                           # success
 Both builds pass. Full reading list CRUD backend complete with 7 endpoints total.
 
 **Next:**
+
 - Slice 3: Frontend reading list management page
 
 ---
@@ -1306,6 +1443,7 @@ Both builds pass. Full reading list CRUD backend complete with 7 endpoints total
 Add follow/unfollow system for instructors. Backend only — no frontend changes.
 
 **Changes:**
+
 1. **Schema** — Added `InstructorFollower` model with `followerId`/`instructorId` (both referencing User), unique constraint on `(followerId, instructorId)`, cascade deletes. Added `following`/`followers` relations on User model. Migration applied.
 2. **Service** — `getMyFollowing()` returns followed instructors with profile info. `follow()` validates target is INSTRUCTOR role, prevents self-follow, idempotent (returns existing record if already following), handles P2002 race condition. `unfollow()` idempotent (succeeds even if not following). `getFollowersCount()` returns count. `isFollowing()` returns boolean status.
 3. **Controller** — 5 endpoints, all behind JwtAuthGuard:
@@ -1317,6 +1455,7 @@ Add follow/unfollow system for instructors. Backend only — no frontend changes
 4. **Module** — `InstructorFollowersModule` registered in `AppModule`.
 
 **Files:**
+
 - `apps/api/prisma/schema.prisma` — InstructorFollower model, User relations
 - `apps/api/prisma/migrations/20260303191507_add_instructor_followers/` — new
 - `apps/api/src/instructor-followers/instructor-followers.service.ts` — new
@@ -1325,7 +1464,8 @@ Add follow/unfollow system for instructors. Backend only — no frontend changes
 - `apps/api/src/app.module.ts` — registered InstructorFollowersModule
 
 **Commands run:**
-```bash
+
+```Shell
 npx prisma migrate dev --name add_instructor_followers  # success
 cd apps/api && npx nest build                            # success
 cd apps/web && npx next build                            # success
@@ -1335,6 +1475,7 @@ cd apps/web && npx next build                            # success
 Both builds pass. Instructor follower system backend complete with 5 endpoints.
 
 **Next:**
+
 - Slice 2: Frontend — follow button on instructor profiles, "Following" list page
 
 ---
@@ -1346,6 +1487,7 @@ Finalize and commit all uncommitted backend work before new feature slices.
 
 **Changes:**
 Two scoped commits created on `feature/reading-lists-slice1` branch:
+
 1. `062cc30` — `feat(reading-lists): add courseCode/semester/isActive fields and full CRUD` (4 files: migration, DTO, controller, service)
 2. `df6092d` — `feat(followers): add backend foundation for instructor follow system` (6 files: schema, migration, service, controller, module, app.module)
 
@@ -1364,6 +1506,7 @@ Add a concise "Build Commands (Monorepo)" section to README for quick reference.
 Added 3-line code block under "Production Build" section showing `npm run build`, API-only, and web-only build commands.
 
 **Files:**
+
 - `README.md` — added "Build Commands (Monorepo)" subsection
 
 **No build verification needed** — documentation-only change.
@@ -1376,17 +1519,20 @@ Added 3-line code block under "Production Build" section showing `npm run build`
 Replace mock reading list data in instructor dashboard with real API calls using existing backend endpoints.
 
 **Changes:**
+
 1. **Types** — Added `ReadingList` and `ReadingListItem` interfaces to `types/index.ts`.
 2. **API client** — Added `readingListsApi` object to `lib/api.ts` with 6 methods: `getMyLists`, `create`, `update`, `remove`, `addItem`, `removeItem`.
 3. **Instructor dashboard** — Replaced hardcoded mock data with `readingListsApi.getMyLists()` on mount. Create modal now calls `readingListsApi.create()` with controlled form inputs. Added delete button with confirmation via `readingListsApi.remove()`. Stats card uses `_count.items` for real book count. Removed unused `Users`/`Clock` icons, removed `studentCount` references (not in schema).
 
 **Files:**
+
 - `apps/web/types/index.ts` — ReadingList + ReadingListItem interfaces
 - `apps/web/lib/api.ts` — readingListsApi client (6 methods)
 - `apps/web/app/dashboard/instructor/page.tsx` — real API integration
 
 **Verification:**
-```bash
+
+```Shell
 cd apps/web && npx next build   # success, all 32 routes compiled
 ```
 
@@ -1400,19 +1546,22 @@ cd apps/web && npx next build   # success, all 32 routes compiled
 Integrate instructor follower API into frontend with minimal changes.
 
 **Changes:**
+
 1. **Types** — Added `FollowedInstructor`, `FollowersCount`, `FollowingStatus` interfaces to `types/index.ts`.
 2. **API client** — Added `followersApi` object to `lib/api.ts` with 5 methods: `getMyFollowing`, `follow`, `unfollow`, `getFollowersCount`, `isFollowing`.
 3. **Instructor dashboard** — Replaced "Total Books in Lists" stat card with clickable "Following" count card (links to following page). Added "Following" quick action card. Fetches following count on mount.
 4. **Following page** (new) — `/dashboard/instructor/following` lists all followed instructors with avatar/initials, name, email, and unfollow button. Optimistic removal on unfollow.
 
 **Files:**
+
 - `apps/web/types/index.ts` — 3 new interfaces
 - `apps/web/lib/api.ts` — followersApi client (5 methods)
 - `apps/web/app/dashboard/instructor/page.tsx` — following count stat + quick action
 - `apps/web/app/dashboard/instructor/following/page.tsx` — new page
 
 **Verification:**
-```bash
+
+```Shell
 cd apps/web && npx next build   # success, 33 routes compiled (new /following route)
 ```
 
@@ -1426,6 +1575,7 @@ cd apps/web && npx next build   # success, 33 routes compiled (new /following ro
 Implement reading list visibility/discovery system with instructor public profiles and follower notifications. Four slices in one pass.
 
 **Slice A — Schema + backend authorization:**
+
 - Added `ReadingListVisibility` enum (PUBLIC, FOLLOWERS_ONLY, PRIVATE), default PUBLIC
 - Added `ReadingListStatus` enum (DRAFT, PUBLISHED, ARCHIVED), default DRAFT
 - Added `READING_LIST_PUBLISHED`, `READING_LIST_UPDATED` to NotificationType
@@ -1434,16 +1584,19 @@ Implement reading list visibility/discovery system with instructor public profil
 - Admin can moderate any instructor list (update/delete)
 
 **Slice B — Discovery endpoints:**
+
 - `GET /reading-lists/feed` — global feed of published non-private lists, visibility-filtered
 - `GET /reading-lists/instructor/:instructorId` — instructor profile with filtered lists, follow state, follower count
 - `GET /reading-lists/:id` — single list with visibility enforcement (replaces old unguarded findOne)
 
 **Slice C — Follower notifications:**
+
 - On status change to PUBLISHED: notify all followers via NotificationsService.createMany()
 - On item added to published list: notify followers of content update
 - Uses existing @Global() NotificationsModule — no module import needed
 
 **Slice D — Frontend UI:**
+
 - Types: ReadingListVisibility, ReadingListStatus, InstructorProfile, extended ReadingList
 - API client: getFeed, getInstructorProfile, getById added
 - `/dashboard/reading-lists` — global feed with visibility badges, lock CTA
@@ -1453,6 +1606,7 @@ Implement reading list visibility/discovery system with instructor public profil
 - Instructor dashboard: status + visibility badges on own lists
 
 **Files changed:**
+
 - `apps/api/prisma/schema.prisma` — 2 enums, 2 fields on ReadingList, 2 notification types
 - `apps/api/prisma/migrations/20260303211403_.../` — new
 - `apps/api/src/reading-lists/dto/reading-lists.dto.ts` — visibility/status in DTOs
@@ -1467,21 +1621,25 @@ Implement reading list visibility/discovery system with instructor public profil
 - `apps/web/app/dashboard/instructors/[id]/page.tsx` — new (profile)
 
 **Commits:**
+
 - `b92041b` — backend (schema, authorization, discovery, notifications)
 - `a483342` — frontend (feed, profiles, visibility UI)
 - `a7f84d2` — README build commands
 
 **Assumptions:**
+
 - Default status is DRAFT (new lists not visible in feed until explicitly published)
 - Notification rate limiting not added (low volume expected)
 - Feed limited to 50 most recently updated lists
 
 ## 2026-03-22 — Fix @react-three/drei monorepo module resolution error
+
 **Goal**: Remove @react-three/drei which caused `Module not found: Can't resolve '@react-three/fiber'` build failure
 **Root cause**: @react-spring/three (drei dep) lives in root node_modules and can't find @react-three/fiber installed only in apps/web/node_modules; transpilePackages doesn't bridge this
 **Changes**:
+
 - `apps/web/components/ui/robot-3d-scene.tsx` — removed OrbitControls import/usage, added slow Y-axis auto-rotation via `root.current.rotation.y += 0.003` in useFrame
 - `apps/web/next.config.js` — removed `@react-three/drei` and `@react-spring/three` from transpilePackages
 - `apps/web/package.json` — removed @react-three/drei, added @types/three (devDep)
-**Verification**: tsc --noEmit ✓  |  next build ✓
-**Next**: Robot 3D is fully functional with auto-rotation. Login, signup, and dashboard logo are all in place.
+  **Verification**: tsc --noEmit ✓ | next build ✓
+  **Next**: Robot 3D is fully functional with auto-rotation. Login, signup, and dashboard logo are all in place.

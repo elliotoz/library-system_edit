@@ -85,7 +85,7 @@ export default function ManagePoliciesPage() {
           <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
         </div>
       ) : policies.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center dark:border-gray-700 dark:bg-gray-800">
+        <div className="glass-card p-8 text-center">
           <ShieldCheck className="mx-auto mb-4 h-12 w-12 text-gray-300" />
           <p className="text-gray-500">No policies configured yet</p>
         </div>
@@ -94,7 +94,7 @@ export default function ManagePoliciesPage() {
           {policies.map((policy) => (
             <div
               key={policy.id}
-              className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800"
+              className="glass-card p-5"
             >
               <div className="mb-4 flex items-center justify-between">
                 <span

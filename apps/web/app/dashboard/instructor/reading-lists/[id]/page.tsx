@@ -147,7 +147,7 @@ export default function ManageReadingListDetailPage() {
       </Link>
 
       {/* Details form */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6">
+      <div className="glass-card p-6">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">List Details</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -223,7 +223,7 @@ export default function ManageReadingListDetailPage() {
       </div>
 
       {/* Books in list */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6">
+      <div className="glass-card p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Books ({list.items.length})
