@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@react-three/fiber": "^8.18.0",
-    "@splinetool/react-spline": "^4.1.0",
+    "@splinetool/react-spline": "^2.2.6",
     "@splinetool/runtime": "^1.12.70",
     "axios": "^1.6.5",
     "clsx": "^2.1.0",
