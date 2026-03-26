@@ -150,6 +150,7 @@ model User {
   followers         InstructorFollower[] @relation("Instructor")
   finePayments      FinePayment[]
   processedFines    FinePayment[]        @relation("FineProcessor")
+  aiMessages        AiMessage[]
 
   @@map("users")
 }
@@ -573,4 +574,16 @@ model FinePayment {
   @@index([userId, status])
   @@index([status])
   @@map("fine_payments")
+}
+
+model AiMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  role      String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("ai_messages")
 }

@@ -1,20 +1,19 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Send, Sparkles, User, Bot, Loader2, ImageIcon, X, BookOpen, ExternalLink } from 'lucide-react';
+import { Send, ImageIcon, X, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { aiApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
+import { renderMessage } from '@/lib/renderMessage';
 
-interface Message {
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  timestamp: Date;
-  modelUsed?: string;
-  sources?: string[];
   imagePreview?: string;
 }
 
@@ -25,118 +24,50 @@ interface BookContext {
   category: string | null;
 }
 
-const DEPT_SUGGESTIONS: Record<string, string[]> = {
-  engineering: [
-    'Recommend books on algorithms and data structures',
-    'What programming books do you have for beginners?',
-    'Find me resources on software architecture',
-    'How do I borrow or reserve a book?',
-  ],
-  science: [
-    'Recommend books on mathematics and physics',
-    'What science textbooks are available?',
-    'Find resources on chemistry and biology',
-    'How do I borrow or reserve a book?',
-  ],
-  medicine: [
-    'Recommend medical textbooks for students',
-    'Find books on anatomy and physiology',
-    'What health sciences resources do you have?',
-    'How do I borrow or reserve a book?',
-  ],
-  law: [
-    'Recommend books on constitutional law',
-    'Find resources on legal research and writing',
-    'What law journals are in the catalog?',
-    'How do I borrow or reserve a book?',
-  ],
-  business: [
-    'Recommend books on economics and finance',
-    'Find resources on business management',
-    'What marketing and strategy books do you have?',
-    'How do I borrow or reserve a book?',
-  ],
-  default: [
-    'What books do you recommend for me?',
-    'How do I borrow or reserve a book?',
-    'What are the most popular books right now?',
-    'Tell me about reading lists',
-  ],
-};
+// ── Role-aware suggested questions ────────────────────────────────────────────
 
-function getSuggestedQuestions(facultyName?: string | null): string[] {
-  if (!facultyName) return DEPT_SUGGESTIONS.default;
-  const f = facultyName.toLowerCase();
-  if (f.includes('engineer') || f.includes('computer') || f.includes('software')) return DEPT_SUGGESTIONS.engineering;
-  if (f.includes('natural science') || f.includes('physics') || f.includes('chemistry') || f.includes('math')) return DEPT_SUGGESTIONS.science;
-  if (f.includes('medic') || f.includes('health') || f.includes('nurs') || f.includes('pharm')) return DEPT_SUGGESTIONS.medicine;
-  if (f.includes('law') || f.includes('legal') || f.includes('hukuk')) return DEPT_SUGGESTIONS.law;
-  if (f.includes('business') || f.includes('manag') || f.includes('econom') || f.includes('finance')) return DEPT_SUGGESTIONS.business;
-  return DEPT_SUGGESTIONS.default;
-}
-
-// Minimal markdown renderer — handles bold, italic, inline code, links, bullet lists, numbered lists
-function renderMarkdown(text: string): React.ReactNode[] {
-  const lines = text.split('\n');
-  const nodes: React.ReactNode[] = [];
-  let key = 0;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    // Bullet list
-    if (/^[-*]\s/.test(line)) {
-      nodes.push(<li key={key++} className="ml-4 list-disc">{inlineRender(line.slice(2))}</li>);
-      continue;
-    }
-    // Numbered list
-    if (/^\d+\.\s/.test(line)) {
-      nodes.push(<li key={key++} className="ml-4 list-decimal">{inlineRender(line.replace(/^\d+\.\s/, ''))}</li>);
-      continue;
-    }
-    // Empty line
-    if (line.trim() === '') {
-      nodes.push(<br key={key++} />);
-      continue;
-    }
-    nodes.push(<span key={key++} className="block">{inlineRender(line)}</span>);
+function getSuggestions(role?: string, facultyName?: string | null): string[] {
+  const faculty = facultyName || 'my faculty';
+  switch (role) {
+    case 'STUDENT':
+      return [
+        `Find books for ${faculty}`,
+        'What books are due soon?',
+        'Recommend something like my recent borrows',
+        'How do I extend a loan?',
+      ];
+    case 'INSTRUCTOR':
+      return [
+        'Find research papers on a topic',
+        'Summarise a book for my students',
+        'Help write a reading list description',
+        'Find books for my course',
+      ];
+    case 'STAFF':
+      return [
+        'Search catalog by subject',
+        'Check book availability',
+        'Explain borrow policies',
+        'Help with a student query',
+      ];
+    case 'ADMIN':
+      return [
+        'Library usage statistics',
+        'Find overdue books summary',
+        'Book catalog search',
+        'System help',
+      ];
+    default:
+      return [
+        'What books do you recommend?',
+        'How do I borrow a book?',
+        'Search the catalog',
+        'Show reading lists',
+      ];
   }
-  return nodes;
 }
 
-function inlineRender(text: string): React.ReactNode {
-  // Split on markdown patterns: **bold**, *italic*, `code`, [label](url)
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g);
-  return parts.map((part, i) => {
-    if (/^\*\*[^*]+\*\*$/.test(part)) {
-      return <strong key={i}>{part.slice(2, -2)}</strong>;
-    }
-    if (/^\*[^*]+\*$/.test(part)) {
-      return <em key={i}>{part.slice(1, -1)}</em>;
-    }
-    if (/^`[^`]+`$/.test(part)) {
-      return <code key={i} className="px-1 py-0.5 bg-black/10 rounded text-xs font-mono">{part.slice(1, -1)}</code>;
-    }
-    const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-    if (linkMatch) {
-      const [, label, href] = linkMatch;
-      const isInternal = href.startsWith('/');
-      if (isInternal) {
-        return (
-          <Link key={i} href={href} className="underline underline-offset-2 font-medium hover:opacity-80">
-            {label}
-          </Link>
-        );
-      }
-      return (
-        <a key={i} href={href} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 font-medium hover:opacity-80 inline-flex items-center gap-0.5">
-          {label}<ExternalLink className="w-3 h-3 inline" />
-        </a>
-      );
-    }
-    return <span key={i}>{part}</span>;
-  });
-}
+// ── Image compression ─────────────────────────────────────────────────────────
 
 async function compressImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -150,122 +81,175 @@ async function compressImage(file: File): Promise<string> {
         else { width = Math.round((width * MAX) / height); height = MAX; }
       }
       const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d')!;
-      ctx.drawImage(img, 0, 0, width, height);
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
       URL.revokeObjectURL(url);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-      resolve(dataUrl.split(',')[1]); // return base64 only
+      resolve(canvas.toDataURL('image/jpeg', 0.8).split(',')[1]);
     };
     img.onerror = reject;
     img.src = url;
   });
 }
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function AIAssistantPage() {
   const { user } = useAuth();
-  const suggestedQuestions = getSuggestedQuestions(user?.facultyName);
   const searchParams = useSearchParams();
   const bookId = searchParams.get('book');
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      role: 'assistant',
-      content: "Hello! I'm your AI library assistant. I can help you find books, get recommendations, answer questions about the library, and more. How can I help you today?",
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [aiOnline, setAiOnline] = useState<boolean | null>(null);
+  const [pendingImage, setPendingImage] = useState<{ base64: string; preview: string } | null>(null);
   const [bookContext, setBookContext] = useState<BookContext | null>(null);
   const [bookContextDismissed, setBookContextDismissed] = useState(false);
-  const [pendingImage, setPendingImage] = useState<{ base64: string; preview: string } | null>(null);
-  const [contextSent, setContextSent] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const contextSentRef = useRef(false);
+  const messagesRef = useRef<ChatMessage[]>([]);
 
-  // Fetch AI status
+  // Keep ref in sync with state for stale-closure-free access in sendMessage
   useEffect(() => {
-    aiApi.getStatus().then((s) => setAiOnline(s.available)).catch(() => setAiOnline(false));
+    messagesRef.current = messages;
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Check AI status
+  useEffect(() => {
+    fetch('/api/ai/status', { credentials: 'include' })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => setAiOnline(d?.available ?? false))
+      .catch(() => setAiOnline(false));
   }, []);
 
-  // Fetch book context if ?book= param present
+  // Load conversation history
+  useEffect(() => {
+    fetch('/api/ai/history', { credentials: 'include' })
+      .then((r) => r.ok ? r.json() : [])
+      .then((history: { id: string; role: string; content: string }[]) => {
+        if (history.length > 0) {
+          setMessages(
+            history.map((m) => ({
+              id: m.id,
+              role: m.role as 'user' | 'assistant',
+              content: m.content,
+            })),
+          );
+        }
+        setHistoryLoaded(true);
+      })
+      .catch(() => setHistoryLoaded(true));
+  }, []);
+
+  // Fetch book context
   useEffect(() => {
     if (!bookId) return;
     fetch(`/api/books/${bookId}`, { credentials: 'include' })
       .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        if (data) setBookContext({ id: data.id, title: data.title, authors: data.authors ?? [], category: data.category });
-      })
+      .then((d) => { if (d) setBookContext({ id: d.id, title: d.title, authors: d.authors ?? [], category: d.category }); })
       .catch(() => null);
   }, [bookId]);
 
-  // Auto-send book context message once book is loaded
-  useEffect(() => {
-    if (!bookContext || contextSent) return;
-    setContextSent(true);
-    const authorsStr = bookContext.authors.length > 0 ? ` by ${bookContext.authors.join(', ')}` : '';
-    const firstMsg = `I'm looking at "${bookContext.title}"${authorsStr}${bookContext.category ? ` (${bookContext.category})` : ''}. Can you give me a study guide and recommend related books?`;
-    sendMessage(firstMsg);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookContext]);
+  // ── Send message ─────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  const sendMessage = useCallback(async (text: string, imgBase64?: string | null) => {
+    if ((!text.trim() && !imgBase64) || isStreaming) return;
 
-  const sendMessage = useCallback(async (text: string, image?: string) => {
-    if (!text.trim() || isLoading) return;
-
-    const userMsg: Message = {
-      id: Date.now().toString(),
+    const userMsg: ChatMessage = {
+      id: `user-${Date.now()}`,
       role: 'user',
-      content: text.trim(),
-      timestamp: new Date(),
-      imagePreview: image ? `data:image/jpeg;base64,${image}` : undefined,
+      content: text.trim() || 'What can you tell me about this image?',
+      imagePreview: imgBase64 ? `data:image/jpeg;base64,${imgBase64}` : undefined,
     };
-    setMessages((prev) => [...prev, userMsg]);
+
+    const assistantMsgId = `assistant-${Date.now() + 1}`;
+    const assistantMsg: ChatMessage = { id: assistantMsgId, role: 'assistant', content: '' };
+
+    // Capture history BEFORE adding new messages
+    const history = messagesRef.current
+      .slice(-10)
+      .map((m) => ({ role: m.role, content: m.content }));
+
+    setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setInput('');
     setPendingImage(null);
-    setIsLoading(true);
+    setIsStreaming(true);
 
     try {
-      const data = await aiApi.chat({ message: text.trim(), image });
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: data.reply,
-          modelUsed: data.modelUsed,
-          sources: data.sources,
-          timestamp: new Date(),
-        },
-      ]);
+
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          message: userMsg.content,
+          history,
+          hasImage: !!imgBase64,
+          imageBase64: imgBase64 ?? null,
+        }),
+      });
+
+      if (!response.body) throw new Error('No response body');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const raw = line.slice(6).trim();
+          if (raw === '[DONE]') break;
+          try {
+            const parsed = JSON.parse(raw) as { text?: string; error?: string };
+            if (parsed.text) {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMsgId ? { ...m, content: m.content + parsed.text } : m,
+                ),
+              );
+            }
+          } catch {
+            // ignore malformed SSE chunks
+          }
+        }
+      }
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: 'Sorry, something went wrong. Please try again.',
-          timestamp: new Date(),
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantMsgId
+            ? { ...m, content: 'Sorry, something went wrong. Please try again.' }
+            : m,
+        ),
+      );
     }
-  }, [isLoading]);
+
+    setIsStreaming(false);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-send book context
+  useEffect(() => {
+    if (!bookContext || !historyLoaded || contextSentRef.current) return;
+    contextSentRef.current = true;
+    const authorsStr = bookContext.authors.length > 0 ? ` by ${bookContext.authors.join(', ')}` : '';
+    sendMessage(`I'm looking at "${bookContext.title}"${authorsStr}${bookContext.category ? ` (${bookContext.category})` : ''}. Can you give me a study guide and recommend related books?`);
+  }, [bookContext, historyLoaded, sendMessage]);
 
   const handleSend = () => {
-    if (!input.trim() && !pendingImage) return;
-    const text = input.trim() || (pendingImage ? 'What can you tell me about this image?' : '');
-    sendMessage(text, pendingImage?.base64);
+    if ((!input.trim() && !pendingImage) || isStreaming) return;
+    sendMessage(input.trim(), pendingImage?.base64 ?? null);
   };
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -274,157 +258,173 @@ export default function AIAssistantPage() {
     e.target.value = '';
     try {
       const base64 = await compressImage(file);
-      const preview = `data:image/jpeg;base64,${base64}`;
-      setPendingImage({ base64, preview });
+      setPendingImage({ base64, preview: `data:image/jpeg;base64,${base64}` });
       inputRef.current?.focus();
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
   };
+
+  const suggestions = getSuggestions(user?.role, user?.facultyName);
+  const showSuggestions = historyLoaded && messages.length === 0 && !bookId;
+
+  // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <div className="h-[calc(100vh-180px)] flex flex-col gap-3">
+
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="w-11 h-11 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl flex items-center justify-center shadow-md shadow-purple-500/20">
-          <Sparkles className="w-5 h-5 text-white" />
+        <div className="w-11 h-11 bg-gradient-to-br from-[#2A9D9D] to-[#1a7a7a] rounded-xl flex items-center justify-center shadow-md shadow-[#2A9D9D]/20 flex-shrink-0">
+          <span className="text-white font-bold text-sm">AI</span>
         </div>
-        <div className="flex-1">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">AI Library Assistant</h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Personalized book recommendations &amp; library help</p>
+        <div className="flex-1 min-w-0">
+          {user && (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Hello, <span className="font-medium text-gray-700 dark:text-gray-300">{user.name}</span>
+            </p>
+          )}
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">AI Library Assistant</h1>
         </div>
         {aiOnline !== null && (
           <span className={cn(
-            'px-3 py-1 rounded-full text-xs font-semibold',
+            'px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0',
             aiOnline
-              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-              : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+              ? 'bg-[#2A9D9D]/15 text-[#2A9D9D] dark:text-[#4bbfbf]'
+              : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
           )}>
-            {aiOnline ? '● AI Online' : '● Basic Mode'}
+            {aiOnline ? '● ÜLIB AI' : '● Offline'}
           </span>
         )}
       </div>
 
       {/* Book context banner */}
       {bookContext && !bookContextDismissed && (
-        <div className="flex items-start gap-3 px-4 py-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-xl">
-          <BookOpen className="w-4 h-4 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 px-4 py-3 bg-[#2A9D9D]/10 border border-[#2A9D9D]/30 rounded-xl">
+          <BookOpen className="w-4 h-4 text-[#2A9D9D] flex-shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm text-purple-800 dark:text-purple-300 font-medium truncate">
-              Study help for: <Link href={`/dashboard/catalog/${bookContext.id}`} className="underline underline-offset-2 hover:text-purple-600">{bookContext.title}</Link>
+            <p className="text-sm text-[#2A9D9D] dark:text-[#4bbfbf] font-medium truncate">
+              Study help for:{' '}
+              <Link href={`/dashboard/catalog/${bookContext.id}`} className="underline underline-offset-2 hover:opacity-80">
+                {bookContext.title}
+              </Link>
             </p>
             {bookContext.authors.length > 0 && (
-              <p className="text-xs text-purple-600 dark:text-purple-400 mt-0.5">{bookContext.authors.join(', ')}</p>
+              <p className="text-xs text-[#2A9D9D]/70 mt-0.5">{bookContext.authors.join(', ')}</p>
             )}
           </div>
-          <button onClick={() => setBookContextDismissed(true)} className="text-purple-400 hover:text-purple-600 flex-shrink-0">
+          <button onClick={() => setBookContextDismissed(true)} className="text-[#2A9D9D]/50 hover:text-[#2A9D9D]">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {/* Chat container */}
-      <div className="flex-1 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col shadow-sm">
+      <div className="flex-1 glass-card overflow-hidden flex flex-col min-h-0">
+
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.map((message) => (
-            <div key={message.id} className={cn('flex gap-2.5', message.role === 'user' ? 'flex-row-reverse' : '')}>
-              {/* Avatar */}
-              <div className={cn(
-                'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5',
-                message.role === 'user'
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-gradient-to-br from-purple-100 to-violet-100 dark:from-purple-900 dark:to-violet-900 text-purple-600 dark:text-purple-300'
-              )}>
-                {message.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
-              </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
 
-              {/* Bubble */}
-              <div className={cn(
-                'max-w-[78%] rounded-2xl px-4 py-3 text-sm',
-                message.role === 'user'
-                  ? 'bg-primary-500 text-white rounded-tr-sm'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-tl-sm'
-              )}>
-                {/* Image preview (user message) */}
-                {message.imagePreview && (
-                  <img src={message.imagePreview} alt="Uploaded" className="max-w-xs rounded-lg mb-2 border border-white/20" />
-                )}
-                {/* Content */}
-                <div className={cn('leading-relaxed', message.role === 'assistant' ? 'prose-sm' : '')}>
-                  {message.role === 'assistant'
-                    ? renderMarkdown(message.content)
-                    : message.content}
+          {/* Empty state */}
+          {showSuggestions && (
+            <div className="h-full flex flex-col items-center justify-center gap-6 py-8">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-gradient-to-br from-[#2A9D9D] to-[#1a7a7a] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[#2A9D9D]/20">
+                  <span className="text-white font-bold text-xl">AI</span>
                 </div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                  {user ? `Hello, ${user.name.split(' ')[0]}!` : 'Hello!'}
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">How can I help you today?</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
+                {suggestions.map((q, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setInput(q)}
+                    className="text-left px-4 py-3 rounded-xl text-sm text-gray-700 dark:text-gray-300 bg-white/50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/10 hover:border-[#2A9D9D]/50 hover:bg-[#2A9D9D]/5 transition-colors"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
-                {/* Source pills */}
-                {message.sources && message.sources.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5 pt-1 border-t border-gray-200 dark:border-gray-700">
-                    {message.sources.map((src) => (
-                      <Link
-                        key={src}
-                        href={src}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 rounded-full text-xs hover:bg-purple-200 dark:hover:bg-purple-900/60 transition-colors"
-                      >
-                        <ExternalLink className="w-2.5 h-2.5" />
-                        {src.split('/').pop() || 'catalog'}
-                      </Link>
-                    ))}
+          {/* Message list */}
+          {messages.map((msg, idx) => {
+            const isLast = idx === messages.length - 1;
+            return (
+              <div key={msg.id} className={cn('flex gap-3 items-start', msg.role === 'user' ? 'flex-row-reverse' : '')}>
+
+                {/* Avatar */}
+                {msg.role === 'assistant' ? (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#2A9D9D] to-[#1a7a7a] flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white font-bold text-[10px]">AI</span>
+                  </div>
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white/80 font-semibold text-xs">
+                      {user?.name?.charAt(0).toUpperCase() ?? 'U'}
+                    </span>
                   </div>
                 )}
 
-                {/* Timestamp + model */}
-                <div className={cn('flex items-center gap-2 mt-1.5', message.role === 'user' ? 'text-white/60' : 'text-gray-400 dark:text-gray-500')}>
-                  <span className="text-[11px]">{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  {message.role === 'assistant' && message.modelUsed && (
-                    <span className="text-[10px] font-mono">{message.modelUsed}</span>
+                {/* Bubble */}
+                <div className={cn(
+                  'max-w-[78%] rounded-2xl px-4 py-3 text-sm',
+                  msg.role === 'user'
+                    ? 'bg-[#2A9D9D]/20 border border-[#2A9D9D]/30 backdrop-blur-sm rounded-tr-sm'
+                    : 'bg-white/[0.05] border border-white/[0.08] backdrop-blur-sm rounded-tl-sm',
+                )}>
+                  {/* Image preview in user message */}
+                  {msg.imagePreview && (
+                    <img
+                      src={msg.imagePreview}
+                      alt="Attached"
+                      className="max-w-xs rounded-lg mb-2 border border-white/20"
+                    />
+                  )}
+
+                  {/* Content */}
+                  {msg.role === 'assistant' ? (
+                    <div className="leading-relaxed">
+                      {renderMessage(msg.content)}
+                      {/* Streaming cursor */}
+                      {isStreaming && isLast && (
+                        <span className="inline-block w-2 h-4 bg-[#2A9D9D] rounded-sm animate-pulse ml-0.5 align-middle" />
+                      )}
+                    </div>
+                  ) : (
+                    <p className="whitespace-pre-wrap text-white/90">{msg.content}</p>
                   )}
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
-          {/* Typing indicator */}
-          {isLoading && (
-            <div className="flex gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-100 to-violet-100 dark:from-purple-900 dark:to-violet-900 text-purple-600 dark:text-purple-300 flex items-center justify-center">
-                <Bot className="w-4 h-4" />
+          {/* Typing indicator (before first token arrives) */}
+          {isStreaming && messages[messages.length - 1]?.content === '' && (
+            <div className="flex gap-3 items-start">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#2A9D9D] to-[#1a7a7a] flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-bold text-[10px]">AI</span>
               </div>
-              <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl rounded-tl-sm px-4 py-3">
+              <div className="bg-white/[0.05] border border-white/[0.08] rounded-2xl rounded-tl-sm px-4 py-3">
                 <div className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:0ms]" />
-                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
-                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
+                  <span className="w-1.5 h-1.5 bg-[#2A9D9D] rounded-full animate-bounce [animation-delay:0ms]" />
+                  <span className="w-1.5 h-1.5 bg-[#2A9D9D] rounded-full animate-bounce [animation-delay:150ms]" />
+                  <span className="w-1.5 h-1.5 bg-[#2A9D9D] rounded-full animate-bounce [animation-delay:300ms]" />
                 </div>
               </div>
             </div>
           )}
+
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Suggested questions — only on first message */}
-        {messages.length === 1 && !bookId && (
-          <div className="px-4 pb-3">
-            <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">Suggested questions</p>
-            <div className="flex flex-wrap gap-2">
-              {suggestedQuestions.map((q, i) => (
-                <button
-                  key={i}
-                  onClick={() => setInput(q)}
-                  className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-purple-50 dark:hover:bg-purple-900/30 hover:text-purple-700 dark:hover:text-purple-300 rounded-full text-sm text-gray-600 dark:text-gray-400 transition-colors border border-transparent hover:border-purple-200 dark:hover:border-purple-800"
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Image preview strip */}
         {pendingImage && (
-          <div className="px-4 pb-2 flex items-center gap-2">
+          <div className="px-4 pb-2 flex items-center gap-2 border-t border-white/[0.06] pt-2">
             <div className="relative inline-block">
-              <img src={pendingImage.preview} alt="To send" className="h-16 w-16 object-cover rounded-lg border border-gray-200 dark:border-gray-700" />
+              <img src={pendingImage.preview} alt="To send" className="h-16 w-16 object-cover rounded-lg border border-white/20" />
               <button
                 onClick={() => setPendingImage(null)}
                 className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-700 text-white rounded-full flex items-center justify-center hover:bg-red-500 transition-colors"
@@ -432,12 +432,12 @@ export default function AIAssistantPage() {
                 <X className="w-3 h-3" />
               </button>
             </div>
-            <span className="text-xs text-gray-500 dark:text-gray-400">Image ready to send</span>
+            <span className="text-xs text-gray-400">Image ready to send</span>
           </div>
         )}
 
         {/* Input bar */}
-        <div className="border-t border-gray-200 dark:border-gray-700 p-3">
+        <div className="border-t border-white/[0.08] p-3">
           <div className="flex gap-2 items-end">
             {/* Image upload */}
             <input
@@ -449,14 +449,14 @@ export default function AIAssistantPage() {
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              disabled={isLoading}
+              disabled={isStreaming}
               title="Attach image"
               className={cn(
                 'p-2.5 rounded-xl border transition-colors flex-shrink-0',
                 pendingImage
-                  ? 'border-purple-400 bg-purple-50 dark:bg-purple-900/30 text-purple-600'
-                  : 'border-gray-200 dark:border-gray-700 text-gray-400 hover:text-purple-500 hover:border-purple-300 dark:hover:border-purple-700',
-                isLoading && 'opacity-40 cursor-not-allowed'
+                  ? 'border-[#2A9D9D]/60 bg-[#2A9D9D]/10 text-[#2A9D9D]'
+                  : 'border-white/20 text-gray-400 hover:text-[#2A9D9D] hover:border-[#2A9D9D]/40',
+                isStreaming && 'opacity-40 cursor-not-allowed',
               )}
             >
               <ImageIcon className="w-5 h-5" />
@@ -467,18 +467,18 @@ export default function AIAssistantPage() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
               placeholder={pendingImage ? 'Ask about this image...' : 'Ask me anything about books...'}
-              className="flex-1 px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-purple-400 focus:border-transparent text-sm placeholder:text-gray-400 dark:text-gray-200"
-              disabled={isLoading}
+              disabled={isStreaming}
+              className="flex-1 px-4 py-2.5 bg-white/[0.06] border border-white/20 rounded-2xl focus:ring-2 focus:ring-[#2A9D9D]/40 focus:border-[#2A9D9D]/50 text-sm placeholder:text-gray-400 text-gray-200 dark:text-gray-200 backdrop-blur-md disabled:opacity-50"
             />
 
             <button
               onClick={handleSend}
-              disabled={(!input.trim() && !pendingImage) || isLoading}
-              className="p-2.5 bg-gradient-to-br from-purple-500 to-violet-600 text-white rounded-xl hover:from-purple-600 hover:to-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm shadow-purple-500/20 flex-shrink-0"
+              disabled={(!input.trim() && !pendingImage) || isStreaming}
+              className="p-2.5 bg-gradient-to-br from-[#2A9D9D] to-[#1a7a7a] text-white rounded-xl hover:from-[#33b5b5] hover:to-[#228888] disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm shadow-[#2A9D9D]/20 flex-shrink-0"
             >
-              {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+              <Send className="w-5 h-5" />
             </button>
           </div>
         </div>
