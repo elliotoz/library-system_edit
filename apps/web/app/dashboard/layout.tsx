@@ -247,7 +247,7 @@ export default function DashboardLayout({
         </defs>
       </svg>
 
-      <div className="min-h-screen dark:bg-[#0d1117]">
+      <div className="min-h-screen">
         {/* WebGL animated mesh background */}
         <WebGLBackground />
 
@@ -268,7 +268,7 @@ export default function DashboardLayout({
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 lg:hidden"
+              className="glass-button flex h-9 w-9 items-center justify-center text-gray-600 dark:text-gray-300 lg:hidden"
               aria-label="Toggle sidebar"
             >
               {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -295,7 +295,7 @@ export default function DashboardLayout({
             {/* Dark mode toggle */}
             <button
               onClick={toggleDarkMode}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+              className="glass-button flex h-9 w-9 items-center justify-center text-gray-600 dark:text-gray-300"
               aria-label="Toggle dark mode"
             >
               {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
@@ -305,7 +305,7 @@ export default function DashboardLayout({
             <div className="relative" ref={notificationRef}>
               <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
-                className="relative flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                className="glass-button relative flex h-9 w-9 items-center justify-center text-gray-600 dark:text-gray-300"
                 aria-label="Toggle notifications"
               >
                 <Bell className="h-5 w-5" />
@@ -441,11 +441,11 @@ export default function DashboardLayout({
           onTouchEnd={handleSidebarTouchEnd}
           className={cn(
             'fixed top-16 z-40 flex h-[calc(100vh-4rem)] w-64 flex-col transition-transform duration-300',
-            'bg-white dark:bg-[#0b1120]',
-            'border-r border-gray-200 dark:border-white/[0.06]',
+            'glass-chrome',
             sidebarOpen ? 'translate-x-0' : '-translate-x-full',
             'lg:translate-x-0'
           )}
+          style={{ borderRadius: 0, borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}
         >
           <nav className="flex-1 overflow-y-auto px-3 py-4">
             {navSections.map((section) => (
@@ -485,7 +485,12 @@ export default function DashboardLayout({
                         {!active && (
                           <motion.div
                             className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100"
-                            style={{ background: 'rgba(255,255,255,0.05)' }}
+                            style={{
+                              background: 'rgba(255,255,255,0.50)',
+                              backdropFilter: 'blur(8px)',
+                              border: '1px solid rgba(255,255,255,0.45)',
+                              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 2px 8px rgba(0,0,0,0.06)',
+                            }}
                             transition={{ duration: 0.15 }}
                           />
                         )}
@@ -510,7 +515,7 @@ export default function DashboardLayout({
           </nav>
 
           {/* Logout */}
-          <div className="border-t border-gray-200 dark:border-white/[0.06] px-3 py-3">
+          <div className="border-t border-black/[0.07] dark:border-white/[0.08] px-3 py-3">
             <button
               onClick={logout}
               className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-500 dark:text-red-400 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
