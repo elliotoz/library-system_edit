@@ -1,12 +1,13 @@
-# End-to-End AI Integration Diagram
+# OZ AI — End-to-End Integration Diagram
 
-## Complete System Overview
+## Complete System Flow
 
 ```
 ================================================================================
-                         SMART LIBRARY MANAGEMENT SYSTEM
-                            AI Integration Overview
+                   OZ AI — AI INTEGRATED LIBRARY SYSTEM
+                        End-to-End Integration Flow
 ================================================================================
+
 
                                  USER LAYER
 ================================================================================
@@ -17,13 +18,15 @@
     +----+----+        +----+----+        +----+----+        +----+----+
          |                  |                  |                  |
          +--------+---------+--------+---------+--------+---------+
-                  |                            |
-                  v                            v
-              +---+----------------------------+---+
-              |          HTTPS Request             |
-              |    Cookie: access_token=JWT        |
-              +----------------+-------------------+
+                  |
+                  v
+              +---+------------------------------+
+              |          HTTPS Request            |
+              |    Cookie: access_token=JWT       |
+              +----------------+------------------+
                                |
+
+
 ================================================================================
                            FRONTEND LAYER (Next.js 14)
                               apps/web/
@@ -33,55 +36,44 @@
 +------------------------------------------------------------------------------+
 |                  app/dashboard/ai-assistant/page.tsx                         |
 |------------------------------------------------------------------------------|
-|  +------------------------------------------------------------------------+  |
-|  |                         CHAT INTERFACE                                 |  |
-|  |  +------------------------------------------------------------------+  |  |
-|  |  |  Message Input                                                   |  |  |
-|  |  |  +------------------------------------------------------------+  |  |  |
-|  |  |  | "Find books about machine learning"              [Send]   |  |  |  |
-|  |  |  +------------------------------------------------------------+  |  |  |
-|  |  +------------------------------------------------------------------+  |  |
-|  |                                                                        |  |
-|  |  +------------------------------------------------------------------+  |  |
-|  |  |  Message History                                                 |  |  |
-|  |  |  +------------------------------------------------------------+  |  |  |
-|  |  |  |  User: "Find books about machine learning"                 |  |  |  |
-|  |  |  |  --------------------------------------------------------  |  |  |  |
-|  |  |  |  AI: Found 12 books matching "machine learning":          |  |  |  |
-|  |  |  |                                                            |  |  |  |
-|  |  |  |  1. "Deep Learning" by Ian Goodfellow                      |  |  |  |
-|  |  |  |     [Available] 3 copies                                   |  |  |  |
-|  |  |  |  2. "Hands-On Machine Learning" by Aurelien Geron         |  |  |  |
-|  |  |  |     [Available] 2 copies                                   |  |  |  |
-|  |  |  |                                                            |  |  |  |
-|  |  |  |  [Model: qwen2.5] [Catalog] [Reading Lists]                |  |  |  |
-|  |  |  +------------------------------------------------------------+  |  |  |
-|  |  +------------------------------------------------------------------+  |  |
-|  +------------------------------------------------------------------------+  |
 |                                                                              |
-|  State: { messages: [], loading: false, error: null }                        |
-|  Handler: handleSendMessage() -> api.chat(message)                           |
+|  +-------------------+  +--------------------------------------------------+ |
+|  | CONVERSATION      |  | CHAT PANEL                                       | |
+|  | SIDEBAR           |  |                                                  | |
+|  |                   |  | +-----------------------------------------+      | |
+|  | [+ New Chat]      |  | | Message History (scrollable)            |      | |
+|  |                   |  | |                                         |      | |
+|  | > Chat about ML   |  | | User: "How many books do we have?"      |      | |
+|  |   Chat about algo |  | |                                         |      | |
+|  |   Research help   |  | | OZ AI: Let me check...                  |      | |
+|  |                   |  | | [tool: get_catalog_stats]               |      | |
+|  |                   |  | | We have **142 active books** with       |      | |
+|  |                   |  | | 389 copies total. 201 are available     |      | |
+|  |                   |  | | right now.                              |      | |
+|  +-------------------+  | +-----------------------------------------+      | |
+|                         |                                                  | |
+|                         | +--------------------------------------+  [Send] | |
+|                         | | Type a message...            [📎]   |         | |
+|                         | +--------------------------------------+         | |
 +------------------------------------------------------------------------------+
                                |
-                               v
+                               | SSE client reads token stream
+                               | EventSource / ReadableStream
+                               |
 +------------------------------------------------------------------------------+
 |                            lib/api.ts                                        |
 |------------------------------------------------------------------------------|
-|  export async function chat(message: string): Promise<ChatResponse> {        |
-|    return fetchWithAuth('/ai/chat', {                                        |
-|      method: 'POST',                                                         |
-|      body: JSON.stringify({ message }),                                      |
-|    });                                                                       |
-|  }                                                                           |
-|                                                                              |
-|  // Cookies sent automatically (credentials: 'include')                      |
-|  // Handles: 401 -> redirect to /login                                       |
+|  POST /api/ai/chat  (Next.js proxy → NestJS)                                 |
+|  { message, conversationId, image? }                                         |
+|  Cookies forwarded automatically                                             |
 +------------------------------------------------------------------------------+
                                |
                                | POST /ai/chat
-                               | { message: "Find books about machine learning" }
+                               | { message: "How many books do we have?" }
                                | Cookie: access_token=eyJhbG...
                                |
+
+
 ================================================================================
                            BACKEND LAYER (NestJS 10)
                               apps/api/
@@ -89,55 +81,11 @@
                                |
                                v
 +------------------------------------------------------------------------------+
-|                            ENTRY POINT                                       |
-|                            src/main.ts                                       |
+|                       AUTHENTICATION                                         |
+|                  JwtAuthGuard (jwt.strategy.ts)                              |
 |------------------------------------------------------------------------------|
-|  - Global prefix: /api (but AI routes are /ai/*)                             |
-|  - Cookie parser enabled                                                     |
-|  - CORS configured for frontend origin                                       |
-|  - Validation pipe (class-validator)                                         |
-+------------------------------------------------------------------------------+
-                               |
-                               v
-+------------------------------------------------------------------------------+
-|                       AUTHENTICATION LAYER                                   |
-|                       src/auth/guards/jwt-auth.guard.ts                      |
-|------------------------------------------------------------------------------|
-|                                                                              |
-|  +------------------------------------------------------------------------+  |
-|  |                         JwtAuthGuard                                   |  |
-|  |------------------------------------------------------------------------|  |
-|  |  1. Extract JWT from cookie: req.cookies['access_token']               |  |
-|  |  2. Verify signature with JWT_SECRET                                   |  |
-|  |  3. Decode payload: { sub: userId, role: 'STUDENT', email: '...' }     |  |
-|  |  4. Attach to request: req.user = { id: userId, role: 'STUDENT' }      |  |
-|  |                                                                        |  |
-|  |  [PASS] Valid     -> Continue to controller                            |  |
-|  |  [FAIL] Invalid   -> 401 Unauthorized                                  |  |
-|  +------------------------------------------------------------------------+  |
-|                                                                              |
-+------------------------------------------------------------------------------+
-                               |
-                               | req.user = { id: 'usr_123', role: 'STUDENT' }
-                               v
-+------------------------------------------------------------------------------+
-|                            AI MODULE                                         |
-|                         src/ai/ai.module.ts                                  |
-|------------------------------------------------------------------------------|
-|  @Module({                                                                   |
-|    imports: [UsersModule],                                                   |
-|    controllers: [AiController],                                              |
-|    providers: [                                                              |
-|      AiService,              // Orchestrator                                 |
-|      ContextBuilderService,  // DB context gatherer                          |
-|      RoleResponseService,    // Rule-based fallback                          |
-|      CatalogSearchService,   // Natural language search                      |
-|      SemanticSearchService,  // Scoring & ranking                            |
-|      LearningPathService,    // Learning path generator                      |
-|      ResearchAssistantService, // Research guidance                          |
-|      OllamaService,          // LLM integration                              |
-|    ],                                                                        |
-|  })                                                                          |
+|  Extract JWT from cookie → verify → attach user to request                  |
+|  req.user = { id: 'usr_123', role: 'STUDENT' }                              |
 +------------------------------------------------------------------------------+
                                |
                                v
@@ -145,379 +93,210 @@
 |                           AI CONTROLLER                                      |
 |                       src/ai/ai.controller.ts                                |
 |------------------------------------------------------------------------------|
-|  @Controller('ai')                                                           |
-|  @UseGuards(JwtAuthGuard)                                                    |
-|  export class AiController {                                                 |
+|  @Post('chat')  @UseGuards(JwtAuthGuard)                                     |
+|  @Sse() — returns Observable<MessageEvent>                                   |
 |                                                                              |
-|    @Post('chat')                                                             |
-|    chat(                                                                     |
-|      @CurrentUser('id') userId: string,      // 'usr_123'                    |
-|      @CurrentUser('role') userRole: Role,    // 'STUDENT'                    |
-|      @Body() dto: ChatDto,                   // { message: "Find books..." } |
-|    ) {                                                                       |
-|      return this.aiService.chat(userId, userRole, dto.message);              |
-|    }                                                                         |
-|                                                                              |
-|    @Patch('interests')   // Staff interest updates                           |
-|    @Get('context')       // Debug: view AI context                           |
-|  }                                                                           |
+|  → agentService.chatStream(userId, role, message, conversationId, cookie)   |
 +------------------------------------------------------------------------------+
                                |
-                               | aiService.chat('usr_123', 'STUDENT', 'Find books...')
-                               |
+                               v
+
+
 ================================================================================
-                           AI SERVICE LAYER
-                          src/ai/*.service.ts
+                         AGENTIC LOOP (AgentService)
+                          src/ai/agent.service.ts
 ================================================================================
                                |
                                v
 +------------------------------------------------------------------------------+
-|                    STEP 1: BUILD CONTEXT                                     |
-|                 ContextBuilderService.build()                                |
+|  STEP 1: BUILD SYSTEM PROMPT                                                 |
 |------------------------------------------------------------------------------|
+|  Prisma parallel queries:                                                    |
+|    user profile + borrow policy + active borrows (titles + count)            |
 |                                                                              |
-|  +------------------------------------------------------------------------+  |
-|  |                    PARALLEL DATABASE QUERIES                           |  |
-|  |                                                                        |  |
-|  |  await Promise.all([                                                   |  |
-|  |    prisma.user.findUnique({ id: userId }),        // User profile      |  |
-|  |    prisma.borrowPolicy.findUnique({ role }),      // Borrow limits     |  |
-|  |    prisma.borrow.findMany({ userId, ACTIVE }),    // Active borrows    |  |
-|  |    prisma.reservation.count({ userId }),          // Reservations      |  |
-|  |    prisma.book.count(),                           // Catalog stats     |  |
-|  |    prisma.readingList.count({ PUBLISHED }),       // Reading lists     |  |
-|  |    prisma.borrow.findMany({ userId, RETURNED }),  // Borrow history    |  |
-|  |    // [ADMIN only] prisma.borrow.count({ OVERDUE }) // System stats    |  |
-|  |  ]);                                                                   |  |
-|  +------------------------------------------------------------------------+  |
-|                               |                                              |
-|                               v                                              |
-|  +------------------------------------------------------------------------+  |
-|  |                   ASSEMBLED CONTEXT (AiContext)                        |  |
-|  |  {                                                                     |  |
-|  |    user: { id, name: "John", role: "STUDENT", faculty: "Engineering" },|  |
-|  |    borrowPolicy: { maxActiveBorrows: 5, maxBorrowDays: 14, ... },      |  |
-|  |    activeBorrows: { count: 2, items: [{ title: "Clean Code", ... }] }, |  |
-|  |    reservations: { count: 1, pending: 1, readyForPickup: 0 },          |  |
-|  |    catalog: { totalBooks: 1500, availableCopies: 3200, ... },          |  |
-|  |    readingLists: { publishedCount: 42, followedInstructors: 3, ... },  |  |
-|  |    borrowHistory: { recentBooks: [...], totalBorrowed: 28 }            |  |
-|  |  }                                                                     |  |
-|  +------------------------------------------------------------------------+  |
-|                                                                              |
+|  System prompt includes:                                                     |
+|    - Identity: "You are OZ AI..."                                            |
+|    - User: name, role, faculty, interests, currently borrowed, borrow limits |
+|    - Behaviour rules: always use tools, never hallucinate, English default   |
+|    - Today's date                                                            |
 +------------------------------------------------------------------------------+
-                               |
-                               | ctx: AiContext
-                               v
-+------------------------------------------------------------------------------+
-|                       STEP 2: INTENT ROUTING                                 |
-|                          AiService.chat()                                    |
-|------------------------------------------------------------------------------|
-|                                                                              |
-|  message = "Find books about machine learning"                               |
-|                                                                              |
-|  +------------------------------------------------------------------------+  |
-|  |                   INTENT DETECTION (Priority Order)                    |  |
-|  |                                                                        |  |
-|  |  1. Staff + No Interests?                                              |  |
-|  |     -> NO (user is STUDENT)                                            |  |
-|  |                                                                        |  |
-|  |  2. Staff + Looks like interests?                                      |  |
-|  |     -> NO (not staff)                                                  |  |
-|  |                                                                        |  |
-|  |  3. Non-Admin + Admin action?                                          |  |
-|  |     -> NO ("find books" is not admin action)                           |  |
-|  |                                                                        |  |
-|  |  4. Catalog search query?                                              |  |
-|  |     -> YES! "Find books about" matches search pattern                  |  |
-|  |     -> ROUTE TO: CatalogSearchService.search()                         |  |
-|  |                                                                        |  |
-|  |  5. Learning path query?                                               |  |
-|  |     -> (not evaluated - already routed)                                |  |
-|  |                                                                        |  |
-|  |  6. Research query?                                                    |  |
-|  |     -> (not evaluated - already routed)                                |  |
-|  |                                                                        |  |
-|  |  7. General chat (Ollama)?                                             |  |
-|  |     -> (not evaluated - already routed)                                |  |
-|  +------------------------------------------------------------------------+  |
-|                                                                              |
-+------------------------------------------------------------------------------+
-                               |
-                               | Routed to: CatalogSearchService
-                               v
-+------------------------------------------------------------------------------+
-|                      STEP 3: CATALOG SEARCH                                  |
-|                    CatalogSearchService.search()                             |
-|------------------------------------------------------------------------------|
-|                                                                              |
-|  +------------------------------------------------------------------------+  |
-|  |  1. PARSE INTENT                                                       |  |
-|  |     message: "Find books about machine learning"                       |  |
-|  |     -> keywords: ["machine", "learning"]                               |  |
-|  |     -> category: null                                                  |  |
-|  |     -> availability: null                                              |  |
-|  +------------------------------------------------------------------------+  |
-|                               |                                              |
-|                               v                                              |
-|  +------------------------------------------------------------------------+  |
-|  |  2. DATABASE QUERY                                                     |  |
-|  |     prisma.book.findMany({                                             |  |
-|  |       where: {                                                         |  |
-|  |         OR: [                                                          |  |
-|  |           { title: { contains: 'machine', mode: 'insensitive' } },     |  |
-|  |           { title: { contains: 'learning', mode: 'insensitive' } },    |  |
-|  |           { description: { contains: 'machine learning' } },           |  |
-|  |           { subjectTags: { hasSome: ['machine learning', 'ML'] } },    |  |
-|  |         ],                                                             |  |
-|  |         isActive: true,                                                |  |
-|  |       },                                                               |  |
-|  |       include: { copies: true, mainFaculty: true },                    |  |
-|  |       take: 20,                                                        |  |
-|  |     })                                                                 |  |
-|  +------------------------------------------------------------------------+  |
-|                               |                                              |
-|                               v                                              |
-|  +------------------------------------------------------------------------+  |
-|  |  3. SEMANTIC SCORING (SemanticSearchService)                           |  |
-|  |                                                                        |  |
-|  |  For each book:                                                        |  |
-|  |    score = 0                                                           |  |
-|  |    score += keywordMatchScore(title, description) * 0.40  // 40%       |  |
-|  |    score += categoryMatchScore(category) * 0.20           // 20%       |  |
-|  |    score += facultyRelevanceScore(faculty) * 0.15         // 15%       |  |
-|  |    score += availabilityScore(copies) * 0.15              // 15%       |  |
-|  |    score += recencyScore(publicationYear) * 0.10          // 10%       |  |
-|  |                                                                        |  |
-|  |  Results sorted by score descending -> Top 10 returned                 |  |
-|  +------------------------------------------------------------------------+  |
-|                               |                                              |
-|                               v                                              |
-|  +------------------------------------------------------------------------+  |
-|  |  4. FORMAT RESPONSE                                                    |  |
-|  |                                                                        |  |
-|  |  Found 12 books matching "machine learning":                           |  |
-|  |                                                                        |  |
-|  |  1. "Deep Learning" by Ian Goodfellow                                  |  |
-|  |     [Available] 3 copies | Engineering                                 |  |
-|  |                                                                        |  |
-|  |  2. "Hands-On Machine Learning" by Aurelien Geron                      |  |
-|  |     [Available] 2 copies | Computer Science                            |  |
-|  |                                                                        |  |
-|  |  3. "Pattern Recognition" by Christopher Bishop                        |  |
-|  |     [Reserved] 0 available (1 reserved)                                |  |
-|  |                                                                        |  |
-|  |  Browse all results in the [Catalog](/dashboard/catalog).              |  |
-|  +------------------------------------------------------------------------+  |
-|                                                                              |
-+------------------------------------------------------------------------------+
-                               |
-+- - - - - - - - - - - - - - - + - - - - - - - - - - - - - - - - - - - - - - - +
-|                                                                              |
-|             ALTERNATIVE ROUTES (if different intent detected)                |
-|                                                                              |
-|  +------------------+  +------------------+  +------------------+            |
-|  | LEARNING PATH    |  | RESEARCH ASSIST  |  | OLLAMA CHAT      |            |
-|  | LearningPath     |  | ResearchAssistant|  | OllamaService    |            |
-|  | Service          |  | Service          |  |                  |            |
-|  |                  |  |                  |  |                  |            |
-|  | Trigger:         |  | Trigger:         |  | Trigger:         |            |
-|  | "learning path"  |  | "research on"    |  | general query    |            |
-|  |                  |  |                  |  |                  |            |
-|  | Output:          |  | Output:          |  | Output:          |            |
-|  | ## Learning Path |  | ## Research      |  | Natural language |            |
-|  | ### Stage 1      |  | ### Books        |  | using role-      |            |
-|  | - Book 1, Book 2 |  | - Book 1, Book 2 |  | specific prompt  |            |
-|  | ### Stage 2      |  | ### Reading Lists|  |                  |            |
-|  | - Book 3, Book 4 |  | - List 1, List 2 |  | Falls back to:   |            |
-|  | ### Stage 3      |  | ### Materials    |  | RoleResponse     |            |
-|  | - Book 5, Book 6 |  | - Paper 1        |  | Service          |            |
-|  +------------------+  +------------------+  +------------------+            |
-|                                                                              |
-+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - +
                                |
                                v
 +------------------------------------------------------------------------------+
-|                      STEP 4: ASSEMBLE RESPONSE                               |
+|  STEP 2: LOAD CONVERSATION HISTORY                                           |
+|------------------------------------------------------------------------------|
+|  prisma.aiMessage.findMany({ conversationId, take: 50 })                     |
+|  → [{ role: 'user', content: '...' }, { role: 'assistant', content: '...' }]|
++------------------------------------------------------------------------------+
+                               |
+                               v
++------------------------------------------------------------------------------+
+|  STEP 3: CALL OLLAMA WITH TOOLS                                              |
 |------------------------------------------------------------------------------|
 |                                                                              |
-|  ChatResponse {                                                              |
-|    reply: "Found 12 books matching \"machine learning\":\n\n1. ...",         |
-|    modelUsed: "rule-based",  // or "qwen2.5" if Ollama enhanced              |
-|    sources: ["/dashboard/catalog", "/dashboard/reading-lists"]               |
-|  }                                                                           |
+|  ollama.chat({                                                               |
+|    model: 'mistral',                                                         |
+|    messages: [ systemPrompt, ...history, userMessage ],                      |
+|    tools: [ search_catalog, get_book_details, read_ebook, fetch_webpage,     |
+|             get_my_borrows, get_catalog_stats, get_active_borrows,           |
+|             get_active_reservations ],                                       |
+|    stream: true,                                                             |
+|  })                                                                          |
 |                                                                              |
 +------------------------------------------------------------------------------+
                                |
+               +---------------+------------------+
+               |                                  |
+               v                                  v
++-----------------------------+      +----------------------------+
+|  RESPONSE: tool_call        |      |  RESPONSE: text token      |
+|  { name, arguments }        |      |                            |
+|                             |      |  yield token via SSE       |
+|  executeTool(name, args,    |      |  → frontend renders it     |
+|    userId, cookieHeader)    |      |    incrementally           |
+|                             |      +----------------------------+
+|  +------------------------+ |
+|  | TOOL EXECUTION         | |
+|  |                        | |
+|  | search_catalog         | |
+|  |  → GET /books?search=  | |
+|  |                        | |
+|  | get_catalog_stats      | |
+|  |  → Prisma.book.count() | |
+|  |    ×6 parallel         | |
+|  |                        | |
+|  | get_my_borrows         | |
+|  |  → Prisma.borrow       | |
+|  |    .findMany(userId)   | |
+|  |                        | |
+|  | get_active_borrows     | |
+|  |  → Prisma + $queryRaw  | |
+|  |    (top 5 by count)    | |
+|  |                        | |
+|  | read_ebook             | |
+|  |  → fetch(url)          | |
+|  |    strip HTML, 4000ch  | |
+|  |                        | |
+|  | fetch_webpage          | |
+|  |  → fetch(url)          | |
+|  |    strip HTML, 3000ch  | |
+|  +------------------------+ |
+|              |              |
+|   inject tool result as     |
+|   { role: 'tool' } message  |
+|              |              |
+|              └──────────────+──► loop back to Ollama
++-----------------------------+
+
+
+================================================================================
+                       STEP 4: PERSIST & STREAM COMPLETE
+================================================================================
+                               |
+                               v
++------------------------------------------------------------------------------+
+|  Save to database:                                                           |
+|    prisma.aiMessage.create({ role: 'user', content, conversationId })       |
+|    prisma.aiMessage.create({ role: 'assistant', content, conversationId })  |
+|                                                                              |
+|  Update conversation title (if first message):                              |
+|    title = first 50 chars of user message                                   |
++------------------------------------------------------------------------------+
+                               |
+                               | SSE stream ends
+                               v
+
+
 ================================================================================
                            DATABASE LAYER
-                      PostgreSQL + Prisma ORM
 ================================================================================
-                               |
-+------------------------------------------------------------------------------+
-|                                                                              |
-|  +----------+  +----------+  +----------+  +----------+  +----------+        |
-|  |  users   |  |  books   |  |book_copies|  | borrows  |  |reservations|      |
-|  |----------|  |----------|  |----------|  |----------|  |----------|        |
-|  | id       |  | id       |  | id       |  | id       |  | id       |        |
-|  | email    |  | title    |  | bookId   |  | userId   |  | userId   |        |
-|  | name     |  | authors  |  | branchId |  | bookCopyId|  | bookCopyId|       |
-|  | role     |<-| facultyId|<-| status   |<-| status   |  | status   |        |
-|  | facultyId|  | category |  |          |  | dueAt    |  | expiresAt|        |
-|  | interests|  | tags     |  |          |  | returnedAt|  |          |        |
-|  +----------+  +----------+  +----------+  +----------+  +----------+        |
-|       |             |             |             |                            |
-|       v             v             v             v                            |
-|  +----------+  +----------+  +----------+  +----------+                      |
-|  | faculties|  |reading_  |  |reading_  |  |borrow_   |                      |
-|  |          |  |lists     |  |list_items|  |policies  |                      |
-|  +----------+  +----------+  +----------+  +----------+                      |
-|                                                                              |
-+------------------------------------------------------------------------------+
-                               |
+
+  +----------+  +----------+  +-----------+  +----------+  +----------------+
+  |  users   |  |  books   |  | book_     |  | borrows  |  | ai_            |
+  |          |  |          |  | copies    |  |          |  | conversations  |
+  |----------|  |----------|  |-----------|  |----------|  |----------------|
+  | id       |  | id       |  | id        |  | id       |  | id             |
+  | email    |  | title    |  | bookId    |  | userId   |  | userId         |
+  | name     |  | authors  |  | branchId  |  | bookCopy |  | title          |
+  | role     |  | isbn     |  | status    |  | status   |  | createdAt      |
+  | faculty  |  | category |  |           |  | dueAt    |  | updatedAt      |
+  | interests|  | isEbook  |  |           |  |          |  +----------------+
+  +----------+  +----------+  +-----------+  +----------+         |
+                                                           +-------+--------+
+                                                           | ai_messages    |
+                                                           |----------------|
+                                                           | id             |
+                                                           | userId         |
+                                                           | conversationId |
+                                                           | role           |
+                                                           | content        |
+                                                           | createdAt      |
+                                                           +----------------+
+
+
 ================================================================================
                          EXTERNAL SERVICES
 ================================================================================
-                               |
-                               v
-+------------------------------------------------------------------------------+
-|                              OLLAMA                                          |
-|                        localhost:11434                                       |
-|------------------------------------------------------------------------------|
-|                                                                              |
-|  +------------------------------------------------------------------------+  |
-|  |                       MODEL SELECTION                                  |  |
-|  |                                                                        |  |
-|  |  +------------+     +------------+     +------------+                  |  |
-|  |  |   phi3     |     |  qwen2.5   |     |   llama3   |                  |  |
-|  |  |  (~2GB)    |     |  (~4GB)    |     |  (~4GB)    |                  |  |
-|  |  |------------|     |------------|     |------------|                  |  |
-|  |  | - Fast     |     | - Balanced |     | - Capable  |                  |  |
-|  |  | - Simple Q |     | - Student  |     | - Complex  |                  |  |
-|  |  | - Staff    |     | - Instructor|    | - Admin    |                  |  |
-|  |  +------------+     +------------+     +------------+                  |  |
-|  +------------------------------------------------------------------------+  |
-|                                                                              |
-|  +------------------------------------------------------------------------+  |
-|  |                       API ENDPOINTS                                    |  |
-|  |                                                                        |  |
-|  |  POST /api/generate                                                    |  |
-|  |  {                                                                     |  |
-|  |    "model": "qwen2.5",                                                 |  |
-|  |    "prompt": "User: Find me books about AI",                           |  |
-|  |    "system": "You are a library assistant. Context: ...",              |  |
-|  |    "stream": false                                                     |  |
-|  |  }                                                                     |  |
-|  |                                                                        |  |
-|  |  GET /api/tags  (health check / model list)                            |  |
-|  +------------------------------------------------------------------------+  |
-|                                                                              |
-|  +------------------------------------------------------------------------+  |
-|  |                    GRACEFUL DEGRADATION                                |  |
-|  |                                                                        |  |
-|  |  IF Ollama unavailable:                                                |  |
-|  |    -> OllamaService.generate() throws error                            |  |
-|  |       -> AiService catches error                                       |  |
-|  |          -> Falls back to RoleResponseService.respond()                |  |
-|  |             -> Returns rule-based response                             |  |
-|  |                -> modelUsed: "rule-based"                              |  |
-|  |                                                                        |  |
-|  |  User experience: Seamless (may notice less natural responses)         |  |
-|  +------------------------------------------------------------------------+  |
-|                                                                              |
-+------------------------------------------------------------------------------+
-                               |
-================================================================================
-                           RESPONSE FLOW
-================================================================================
-                               |
-                               v
-+------------------------------------------------------------------------------+
-|                                                                              |
-|  Backend Response:                                                           |
-|  {                                                                           |
-|    "reply": "Found 12 books matching \"machine learning\":\n\n1. ...",       |
-|    "modelUsed": "qwen2.5",                                                   |
-|    "sources": ["/dashboard/catalog", "/dashboard/reading-lists"]             |
-|  }                                                                           |
-|                               |                                              |
-|                               | HTTP 200 JSON                                |
-|                               v                                              |
-|                                                                              |
-|  Frontend Processing (lib/api.ts):                                           |
-|  const response = await fetchWithAuth('/ai/chat', { ... });                  |
-|  return response.json(); // ChatResponse                                     |
-|                               |                                              |
-|                               | ChatResponse object                          |
-|                               v                                              |
-|                                                                              |
-|  React State Update (page.tsx):                                              |
-|  setMessages([...messages, {                                                 |
-|    role: 'assistant',                                                        |
-|    content: response.reply,                                                  |
-|    model: response.modelUsed                                                 |
-|  }]);                                                                        |
-|                               |                                              |
-|                               | Re-render                                    |
-|                               v                                              |
-|                                                                              |
-|  UI Rendering:                                                               |
-|  +------------------------------------------------------------------------+  |
-|  |  Found 12 books matching "machine learning":                           |  |
-|  |                                                                        |  |
-|  |  1. "Deep Learning" by Ian Goodfellow                                  |  |
-|  |     [Available] 3 copies | Engineering                                 |  |
-|  |                                                                        |  |
-|  |  2. "Hands-On Machine Learning" by Aurelien Geron                      |  |
-|  |     [Available] 2 copies | Computer Science                            |  |
-|  |                                                                        |  |
-|  |  [Model: qwen2.5] [Catalog] [Reading Lists]  <- Clickable badges       |  |
-|  +------------------------------------------------------------------------+  |
-|                                                                              |
-+------------------------------------------------------------------------------+
+
+  +------------------------------------------------------------------------+
+  |                           OLLAMA                                       |
+  |                     localhost:11434                                    |
+  |------------------------------------------------------------------------|
+  |                                                                        |
+  |  Models:                                                               |
+  |    mistral     — primary chat + tool calling (~4GB)                    |
+  |    gemma3:4b   — book cover scanning, multimodal (~2GB)                |
+  |                                                                        |
+  |  Endpoints used:                                                       |
+  |    POST /api/chat    — streaming chat with tools                       |
+  |    POST /api/generate — cover scan (gemma3:4b, images array)          |
+  |    GET  /api/tags    — health check / installed models                 |
+  |                                                                        |
+  |  Graceful degradation:                                                 |
+  |    /ai/status → { available: false }                                   |
+  |    Frontend shows "Basic Mode" amber pill                              |
+  |    Agent stream returns error message to user                          |
+  +------------------------------------------------------------------------+
 
 
 ================================================================================
-                         SIMPLIFIED FLOW SUMMARY
+                       SIMPLIFIED FLOW SUMMARY
 ================================================================================
 
-    USER          FRONTEND           BACKEND              DATABASE          OLLAMA
-     |               |                  |                    |                |
-     |  Type msg     |                  |                    |                |
-     |-------------->|                  |                    |                |
-     |               |  POST /ai/chat   |                    |                |
-     |               |----------------->|                    |                |
-     |               |                  |  Verify JWT        |                |
-     |               |                  |-----------------> |                |
-     |               |                  | <-----------------|                |
-     |               |                  |                    |                |
-     |               |                  |  Build Context     |                |
-     |               |                  |-----------------> |                |
-     |               |                  | <-----------------|                |
-     |               |                  |   (user, borrows,  |                |
-     |               |                  |    reservations,   |                |
-     |               |                  |    catalog stats)  |                |
-     |               |                  |                    |                |
-     |               |                  |  Route Intent      |                |
-     |               |                  |  ---------------   |                |
-     |               |                  |  (keyword match)   |                |
-     |               |                  |                    |                |
-     |               |                  |  Search Catalog    |                |
-     |               |                  |-----------------> |                |
-     |               |                  | <-----------------|                |
-     |               |                  |                    |                |
-     |               |                  |  [Optional] LLM    |                |
-     |               |                  |----------------------------------->|
-     |               |                  | <----------------------------------|
-     |               |                  |                    |                |
-     |               |                  |  Format Response   |                |
-     |               |  ChatResponse    |                    |                |
-     |               |<-----------------|                    |                |
-     |  Display msg  |                  |                    |                |
-     |<--------------|                  |                    |                |
-     |               |                  |                    |                |
+  USER       FRONTEND          BACKEND          DATABASE        OLLAMA
+   |             |                 |                |              |
+   | type msg    |                 |                |              |
+   |------------>|                 |                |              |
+   |             | POST /ai/chat   |                |              |
+   |             |---------------->|                |              |
+   |             |                 | verify JWT     |              |
+   |             |                 | build prompt   |              |
+   |             |                 |--------------->|              |
+   |             |                 |<---------------|              |
+   |             |                 | load history   |              |
+   |             |                 |--------------->|              |
+   |             |                 |<---------------|              |
+   |             |                 | call Ollama    |              |
+   |             |                 |-------------------------------->
+   |             |                 |       tool_call? get_catalog_stats
+   |             |                 |<--------------------------------
+   |             |                 | execute tool   |              |
+   |             |                 |--------------->|              |
+   |             |                 |<---------------|              |
+   |             |                 | inject result  |              |
+   |             |                 |-------------------------------->
+   |             |                 |       stream tokens           |
+   |             | SSE tokens      |<--------------------------------
+   |             |<----------------|                |              |
+   | renders     |                 |                |              |
+   | incremental |                 | save messages  |              |
+   |             |                 |--------------->|              |
+   |             |                 |                |              |
 
-    Total time: ~200ms (rule-based) to ~3s (Ollama)
+  Typical latency:
+    First token:  ~1-2s  (prompt build + first Ollama call)
+    Tool calls:   +100-300ms each (DB) or +1-2s (web fetch)
+    Full answer:  ~2-5s  (1-2 tool calls + generation)
 
 
 ================================================================================
@@ -528,147 +307,58 @@
   +-- app/
   |   +-- dashboard/
   |       +-- ai-assistant/
-  |           +-- page.tsx --------------- Chat UI component
+  |           +-- page.tsx --------------- Chat UI, SSE reader, conversation sidebar
+  +-- app/api/ai/
+  |   +-- chat/route.ts ---------------- Next.js proxy → NestJS (streams SSE)
+  |   +-- conversations/route.ts ------- Next.js proxy → NestJS conversations
+  |   +-- history/route.ts ------------- Next.js proxy → NestJS history
   +-- lib/
-  |   +-- api.ts ------------------------- API client (fetchWithAuth)
-  +-- types/
-      +-- index.ts ----------------------- TypeScript interfaces
+      +-- api.ts ------------------------ API client (fetchWithAuth + SSE)
 
   BACKEND (apps/api/)
   +-- src/
       +-- ai/
       |   +-- ai.module.ts --------------- Module definition
-      |   +-- ai.controller.ts ----------- REST endpoints
-      |   +-- ai.service.ts -------------- Orchestrator + intent router
-      |   +-- context-builder.service.ts - Database context gatherer
-      |   +-- role-response.service.ts --- Rule-based fallback
-      |   +-- catalog-search.service.ts -- Natural language search
-      |   +-- semantic-search.service.ts - Scoring & ranking
-      |   +-- learning-path.service.ts --- Learning path generator
-      |   +-- research-assistant.service.ts - Research guidance
-      |   +-- ollama.service.ts ---------- LLM integration
+      |   +-- ai.controller.ts ----------- REST + SSE endpoints
+      |   +-- agent.service.ts ----------- Agentic loop, tools, SSE, history
+      |   +-- ai.service.ts -------------- Legacy orchestrator (still registered)
+      |   +-- context-builder.service.ts - DB context (legacy path)
+      |   +-- ollama.service.ts ---------- LLM calls + cover scan
       |   +-- dto/
-      |       +-- chat.dto.ts ------------ Chat request validation
-      |       +-- update-interests.dto.ts  Interests update validation
-      +-- auth/
-      |   +-- guards/
-      |   |   +-- jwt-auth.guard.ts ------ JWT verification
-      |   +-- decorators/
-      |       +-- current-user.decorator.ts - Extract user from request
-      +-- prisma/
-          +-- prisma.service.ts ---------- Database client
+      |       +-- chat.dto.ts ------------ { message, conversationId?, image? }
+      |       +-- scan-cover.dto.ts ------- { image: base64 }
+      +-- auth/guards/jwt-auth.guard.ts -- JWT verification
 
   DATABASE
-  +-- apps/api/prisma/
-      +-- schema.prisma ------------------ All table definitions
-
-  CONFIGURATION
-  +-- apps/api/.env ---------------------- OLLAMA_BASE_URL, JWT_SECRET
-  +-- apps/web/.env ---------------------- NEXT_PUBLIC_API_URL
+  +-- apps/api/prisma/schema.prisma ------ AiConversation, AiMessage models
 
 
 ================================================================================
-                       SECURITY & PERMISSION FLOW
+                         SECURITY CHECKPOINTS
 ================================================================================
 
-  +------------------------------------------------------------------------+
-  | CHECKPOINT 1: Authentication (JwtAuthGuard)                            |
-  |                                                                        |
-  |   Request --> Extract JWT from cookie                                  |
-  |           --> Verify signature with JWT_SECRET                         |
-  |           --> Check expiration                                         |
-  |           --> Attach user to request                                   |
-  |                                                                        |
-  |   [PASS] Valid: Continue to controller                                 |
-  |   [FAIL] Invalid: 401 Unauthorized                                     |
-  +------------------------------------------------------------------------+
-                          |
-                          v
-  +------------------------------------------------------------------------+
-  | CHECKPOINT 2: Context Isolation (ContextBuilderService)                |
-  |                                                                        |
-  |   - User can only see their own data                                   |
-  |   - Borrows: WHERE userId = currentUser.id                             |
-  |   - Reservations: WHERE userId = currentUser.id                        |
-  |   - Admin stats: Only if role === ADMIN                                |
-  |                                                                        |
-  |   No cross-user data leakage possible                                  |
-  +------------------------------------------------------------------------+
-                          |
-                          v
-  +------------------------------------------------------------------------+
-  | CHECKPOINT 3: Permission Gate (AiService)                              |
-  |                                                                        |
-  |   Non-admin user asks: "Delete user john@test.com"                     |
-  |                                                                        |
-  |   isAdminAction() detects: "delete user" -> true                       |
-  |                                                                        |
-  |   Response:                                                            |
-  |   "That action requires administrator privileges. As a student,        |
-  |    you can: Browse Catalog, Manage Borrows, Explore Reading Lists..."  |
-  |                                                                        |
-  |   Action blocked before reaching any service                           |
-  +------------------------------------------------------------------------+
-                          |
-                          v
-  +------------------------------------------------------------------------+
-  | CHECKPOINT 4: Prompt Boundaries (System Prompts)                       |
-  |                                                                        |
-  |   All system prompts include:                                          |
-  |   "Do not perform administrative actions - only provide information    |
-  |    and guidance."                                                      |
-  |                                                                        |
-  |   Role-specific boundaries:                                            |
-  |   - Student: "Help the student find books, manage borrows..."          |
-  |   - Admin: "Never execute actions - only inform"                       |
-  |                                                                        |
-  |   LLM guided to stay within scope                                      |
-  +------------------------------------------------------------------------+
+  CHECKPOINT 1: Authentication
+  ─────────────────────────────
+  JwtAuthGuard on every /ai/* endpoint
+  → 401 if cookie missing or token expired/invalid
 
+  CHECKPOINT 2: Data Scoping
+  ──────────────────────────
+  get_my_borrows: WHERE userId = request.user.id (Prisma direct)
+  get_history:    WHERE userId = request.user.id
+  deleteConversation: WHERE id = :id AND userId = request.user.id
 
-================================================================================
-                      PERFORMANCE CHARACTERISTICS
-================================================================================
+  CHECKPOINT 3: Role Guard
+  ────────────────────────
+  /ai/scan-cover: @Roles(Role.ADMIN) + RolesGuard
+  → 403 for non-admin users
 
-  REQUEST TYPE               AVG LATENCY        COMPONENTS INVOLVED
-  -------------------------------------------------------------------------
-
-  Rule-based response        ~100-200ms         JWT verify + DB context +
-  (borrowing limits, etc.)                      keyword match
-
-  Catalog search             ~300-500ms         JWT + DB context + catalog
-  (find books about...)                         query + scoring + formatting
-
-  Learning path              ~500-800ms         JWT + DB context + catalog
-  (without LLM)                                 search + classification
-
-  Learning path              ~2-4s              Above + Ollama generate
-  (with LLM enhancement)                        (stage descriptions)
-
-  General chat (phi3)        ~1-2s              JWT + DB context + LLM
-  (simple queries)
-
-  General chat (qwen2.5)     ~2-3s              JWT + DB context + LLM
-  (balanced queries)
-
-  General chat (llama3)      ~3-5s              JWT + DB context + LLM
-  (complex/admin queries)
-
-  -------------------------------------------------------------------------
-
-  DATABASE QUERIES PER REQUEST (Context Building)
-  -------------------------------------------------------------------------
-  - User profile: 1 query
-  - Borrow policy: 1 query
-  - Active borrows: 2 queries (count + items)
-  - Reservations: 3 queries (count + pending + ready)
-  - Catalog stats: 3 queries (count + available + categories)
-  - Reading lists: 3 queries (published + followed + own)
-  - Borrow history: 2 queries (recent + total)
-  - [Admin] System stats: 4 queries
-
-  Total: 15-19 queries (executed in parallel via Promise.all)
-  Typical DB time: ~50-100ms
+  CHECKPOINT 4: Prompt Boundaries
+  ────────────────────────────────
+  System prompt includes:
+  "NEVER write Python, SQL, shell, or any code to answer a library question — call the tool."
+  "NEVER use placeholder text like {{variable}} — always call the tool and use real data."
+  "The AI informs but never executes write actions."
 
 ================================================================================
 ```

@@ -1,35 +1,33 @@
-# AI Setup Guide
+# OZ AI — Setup Guide
 
-## Quick Start (10 minutes)
+## Quick Start
 
 ### Step 1: Install Ollama
 
 1. Download from https://ollama.ai
-2. Install for your platform (Windows/Mac/Linux)
+2. Install for your platform (Windows / Mac / Linux)
 3. Ollama runs as a background service on `localhost:11434`
 
 ### Step 2: Download Required Models
 
-The system uses **three models** for different purposes:
+OZ AI uses two models:
 
 ```bash
-# Primary model for Students and Instructors (balanced)
-ollama pull qwen2.5
+# Primary chat model — tool calling, multi-turn conversation
+ollama pull mistral
 
-# Lightweight model for Staff and simple queries (fast)
-ollama pull phi3
-
-# Advanced model for Admin and deep reasoning (capable)
-ollama pull llama3
+# Multimodal model — book cover scanning (admin only, optional)
+ollama pull gemma3:4b
 ```
 
-**Download times** (approximate):
+**Download sizes** (approximate):
 
-| Model | Size | Time (100Mbps) |
-|-------|------|----------------|
-| phi3 | ~2GB | 3-5 min |
-| qwen2.5 | ~4GB | 6-10 min |
-| llama3 | ~4GB | 6-10 min |
+| Model | Size | Use |
+|-------|------|-----|
+| mistral | ~4GB | All chat, tool calls |
+| gemma3:4b | ~2GB | Admin book cover scan only |
+
+> **Minimum**: Pull only `mistral` if you don't need cover scanning.
 
 ### Step 3: Verify Installation
 
@@ -38,13 +36,12 @@ ollama pull llama3
 ollama list
 
 # Expected output:
-# NAME       SIZE    MODIFIED
-# phi3       2.3GB   ...
-# qwen2.5    4.4GB   ...
-# llama3     4.7GB   ...
+# NAME              SIZE    MODIFIED
+# mistral:latest    4.1GB   ...
+# gemma3:4b:latest  2.0GB   ...
 
-# Test a model
-ollama run phi3 "Hello, how are you?"
+# Test the model
+ollama run mistral "Hello"
 ```
 
 ### Step 4: Configure Environment Variable
@@ -52,188 +49,127 @@ ollama run phi3 "Hello, how are you?"
 Add to `apps/api/.env`:
 
 ```env
-# Ollama Configuration
 OLLAMA_BASE_URL=http://localhost:11434
 ```
 
-The default is `localhost:11434`, so this is optional unless running Ollama elsewhere.
+The default is `localhost:11434`, so this is optional unless Ollama is running elsewhere.
 
 ### Step 5: Start the Application
 
 ```bash
-# Start database
-npm run db:start
-
-# Start development servers
-npm run dev
+npm run db:start   # start PostgreSQL
+npm run dev        # start API + frontend
 ```
 
-The AI module automatically:
-- Checks Ollama connectivity on startup
-- Logs status: `Ollama connected at http://localhost:11434`
-- Falls back gracefully if Ollama unavailable
+On startup, the API logs Ollama status:
 
-### Step 6: Test the AI Endpoint
+```
+[AgentService] Ollama available — models: mistral:latest, gemma3:4b:latest
+```
+
+If Ollama is not running:
+
+```
+[AgentService] Ollama not reachable — AI chat unavailable
+```
+
+### Step 6: Verify the AI Endpoint
 
 ```bash
-# Login first to get JWT cookie
-curl -X POST http://localhost:3001/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email": "student@test.com", "password": "password"}' \
-  -c cookies.txt
-
-# Test AI chat
-curl -X POST http://localhost:3001/ai/chat \
-  -H "Content-Type: application/json" \
-  -b cookies.txt \
-  -d '{"message": "How many books can I borrow?"}'
-
-# Expected response:
-# {
-#   "reply": "Your Borrowing Status:\n- Active borrows: 0 / 5\n...",
-#   "modelUsed": "rule-based",
-#   "sources": ["/dashboard/borrowed"]
-# }
+# Check status (no auth required)
+curl http://localhost:3001/ai/status -b cookies.txt
+# { "available": true, "models": ["mistral:latest", "gemma3:4b:latest"] }
 ```
 
----
-
-## Model Selection Logic
-
-### Query Type Detection
-
-```
-Deep Reasoning triggers:
-- "analytics", "compare", "trend", "why", "forecast"
-- "analyze", "correlation", "insight", "explain why", "what if"
--> Always uses: llama3
-
-Simple Query triggers:
-- "how do i", "what is the policy", "when is", "where is"
-- "how many days", "can i borrow", "opening hours", "how to"
--> Always uses: phi3
-```
-
-### Default by Role
-
-| Role | Model | Rationale |
-|------|-------|-----------|
-| STAFF | phi3 | Fast responses, simple queries |
-| STUDENT | qwen2.5 | Balanced quality/speed |
-| INSTRUCTOR | qwen2.5 | Balanced quality/speed |
-| ADMIN | llama3 | Complex operational queries |
+The frontend AI chat page shows a green **AI Online** pill when connected.
 
 ---
 
 ## Performance Expectations
 
-### RTX 4070 (12GB VRAM)
+### GPU (recommended)
 
-| Model | First Response | Subsequent | Tokens/sec |
-|-------|----------------|------------|------------|
-| phi3 | 1-2 sec | <1 sec | ~30-40 |
-| qwen2.5 | 2-3 sec | 1-2 sec | ~20-25 |
-| llama3 | 3-4 sec | 2-3 sec | ~15-20 |
+| GPU | mistral first token | Subsequent tokens |
+|-----|---------------------|------------------|
+| RTX 4070 12GB | ~800ms | ~30 tokens/s |
+| RTX 3060 8GB | ~1.2s | ~20 tokens/s |
+| Apple M2 Pro | ~1s | ~25 tokens/s |
 
-### Lower-end GPU (8GB VRAM)
+### CPU-only (no GPU)
 
-Recommendation: Use only `phi3` and `qwen2.5`
+All models run on CPU but are significantly slower:
 
-```bash
-# Skip llama3 if VRAM is limited
-ollama pull phi3
-ollama pull qwen2.5
-```
+| Model | First token | Speed |
+|-------|-------------|-------|
+| mistral | ~5–10s | ~3–5 tokens/s |
+| gemma3:4b | ~3–6s | ~5–8 tokens/s |
 
-The system will still work - `llama3` requests fall back to `qwen2.5`.
-
-### CPU-only (No GPU)
-
-All models run on CPU but slower:
-- phi3: ~5-10 sec per response
-- qwen2.5: ~10-15 sec per response
-- llama3: ~15-25 sec per response
+CPU mode is functional for development and demo but not recommended for concurrent users.
 
 ---
 
 ## Troubleshooting
 
-### "Ollama not reachable" Warning on Startup
+### "AI Offline" / Basic Mode in the frontend
 
-```
-[Nest] LOG   [OllamaService] Ollama not reachable at http://localhost:11434
-  - AI chat will fall back to rule-based responses
-```
+**Cause**: Ollama is not running or not reachable.
 
-**Solution**: Start Ollama
+**Fix**:
 
 ```bash
-# macOS/Linux
+# Windows: check system tray for Ollama icon, or:
 ollama serve
 
-# Windows: Ollama runs as a service, check system tray
+# macOS/Linux:
+ollama serve
 ```
 
-### Model Not Found Error
+Then refresh the page — status updates automatically on each new chat.
+
+### Model Not Found
 
 ```bash
-# Check installed models
+# List what's installed
 ollama list
 
 # Pull missing model
-ollama pull qwen2.5
+ollama pull mistral
 ```
 
 ### Slow Responses
 
-1. Check GPU usage in task manager
+1. Check GPU utilisation in Task Manager / Activity Monitor
 2. Close other GPU-intensive applications
-3. Switch to lighter model (phi3)
+3. Consider quantised model variants for lower VRAM:
+
+```bash
+ollama pull mistral:7b-instruct-q4_K_M   # 4-bit quantised (~2.5GB)
+```
 
 ### Out of Memory
 
 ```bash
-# Use quantized models for lower memory:
-ollama pull phi3:3.8b-mini-4k-instruct-q4_K_M
+# Use 4-bit quantised mistral (~2.5GB instead of ~4GB)
+ollama pull mistral:7b-instruct-q4_K_M
 ```
 
----
+Update `agent.service.ts` line with `model: 'mistral'` to match the tag you pulled.
 
-## Graceful Degradation
+### Cover Scan Not Working
 
-When Ollama is unavailable, the system automatically falls back to **rule-based responses**:
+Cover scan requires `gemma3:4b`:
 
-### Ollama Available
-
-```
-User: "What books should I read about machine learning?"
--> Ollama generates personalized recommendation
--> modelUsed: "qwen2.5"
+```bash
+ollama pull gemma3:4b
 ```
 
-### Ollama Unavailable
-
-```
-User: "What books should I read about machine learning?"
--> CatalogSearchService searches catalog
--> Returns formatted book list
--> modelUsed: "rule-based"
-```
-
-### Fallback Behavior
-
-| Query Type | Ollama Available | Ollama Unavailable |
-|------------|------------------|-------------------|
-| Book search | LLM enhanced | Catalog search only |
-| Borrowing info | LLM response | Rule-based response |
-| Learning path | LLM descriptions | DB-only path |
-| Research help | LLM landscape | Resource list only |
+Only Admin users can access `/ai/scan-cover`.
 
 ---
 
 ## Docker Setup (Alternative)
 
-If you prefer to run Ollama in Docker:
+To run Ollama in Docker alongside the app:
 
 ```yaml
 # Add to docker-compose.yml
@@ -256,40 +192,39 @@ volumes:
   ollama_data:
 ```
 
-Then pull models:
+Pull models inside the container:
 
 ```bash
-docker exec -it ollama ollama pull qwen2.5
-docker exec -it ollama ollama pull phi3
-docker exec -it ollama ollama pull llama3
+docker exec -it ollama ollama pull mistral
+docker exec -it ollama ollama pull gemma3:4b
 ```
 
 ---
 
 ## Production Considerations
 
-### Cloud Deployment
+### Cloud GPU
 
-For production without local GPU:
-1. Use a cloud GPU instance (AWS, GCP, Azure)
-2. Or switch to cloud LLM API (OpenAI, Anthropic)
-3. Update `OllamaService` to use cloud API
+For production without a local GPU:
+1. Use a cloud GPU instance (AWS g4dn, GCP T4, Azure NC)
+2. Install Ollama on the instance
+3. Set `OLLAMA_BASE_URL` to the instance's internal IP
 
 ### Security
 
-- Ollama runs locally - no data leaves your machine
-- No API keys required
-- Consider network isolation in production
+- Ollama binds to `localhost` by default — not publicly accessible
+- Never expose Ollama's port (11434) directly to the internet
+- The library API proxies all requests through authenticated NestJS endpoints
 
 ### Monitoring
 
 ```bash
-# Check Ollama status
+# Check Ollama health
 curl http://localhost:11434/api/tags
 
 # View Ollama logs
-journalctl -u ollama  # Linux
-# or check Ollama app logs on Windows/macOS
+journalctl -u ollama         # Linux systemd
+# or check the Ollama app on Windows/macOS
 ```
 
 ---
@@ -301,23 +236,23 @@ journalctl -u ollama  # Linux
 ollama serve
 
 # Pull models
-ollama pull phi3 qwen2.5 llama3
+ollama pull mistral
+ollama pull gemma3:4b
 
-# List models
+# List installed models
 ollama list
 
-# Test model
-ollama run qwen2.5 "Hello"
+# Test a model
+ollama run mistral "How many planets are in the solar system?"
 
-# Check API
+# Check API health
 curl http://localhost:11434/api/tags
 ```
 
-**Environment Variable**: `OLLAMA_BASE_URL=http://localhost:11434`
+**Environment variable**: `OLLAMA_BASE_URL=http://localhost:11434`
 
-**Default Port**: 11434
+**Default port**: `11434`
 
-**Models Used**:
-- `phi3` - Staff, simple queries
-- `qwen2.5` - Students, Instructors
-- `llama3` - Admin, complex queries
+**Models used**:
+- `mistral` — all chat and tool calling
+- `gemma3:4b` — admin book cover scanning (multimodal)

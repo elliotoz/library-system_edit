@@ -1,8 +1,21 @@
-# AI Assistant User Guide
+# OZ AI — User Guide
 
 ## Overview
 
-The AI Assistant is available in your dashboard at `/dashboard/ai-assistant`. It provides personalized help based on your role in the library system.
+**OZ AI** is available in your dashboard at `/dashboard/ai-assistant`. It provides real-time, personalised help based on your role, backed by live library data — not guesswork.
+
+Unlike a generic chatbot, OZ AI calls the actual library database to answer questions. When you ask "how many books do we have?", it queries the database and gives you the exact number.
+
+---
+
+## Conversations
+
+OZ AI remembers your conversation history. Each chat session is saved as a named conversation.
+
+- Click **+ New Chat** in the sidebar to start a fresh conversation
+- Previous conversations appear in the sidebar, sorted by most recent
+- Click any conversation to resume where you left off
+- Delete conversations using the trash icon
 
 ---
 
@@ -15,59 +28,59 @@ The AI Assistant is available in your dashboard at `/dashboard/ai-assistant`. It
 "Find books about machine learning"
 "Search for psychology textbooks"
 "Show me available books on finance"
-"Recommend books for beginners in programming"
+"Do you have Clean Code by Robert Martin?"
 ```
 
 #### Borrowing Information
 ```
 "How many books can I borrow?"
+"What books do I currently have borrowed?"
 "When are my books due?"
-"Can I extend my borrow?"
-"What's my borrowing limit?"
+"Am I close to my borrow limit?"
 ```
 
-#### Reservations
+#### Library Stats
 ```
-"What's the status of my reservation?"
-"Do I have any books ready for pickup?"
-"How do I reserve a book?"
+"How many books does the library have?"
+"How many copies are available right now?"
+"How many e-books do we have?"
 ```
 
-#### Learning Paths
+#### E-Book Content
 ```
-"Create a learning path for data science"
-"What should I read to learn web development?"
-"Study plan for algorithms"
+"Summarise the book Frankenstein"
+"What does Think Python say about recursion?"
 ```
 
 #### Research Help
 ```
-"Research on artificial intelligence"
-"Find academic resources for my thesis"
-"Literature on cognitive psychology"
+"Find me books on neural networks"
+"What academic resources do we have on climate change?"
+"I'm writing a thesis on cognitive psychology — what can you find?"
 ```
 
 #### Reading Lists
 ```
 "Show me reading lists from my instructors"
-"What reading lists are available?"
-"Find reading lists about economics"
+"What reading lists are available for engineering students?"
 ```
 
 ### Your Limits
 
-| Limit | Value |
-|-------|-------|
-| Max books | 5 at a time |
+| Limit | Default Value |
+|-------|--------------|
+| Max active borrows | 5 |
 | Borrow period | 14 days |
 | Extensions | 2 (7 days each) |
 
+*(Your actual policy may differ — OZ AI will tell you your exact limits.)*
+
 ### Tips
 
-- Ask naturally - the AI understands conversational language
-- It shows relevant links to dashboard pages
-- Recommendations are personalized to your faculty
-- Follow instructors to see their reading lists
+- Ask naturally — OZ AI understands conversational language
+- Book titles in responses are clickable links to the catalog detail page
+- Recommendations are personalised to your faculty
+- Attach an image and ask OZ AI to describe it
 
 ---
 
@@ -78,7 +91,6 @@ The AI Assistant is available in your dashboard at `/dashboard/ai-assistant`. It
 #### Reading Lists
 ```
 "How do I create a reading list?"
-"Show me my reading lists"
 "What books should I add for my algorithms course?"
 "Help me curate a list for freshman students"
 ```
@@ -87,35 +99,25 @@ The AI Assistant is available in your dashboard at `/dashboard/ai-assistant`. It
 ```
 "How do I submit a publication?"
 "What's the process for uploading course materials?"
-"Can I share my research paper with students?"
 ```
 
 #### Course Resources
 ```
-"Find books for my data structures course"
-"Recommend textbooks for advanced statistics"
-"What's available in the faculty collection?"
+"Find textbooks for my data structures course"
+"What's available in the faculty collection for advanced statistics?"
 ```
 
 #### Borrowing (Extended Privileges)
 ```
-"How many books can I borrow?"
-"What's my borrowing status?"
+"What's my current borrowing status?"
 "When are my books due?"
-```
-
-#### Research Assistance
-```
-"Research resources on neural networks"
-"Academic literature on cognitive science"
-"Help with research methodology books"
 ```
 
 ### Your Privileges
 
 | Privilege | Value |
 |-----------|-------|
-| Max books | 10 at a time |
+| Max active borrows | 10 |
 | Borrow period | 30 days |
 | Extensions | 3 (7 days each) |
 | Create reading lists | Yes |
@@ -123,81 +125,48 @@ The AI Assistant is available in your dashboard at `/dashboard/ai-assistant`. It
 
 ### Tips
 
-- Students who follow you get notified when you publish
-- The AI can help you find books to add to reading lists
-- Your faculty collection is prioritized in recommendations
+- Students who follow you are notified when you publish a reading list
+- OZ AI can suggest books to add to a reading list by topic
+- Your faculty collection is prioritised in search results
 
 ---
 
 ## For Staff
 
-### First Time Setup
-
-When you first use the AI assistant, it will ask about your interests:
-
-```
-AI: "Hi! To give you personalized recommendations, I need to know your interests.
-     Please tell me your areas of interest (e.g., 'finance, technology, history')."
-
-You: "finance, technology, history, self-help"
-
-AI: "Great! I've saved your interests: finance, technology, history, self-help.
-     Now I can give you personalized recommendations."
-```
-
 ### What You Can Ask
+
+#### Catalog & Stats
+```
+"How many books do we have in the catalog?"
+"What are the most borrowed books?"
+"How many copies are available?"
+```
 
 #### Personalized Recommendations
 ```
 "Suggest books for me"
-"What should I read next?"
-"Find books about my interests"
-"New arrivals I might like"
+"What should I read next based on my interests?"
+"Find books about leadership"
 ```
 
 #### Borrowing
 ```
-"How many books can I borrow?"
-"What's my borrowing status?"
+"What books do I currently have out?"
 "When are my books due?"
 ```
-
-#### Catalog Search
-```
-"Find books about leadership"
-"Search for productivity books"
-"Available books on management"
-```
-
-#### Reading Lists
-```
-"Show me popular reading lists"
-"Reading lists about business"
-"What are instructors recommending?"
-```
-
-#### Update Interests
-
-Just type a new comma-separated list anytime:
-```
-"technology, blockchain, AI, productivity"
-```
-
-The AI will automatically update your preferences.
 
 ### Your Limits
 
 | Limit | Value |
 |-------|-------|
-| Max books | 7 at a time |
+| Max active borrows | 7 |
 | Borrow period | 14 days |
 | Extensions | 2 (7 days each) |
 
 ### Tips
 
-- Keep your interests updated for better recommendations
-- The AI remembers your reading history for personalization
-- Try following instructors whose interests match yours
+- Update your interests in your profile for better recommendations
+- OZ AI reads your borrow history to personalise suggestions
 
 ---
 
@@ -207,82 +176,52 @@ The AI will automatically update your preferences.
 
 #### System Overview
 ```
-"How is the library doing?"
-"Give me a system overview"
-"What's the current status?"
-"Dashboard summary"
+"How many books are in the catalog?"
+"How many copies are available vs borrowed?"
+"How many active borrows do we have right now?"
+"What are the most borrowed books?"
 ```
 
-#### Reservations
+#### Active Operations
 ```
-"How many pending reservations?"
-"Reservation status overview"
-"Any reservations needing attention?"
-```
-
-#### Loans & Overdue
-```
-"How many active loans?"
-"Show me overdue statistics"
-"Any overdue books?"
-"Loan trends"
+"How many pending reservations are there?"
+"Show me reservations ready for pickup"
+"Are there any overdue borrows?"
 ```
 
-#### User Management
+#### Book Catalog
 ```
-"How many active users?"
-"User statistics"
-"User management overview"
-```
-
-#### Catalog Management
-```
-"How many books in the catalog?"
-"Available copies count"
-"Popular categories"
+"Find books about [topic]"
+"Show me details for book ID abc123"
+"How many e-books do we have?"
 ```
 
-#### Reading Lists
-```
-"How many published reading lists?"
-"Reading list moderation status"
-```
+#### Book Cover Scanning (Admin only)
 
-#### Analytics
-```
-"Analyze borrowing trends"
-"Compare this month to last month"
-"What insights can you give me?"
-"Forecast demand"
-```
+From the **Add Book** page, click **Scan Cover**:
+1. Upload a photo of the book cover
+2. OZ AI (using `gemma3:4b` multimodal) extracts the title, authors, ISBN, publisher, and year
+3. The form is auto-filled — review and save
 
-### What the AI Won't Do
+### What OZ AI Won't Do
 
-The AI provides information only - it does NOT execute actions:
+OZ AI provides information only — it does **not** execute write actions:
 
-- Delete or deactivate users
-- Approve or reject materials
-- Change system settings
-- Modify books or reservations
+- Cannot delete or deactivate users
+- Cannot approve or reject materials
+- Cannot change system settings
+- Cannot process returns or approvals
 
-For these actions, use the Admin Dashboard directly.
+Use the Admin Dashboard directly for those actions.
 
 ### Your Privileges
 
 | Privilege | Value |
 |-----------|-------|
-| Max books | Unlimited |
+| Max borrows | Unlimited |
 | Borrow period | 60 days |
 | Extensions | Unlimited |
-| System visibility | Full |
-| AI model | llama3 (most capable) |
-
-### Tips
-
-- The AI uses the most capable model for complex queries
-- Ask "why" questions for deeper analysis
-- It can compare trends and provide forecasts
-- All links provided go to admin pages
+| System-wide data access | Full (via tools) |
 
 ---
 
@@ -290,51 +229,40 @@ For these actions, use the Admin Dashboard directly.
 
 ### Example Prompts by Category
 
-| Category | Example |
-|----------|---------|
-| Search | "Find books about [topic]" |
-| Borrowing | "How many books can I borrow?" |
-| Reservations | "Do I have any pickups ready?" |
-| Learning | "Learning path for [topic]" |
-| Research | "Research on [topic]" |
+| Category | Example Prompt |
+|----------|---------------|
+| Book search | "Find books about [topic]" |
+| Book lookup | "Find me Clean Code" |
+| Catalog stats | "How many books do we have?" |
+| My borrows | "What books do I have out?" |
+| Due dates | "When are my books due?" |
+| E-book | "Summarise [book title]" |
+| Web lookup | "Fetch this URL and summarise it: [url]" |
 | Help | "What can you help me with?" |
 
-### Response Indicators
+### Status Indicator
+
+The OZ AI header shows your connection status:
 
 | Badge | Meaning |
 |-------|---------|
-| `rule-based` | Fast, keyword-matched response |
-| `phi3` | Lightweight model, quick responses |
-| `qwen2.5` | Balanced model, most common |
-| `llama3` | Advanced model, complex queries |
-| `system` | Internal operation (e.g., saving interests) |
+| 🟢 **AI Online** | Ollama is running — full capabilities available |
+| 🟡 **Basic Mode** | Ollama unavailable — limited responses only |
 
-### Source Links
+### Offline / Basic Mode
 
-Responses include clickable links to relevant pages:
-- Catalog
-- Borrowed
-- Reservations
-- Reading Lists
-
----
-
-## Offline Mode
-
-If the AI server (Ollama) is unavailable:
-
-- The assistant still works
-- Uses rule-based responses (pre-programmed answers)
-- You'll see "rule-based" as the model
-- All core features remain functional
-
-The experience is slightly less natural, but all essential functionality works.
+When Ollama is unavailable:
+- OZ AI cannot answer questions that require the LLM
+- Tool calls that go directly to the database (catalog stats, borrows) may still work
+- The "Basic Mode" amber pill appears in the chat header
+- Start Ollama and refresh to restore full capabilities
 
 ---
 
 ## Privacy
 
-- All conversations are processed locally
-- No data is sent to external servers
-- The AI only accesses your own library data
-- Conversations are not stored permanently
+- All conversations are processed locally — no data leaves your server
+- No data is sent to external AI providers
+- OZ AI only accesses your own library data (borrows, reservations)
+- Conversation history is stored in the database and visible only to you
+- Admins can access system-wide data (borrows, reservations) through the appropriate tools

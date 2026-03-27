@@ -1,12 +1,8 @@
-# AI Architecture Document
+# OZ AI — Architecture
 
 ## Overview
 
-The AI module transforms a traditional library management system into a **Smart Library Management System** by providing:
-- Natural language interaction
-- Role-aware personalized responses
-- Live context from the library database
-- Graceful degradation when LLM is unavailable
+OZ AI is an **agentic assistant** that answers questions by calling real database tools rather than relying on static context injection. It streams responses token-by-token via Server-Sent Events (SSE) and loops through tool calls until it has enough information to answer.
 
 ---
 
@@ -19,78 +15,55 @@ The AI module transforms a traditional library management system into a **Smart 
     +----+-----+    +-----+------+    +----+-----+    +----+-----+
          |               |                 |               |
          +-------+-------+--------+--------+-------+-------+
-                 |                         |
-                 v                         v
-         +-------+-------------------------+-------+
-         |              HTTPS Request              |
-         |      Cookie: access_token=JWT           |
-         +-------------------+---------------------+
+                 |
+                 v
+         +-------+-------------------------------------------+
+         |              HTTPS Request                        |
+         |      Cookie: access_token=JWT                     |
+         +-------------------+-------------------------------+
                              |
                              v
-         +-------------------+---------------------+
-         |           FRONTEND (Next.js 14)         |
-         |           apps/web/                     |
-         |  +------------------------------------+ |
-         |  | app/dashboard/ai-assistant/page   | |
-         |  | - Chat UI with message history    | |
-         |  | - Markdown rendering              | |
-         |  | - Source links as badges          | |
-         |  +------------------------------------+ |
-         |  +------------------------------------+ |
-         |  | lib/api.ts                        | |
-         |  | - fetchWithAuth('/ai/chat')       | |
-         |  +------------------------------------+ |
-         +-------------------+---------------------+
+         +-------------------+-------------------------------+
+         |           FRONTEND (Next.js 14)                   |
+         |  app/dashboard/ai-assistant/page.tsx              |
+         |  - Conversation sidebar (persistent history)      |
+         |  - SSE reader — renders tokens as they arrive     |
+         |  - Markdown rendering with clickable book links   |
+         |  - Image upload (compressed via Canvas API)       |
+         +-------------------+-------------------------------+
                              |
-                             | POST /ai/chat
-                             | { message: string }
+                             | POST /ai/chat   (SSE response)
+                             | { message, conversationId?, image? }
                              v
-         +-------------------+---------------------+
-         |           BACKEND (NestJS 10)           |
-         |           apps/api/                     |
-         |  +------------------------------------+ |
-         |  | JwtAuthGuard                       | |
-         |  | - Extract JWT from cookie          | |
-         |  | - Verify signature                 | |
-         |  | - Attach user to request           | |
-         |  +------------------------------------+ |
-         |                   |                     |
-         |                   v                     |
-         |  +------------------------------------+ |
-         |  | AiController                       | |
-         |  | POST /chat -> AiService.chat()    | |
-         |  +------------------------------------+ |
-         +-------------------+---------------------+
+         +-------------------+-------------------------------+
+         |           BACKEND (NestJS 10)                     |
+         |  JwtAuthGuard → AiController → AgentService      |
+         +-------------------+-------------------------------+
                              |
                              v
-         +-------------------+---------------------+
-         |              AI SERVICE LAYER           |
-         |  +------------------------------------+ |
-         |  | ContextBuilderService              | |
-         |  | - Gathers live DB context          | |
-         |  +------------------------------------+ |
-         |                   |                     |
-         |                   v                     |
-         |  +------------------------------------+ |
-         |  | AiService (Orchestrator)           | |
-         |  | - Intent routing                   | |
-         |  | - Coordinates specialized services | |
-         |  +------------------------------------+ |
-         |         |         |         |           |
-         |         v         v         v           |
-         |  +----------+ +--------+ +----------+   |
-         |  | Catalog  | |Learning| | Research |   |
-         |  | Search   | | Path   | | Assistant|   |
-         |  +----------+ +--------+ +----------+   |
-         |         |         |         |           |
-         |         +----+----+----+----+           |
-         |              |         |                |
-         |              v         v                |
-         |  +------------------------------------+ |
-         |  | OllamaService    RoleResponseService|
-         |  | (LLM)            (Rule-based)       |
-         |  +------------------------------------+ |
-         +-------------------+---------------------+
++--------------------------------------------------------------------+
+|                    AGENTIC LOOP (AgentService)                     |
+|                                                                    |
+|  1. Build system prompt (user profile, borrows, policy)           |
+|  2. Load conversation history from DB (AiMessage)                 |
+|  3. Append user message                                            |
+|  4. Call Ollama /api/chat with tools injected                      |
+|                                                                    |
+|  ┌─────────────────────────────────────────┐                       |
+|  │  Ollama responds with...                │                       |
+|  │                                         │                       |
+|  │  tool_call?                             │                       |
+|  │  ┌──────YES──────┐   ┌────NO────┐       │                       |
+|  │  │ executeTool() │   │ stream   │       │                       |
+|  │  │ (Prisma/fetch)│   │ tokens   │       │                       |
+|  │  └──────┬────────┘   └──────────┘       │                       |
+|  │         │ inject tool result            │                       |
+|  │         └──────────► loop back ────────►│                       |
+|  └─────────────────────────────────────────┘                       |
+|                                                                    |
+|  5. Persist user + assistant messages to AiMessage table           |
+|  6. Update conversation title on first message                     |
++--------------------------------------------------------------------+
                              |
              +---------------+---------------+
              |                               |
@@ -107,226 +80,78 @@ The AI module transforms a traditional library management system into a **Smart 
 
 ### AiController (`ai.controller.ts`)
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/ai/chat` | POST | Main chat endpoint |
-| `/ai/interests` | PATCH | Update user interests |
-| `/ai/context` | GET | Debug: view AI context |
+| Endpoint | Method | Purpose | Guard |
+|----------|--------|---------|-------|
+| `/ai/status` | GET | Ollama availability + installed models | JwtAuthGuard |
+| `/ai/conversations` | GET | List user's conversations | JwtAuthGuard |
+| `/ai/conversations` | POST | Create new conversation | JwtAuthGuard |
+| `/ai/conversations/:id` | DELETE | Delete a conversation | JwtAuthGuard |
+| `/ai/history` | GET | Message history (optionally scoped to conversation) | JwtAuthGuard |
+| `/ai/chat` | POST | Main SSE chat endpoint | JwtAuthGuard |
+| `/ai/interests` | PATCH | Update user interests | JwtAuthGuard |
+| `/ai/context` | GET | Debug: view built AI context | JwtAuthGuard |
+| `/ai/scan-cover` | POST | Admin: scan book cover image → extract metadata | JwtAuthGuard + RolesGuard(ADMIN) |
 
-- Protected by `JwtAuthGuard`
-- Extracts `userId` and `userRole` from JWT
-- Swagger documented
+### AgentService (`agent.service.ts`)
 
-### AiService (`ai.service.ts`)
+The core of OZ AI. Responsibilities:
 
-**Role**: Central orchestrator and intent router
-
-```
-chat(userId, userRole, message)
-    |
-    +-> ContextBuilderService.build()
-    |
-    +-> Intent Detection (priority order):
-        |
-        +-> Staff Interest Bootstrap
-        +-> Staff Interest Update
-        +-> Admin Permission Gate
-        +-> Catalog Search (CatalogSearchService)
-        +-> Learning Path (LearningPathService)
-        +-> Research Query (ResearchAssistantService)
-        +-> General Chat (OllamaService + RoleResponseService fallback)
-```
-
-### ContextBuilderService (`context-builder.service.ts`)
-
-**Role**: Gather live data from database for each request
-
-| Data Gathered | Source |
-|---------------|--------|
-| User profile | `users` table |
-| Borrow policy | `borrow_policies` table |
-| Active borrows | `borrows` WHERE status=ACTIVE |
-| Reservations | `reservations` table |
-| Catalog stats | `books` + `book_copies` |
-| Reading lists | `reading_lists` table |
-| Borrow history | `borrows` WHERE status=RETURNED |
-| Admin stats | System-wide aggregates (ADMIN only) |
+- **Conversation management** — CRUD for `AiConversation` and `AiMessage` Prisma records
+- **System prompt** — builds a personalised prompt per user (name, role, faculty, borrows, policy)
+- **Tool registry** — defines 8 tools as Ollama `Tool[]` objects
+- **Agentic loop** — calls Ollama, detects tool calls, executes them, feeds results back, loops until final answer
+- **SSE streaming** — yields tokens to the controller as they arrive via async generator `chatStream()`
+- **Message persistence** — saves user + assistant messages after each exchange
 
 ### OllamaService (`ollama.service.ts`)
 
-**Role**: LLM integration with role-based model selection
+- `generate()` — single-turn generation (used by legacy `ai.service.ts`)
+- `chat()` — multi-turn chat with history array (used by legacy path)
+- `scanBookCover(base64)` — calls Ollama `/api/generate` with `gemma3:4b` + image; extracts title/authors/ISBN/publisher/year as JSON
+- `isAvailable()` — returns current availability flag (updated on every call success/failure)
 
-| Role | Default Model | Deep Reasoning |
-|------|---------------|----------------|
-| STAFF | phi3 | llama3 |
-| STUDENT | qwen2.5 | llama3 |
-| INSTRUCTOR | qwen2.5 | llama3 |
-| ADMIN | llama3 | llama3 |
+### ContextBuilderService (`context-builder.service.ts`)
 
-### RoleResponseService (`role-response.service.ts`)
-
-**Role**: Rule-based fallback when Ollama unavailable
-
-- Keyword-based response matching per role
-- Handles common queries without LLM
-- Provides structured responses with sources
-
-### CatalogSearchService (`catalog-search.service.ts`)
-
-**Role**: Natural language to catalog search
-
-- Parses intent (keywords, category, availability)
-- Builds dynamic Prisma query
-- Applies semantic scoring
-- Returns formatted book list
-
-### SemanticSearchService (`semantic-search.service.ts`)
-
-**Role**: Multi-factor book scoring and ranking
-
-| Factor | Weight |
-|--------|--------|
-| Keyword match | 40% |
-| Category match | 20% |
-| Faculty relevance | 15% |
-| Availability | 15% |
-| Recency | 10% |
-
-### LearningPathService (`learning-path.service.ts`)
-
-**Role**: Generate structured learning paths
-
-- Groups books into difficulty levels
-- Stages: Foundations -> Core -> Advanced
-- Considers user's borrow history
-
-### ResearchAssistantService (`research-assistant.service.ts`)
-
-**Role**: Research guidance and literature discovery
-
-- Searches books, reading lists, and materials
-- Provides role-specific guidance
-- Optionally generates literature landscape via Ollama
+Still used by the legacy `ai.service.ts` path. Executes 15–19 parallel Prisma queries to assemble a full `AiContext` object (user profile, borrow policy, active borrows, reservations, catalog stats, reading lists, borrow history, admin stats).
 
 ---
 
-## Intent Routing Flow
+## Tools
 
-```
-                         User Message
-                              |
-                              v
-                    +-------------------+
-                    | Build Live Context|
-                    +-------------------+
-                              |
-                              v
-+------------------------------------------------------------------+
-|                       INTENT ROUTER                               |
-+------------------------------------------------------------------+
-|                              |                                    |
-|  1. Staff + No Interests?    |                                    |
-|     +-> YES: Return bootstrap prompt                              |
-|     +-> NO: Continue                                              |
-|                              |                                    |
-|  2. Staff + Looks like interests?                                 |
-|     +-> YES: Save interests, return confirmation                  |
-|     +-> NO: Continue                                              |
-|                              |                                    |
-|  3. Non-Admin + Admin action?                                     |
-|     +-> YES: Return permission denied message                     |
-|     +-> NO: Continue                                              |
-|                              |                                    |
-|  4. Catalog search query?                                         |
-|     ("find books", "search for", "available books")               |
-|     +-> YES: Route to CatalogSearchService                        |
-|     +-> NO: Continue                                              |
-|                              |                                    |
-|  5. Learning path query?                                          |
-|     ("learning path", "study plan", "what should I read")         |
-|     +-> YES: Route to LearningPathService                         |
-|     +-> NO: Continue                                              |
-|                              |                                    |
-|  6. Research query?                                               |
-|     ("research on", "thesis about", "literature on")              |
-|     +-> YES: Route to ResearchAssistantService                    |
-|     +-> NO: Continue                                              |
-|                              |                                    |
-|  7. General query                                                 |
-|     +-> Try OllamaService                                         |
-|         +-> Success: Return LLM response                          |
-|         +-> Failure: Fallback to RoleResponseService              |
-|                                                                   |
-+------------------------------------------------------------------+
-```
+| Tool | Parameters | Data Source |
+|------|-----------|-------------|
+| `search_catalog` | `query`, `pageSize` | `GET /books` API |
+| `get_book_details` | `bookId` | `GET /books/:id` API |
+| `read_ebook` | `url`, `question` | External HTTP fetch |
+| `fetch_webpage` | `url`, `purpose` | External HTTP fetch |
+| `get_my_borrows` | — | Prisma direct (scoped to caller) |
+| `get_catalog_stats` | — | Prisma direct (6 parallel counts) |
+| `get_active_borrows` | — | Prisma direct + raw SQL (top 5) |
+| `get_active_reservations` | — | Prisma direct |
 
 ---
 
-## Data Flow: Request to Response
+## Conversation & Message Persistence
 
 ```
-1. USER INPUT
-   "Find books about machine learning"
-              |
-              v
-2. FRONTEND (Next.js)
-   - User types message
-   - handleSendMessage()
-   - api.chat(message)
-   - POST /ai/chat with JWT cookie
-              |
-              v
-3. AUTHENTICATION (JwtAuthGuard)
-   - Extract JWT from cookie
-   - Verify signature
-   - Decode: { sub: userId, role: 'STUDENT' }
-   - Attach to request
-              |
-              v
-4. CONTROLLER (AiController)
-   - @CurrentUser('id') -> userId
-   - @CurrentUser('role') -> userRole
-   - Call aiService.chat(userId, userRole, message)
-              |
-              v
-5. CONTEXT BUILDING (ContextBuilderService)
-   - Query user profile
-   - Query borrow policy
-   - Query active borrows
-   - Query reservations
-   - Query catalog stats
-   - Query reading lists
-   - Query borrow history
-   - [ADMIN] Query system stats
-   - Return AiContext object
-              |
-              v
-6. INTENT ROUTING (AiService)
-   - "Find books about" matches search pattern
-   - Route to CatalogSearchService
-              |
-              v
-7. CATALOG SEARCH (CatalogSearchService)
-   - Parse: keywords=["machine", "learning"]
-   - Query database for matching books
-   - Apply semantic scoring
-   - Format as markdown
-              |
-              v
-8. RESPONSE ASSEMBLY
-   {
-     reply: "Found 12 books...",
-     modelUsed: "rule-based",
-     sources: ["/dashboard/catalog"]
-   }
-              |
-              v
-9. FRONTEND RENDERING
-   - Receive ChatResponse
-   - Update message state
-   - Render markdown
-   - Display source badges
+AiConversation
+  id          UUID
+  userId      → User
+  title       string   (auto-set from first message)
+  createdAt
+  updatedAt
+  messages[]  → AiMessage[]
+
+AiMessage
+  id
+  userId      → User
+  conversationId → AiConversation (nullable — legacy messages)
+  role        "user" | "assistant" | "tool"
+  content     string
+  createdAt
 ```
+
+History is loaded at the start of each `chatStream()` call (last 50 messages) and passed as the Ollama message array, giving the model full multi-turn context.
 
 ---
 
@@ -346,23 +171,25 @@ chat(userId, userRole, message)
           |                |                |
           v                v                v
    +------+------+  +------+------+  +------+------+
-   | UsersModule |  |PrismaModule |  | (internal)  |
+   | UsersModule |  |PrismaModule |  | AuthModule  |
    +-------------+  +-------------+  +-------------+
                                             |
-            +-------+-------+-------+-------+-------+-------+
-            |       |       |       |       |       |       |
-            v       v       v       v       v       v       v
-        +-----+ +-----+ +-----+ +-----+ +-----+ +-----+ +-----+
-        | Ai  | |Ctxt | |Role | |Cat  | |Sem  | |Lrn  | |Res  |
-        | Svc | |Bldr | |Resp | |Srch | |Srch | |Path | |Asst |
-        +-----+ +-----+ +-----+ +-----+ +-----+ +-----+ +-----+
-            |                                               |
-            +-------------------+---------------------------+
-                                |
-                                v
-                         +------+------+
-                         |OllamaService|
-                         +-------------+
+                    +-----------------------+
+                    |
+                    v
+         +----------+----------+
+         |                     |
+         v                     v
+  +-------------+      +---------------+
+  | AgentService|      | AiService     |
+  | (agentic    |      | (legacy       |
+  |  SSE loop)  |      |  orchestrator)|
+  +-------------+      +---------------+
+         |
+         v
+  +-------------+
+  | OllamaService|
+  +-------------+
 ```
 
 ---
@@ -372,14 +199,11 @@ chat(userId, userRole, message)
 | File | Purpose |
 |------|---------|
 | `src/ai/ai.module.ts` | Module definition |
-| `src/ai/ai.controller.ts` | REST endpoints |
-| `src/ai/ai.service.ts` | Orchestrator |
-| `src/ai/context-builder.service.ts` | DB context gatherer |
-| `src/ai/role-response.service.ts` | Rule-based fallback |
-| `src/ai/catalog-search.service.ts` | Natural language search |
-| `src/ai/semantic-search.service.ts` | Book scoring |
-| `src/ai/learning-path.service.ts` | Learning path generator |
-| `src/ai/research-assistant.service.ts` | Research guidance |
-| `src/ai/ollama.service.ts` | LLM integration |
+| `src/ai/ai.controller.ts` | REST + SSE endpoints |
+| `src/ai/agent.service.ts` | Agentic loop, tools, SSE streaming, conversation persistence |
+| `src/ai/ai.service.ts` | Legacy orchestrator (intent-router path, still registered) |
+| `src/ai/context-builder.service.ts` | DB context gatherer (used by legacy path) |
+| `src/ai/ollama.service.ts` | LLM calls + cover scan |
 | `src/ai/dto/chat.dto.ts` | Chat request DTO |
-| `src/ai/dto/update-interests.dto.ts` | Interests DTO |
+| `src/ai/dto/scan-cover.dto.ts` | Cover scan DTO (base64, 2MB cap) |
+| `src/ai/dto/update-interests.dto.ts` | Interests update DTO |

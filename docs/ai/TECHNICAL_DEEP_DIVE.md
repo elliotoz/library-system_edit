@@ -1,623 +1,429 @@
-# AI Technical Deep-Dive
+# OZ AI — Technical Deep-Dive
 
-## Context Building
+## System Prompt
 
-### AiContext Interface
+The system prompt is built dynamically per request in `AgentService.buildSystemPrompt()`. It is personalised to the specific user making the request.
 
-The complete context object built for each request:
+### Structure
 
-```typescript
-interface AiContext {
-  // User information
-  user: {
-    id: string;
-    name: string;
-    role: Role;                    // STUDENT | INSTRUCTOR | STAFF | ADMIN
-    facultyName: string | null;    // e.g., "Engineering", "Arts"
-    interests: string[];           // Staff-specific personal interests
-  };
+```
+You are OZ AI — the AI assistant for AI Integrated Library System.
+You are smart, academic, friendly, and precise.
+Respond in English by default. Only switch to Turkish if the user's message is written in Turkish.
 
-  // Role-specific borrow limits
-  borrowPolicy: {
-    maxActiveBorrows: number;      // 5 (student), 10 (instructor), etc.
-    maxBorrowDays: number;         // 14, 30, 60 days
-    maxExtensions: number;         // 2, 3, unlimited
-    extensionDays: number;         // 7 days per extension
-  };
+## Current User
+Name: {user.name}
+Role: {user.role}
+Faculty: {user.faculty.name}
+Interests: {user.interests}
+Currently Borrowed: {book titles}
+Active Borrows: {count} / {maxActiveBorrows} max
+Borrow Policy: {maxBorrowDays} days, {maxExtensions} extensions
 
-  // Current borrowing status
-  activeBorrows: {
-    count: number;                 // How many books currently borrowed
-    items: Array<{
-      title: string;
-      dueAt: Date;
-    }>;                            // Top 5 upcoming due dates
-  };
+## Your Capabilities
+You have tools to search the library catalog, count catalog stats, get book details,
+read and summarise e-books, fetch web pages, check your own borrows, and — for staff/admin —
+view all active borrows and reservations across the library.
+You have direct, real-time access to the library database through these tools.
 
-  // Reservation status
-  reservations: {
-    count: number;                 // Total active reservations
-    pending: number;               // Awaiting approval
-    readyForPickup: number;        // Ready to collect
-  };
-
-  // Library catalog snapshot
-  catalog: {
-    totalBooks: number;            // e.g., 1500
-    availableCopies: number;       // e.g., 3200
-    facultyBooks: number;          // Books in user's faculty
-    topCategories: string[];       // ["Computer Science", "Business", ...]
-  };
-
-  // Reading list statistics
-  readingLists: {
-    publishedCount: number;        // Total published lists
-    followedInstructors: number;   // How many instructors user follows
-    ownListCount: number;          // User's own lists (instructor/admin)
-  };
-
-  // Past borrowing history
-  borrowHistory: {
-    recentBooks: Array<{
-      title: string;
-      category: string | null;
-      returnedAt: Date;
-    }>;                            // Last 10 returned books
-    totalBorrowed: number;         // Lifetime borrow count
-  };
-
-  // Admin-only operational data
-  admin?: {
-    pendingReservations: number;
-    activeLoans: number;
-    overdueLoans: number;
-    totalUsers: number;
-  };
-}
+## Behaviour Rules
+- ALWAYS use a tool to answer library data questions. NEVER guess or invent numbers.
+- To count books: call get_catalog_stats — it returns exact totals from the database.
+- To find a book by name: call search_catalog with the book title as the query.
+- When the user says "find/get/fetch [name]", treat [name] as a book title and call search_catalog.
+- When books are returned by any tool, always render the title as a markdown link: [Title](link)
+- To see active borrows or the most-borrowed book: call get_active_borrows.
+- To see active reservations: call get_active_reservations.
+- NEVER write Python, SQL, shell, or any code to answer a library question — call the tool.
+- NEVER use placeholder text like {{variable}} or <result> — always call the tool and use real data.
+- For code questions (user explicitly asking to write code), reply with a code block only.
+- When summarising a book, call read_ebook first — never invent summaries.
+- When the user sends an image, describe what you see in detail, then answer their question.
+- Use markdown: bullet points for lists, headings for long answers, fenced code blocks for code.
+- Be concise. Today is {date}.
 ```
 
-### Database Queries
+### Data Queries for Prompt
 
-The `ContextBuilderService` executes these queries in parallel:
+Three parallel Prisma queries run before every chat call:
 
 ```typescript
 await Promise.all([
-  // User profile with faculty
   prisma.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { id, name, role, interests, faculty: { select: { name } } }
+    select: { name, role, interests, faculty: { select: { name } } }
   }),
-
-  // Borrow policy for role
   prisma.borrowPolicy.findUnique({ where: { role } }),
-
-  // Active borrows (count + items)
   prisma.borrow.findMany({
     where: { userId, status: 'ACTIVE' },
-    select: { dueAt, bookCopy: { select: { book: { select: { title } } } } },
-    orderBy: { dueAt: 'asc' },
-    take: 5
+    include: { bookCopy: { include: { book: { select: { title } } } } }
   }),
-
-  // Reservations (count + pending + ready)
-  prisma.reservation.count({
-    where: { userId, status: { in: ['PENDING', 'READY_FOR_PICKUP'] } }
-  }),
-
-  // Catalog stats
-  prisma.book.count({ where: { isActive: true } }),
-  prisma.bookCopy.count({ where: { status: 'AVAILABLE' } }),
-  prisma.book.groupBy({ by: ['category'], _count: true, take: 5 }),
-
-  // Reading list stats
-  prisma.readingList.count({ where: { status: 'PUBLISHED' } }),
-  prisma.instructorFollower.count({ where: { followerId: userId } }),
-
-  // Borrow history
-  prisma.borrow.findMany({
-    where: { userId, status: 'RETURNED' },
-    orderBy: { returnedAt: 'desc' },
-    take: 10
-  }),
-
-  // [ADMIN only] System stats
-  prisma.reservation.count({ where: { status: 'PENDING' } }),
-  prisma.borrow.count({ where: { status: 'ACTIVE' } }),
-  prisma.borrow.count({ where: { status: 'OVERDUE' } }),
-  prisma.user.count({ where: { isActive: true } })
 ]);
 ```
 
-**Total queries**: 15-19 (executed in parallel)
-**Typical DB time**: ~50-100ms
+**DB time**: ~20–50ms (3 queries, parallel)
 
 ---
 
-## Prompt Templates
+## Agentic Loop
 
-### Base Prompt (All Roles)
-
-```
-You are a helpful AI assistant for a university library management system.
-The current user is {name}, a {Role} in the {Faculty} faculty.
-
-Library context:
-- Catalog: {totalBooks} books, {availableCopies} available copies
-- Borrow policy: {maxBorrowDays} days, {maxExtensions} extensions of {extensionDays} days
-- Published reading lists: {publishedCount}
-- Popular categories: {topCategories}
-
-Respond concisely and helpfully. Use markdown formatting.
-Do not perform administrative actions - only provide information and guidance.
-If the user asks about something outside the library system, politely redirect them.
-
-When referencing library data, include relevant dashboard links in your response
-using markdown format.
-
-Available pages:
-- Catalog: /dashboard/catalog
-- Borrowed books: /dashboard/borrowed
-- Reservations: /dashboard/reservations
-- Reading lists: /dashboard/reading-lists
-- Profile: /dashboard/profile
-```
-
-### Student Prompt Addition
-
-```
-Student-specific context:
-- Active borrows: {count} / {maxActiveBorrows} ({remaining} remaining)
-- Reservations: {total} total, {readyForPickup} ready for pickup, {pending} pending
-- Faculty books: {facultyBooks} in {facultyName}
-- Following {followedInstructors} instructor(s)
-- Upcoming due dates:
-  - "{title}" due {date}
-  - "{title}" due {date}
-
-Help the student find books, manage borrows, and discover reading lists.
-```
-
-### Instructor Prompt Addition
-
-```
-Instructor-specific context:
-- Active borrows: {count} / {maxActiveBorrows} ({remaining} remaining)
-- Own reading lists: {ownListCount}
-- Faculty collection: {facultyBooks} books in {facultyName}
-
-Help the instructor manage reading lists, find books for courses, and submit materials.
-```
-
-### Staff Prompt Addition
-
-```
-Staff-specific context:
-- Active borrows: {count} / {maxActiveBorrows} ({remaining} remaining)
-- User interests: {interests}
-
-Give personalized book recommendations based on the user's interests.
-```
-
-### Admin Prompt Addition
-
-```
-Admin-specific context:
-- Pending reservations: {pendingReservations}
-- Active loans: {activeLoans}
-- Overdue loans: {overdueLoans}
-- Total users: {totalUsers}
-
-Provide system overview and operational insights. Never execute actions - only inform.
-
-Additional admin pages:
-- Admin dashboard: /dashboard/admin
-- Admin statistics: /dashboard/admin/statistics
-- Admin users: /dashboard/admin/users
-- Admin borrows: /dashboard/admin/borrows
-- Admin reservations: /dashboard/admin/reservations
-- Admin reading lists: /dashboard/admin/reading-lists
-```
-
----
-
-## Intent Detection Patterns
-
-### Catalog Search Detection
+The core loop in `chatStream()` is an async generator that yields SSE tokens:
 
 ```typescript
-const SEARCH_TRIGGERS = [
-  'find book',
-  'search for',
-  'look for',
-  'show me book',
-  'available book',
-  'books about',
-  'books on',
-  'recommend book',
-];
+async *chatStream(userId, role, message, conversationId?, cookieHeader?): AsyncGenerator<string> {
+  // 1. Build system prompt
+  const systemPrompt = await this.buildSystemPrompt(userId);
 
-// Examples:
-// MATCH: "Find books about machine learning"
-// MATCH: "Search for psychology textbooks"
-// NO MATCH: "How many books can I borrow?"
-```
+  // 2. Load conversation history
+  const history = await this.getHistory(userId, conversationId);
+  const messages: OllamaMessage[] = [
+    { role: 'system', content: systemPrompt },
+    ...history.map(m => ({ role: m.role, content: m.content })),
+    { role: 'user', content: message },
+  ];
 
-### Learning Path Detection
+  // 3. Agentic loop
+  let fullResponse = '';
+  while (true) {
+    const stream = await this.ollama.chat({
+      model: 'mistral',
+      messages,
+      tools: this.getTools(),
+      stream: true,
+    });
 
-```typescript
-const LEARNING_PATH_TRIGGERS = [
-  'learning path',
-  'study plan',
-  'curriculum',
-  'what should i read to learn',
-  'how to learn',
-  'roadmap for',
-  'guide to learning',
-];
+    let toolCalls = [];
+    for await (const chunk of stream) {
+      if (chunk.message.tool_calls?.length) {
+        toolCalls = chunk.message.tool_calls;
+      } else if (chunk.message.content) {
+        fullResponse += chunk.message.content;
+        yield chunk.message.content;  // SSE token
+      }
+    }
 
-// Examples:
-// MATCH: "Create a learning path for data science"
-// MATCH: "What should I read to learn algorithms?"
-// NO MATCH: "What are learning styles?"
-```
+    if (!toolCalls.length) break;  // no more tool calls → done
 
-### Research Query Detection
+    // Execute tools and inject results
+    for (const call of toolCalls) {
+      const result = await this.executeTool(call.function.name, call.function.arguments, userId, cookieHeader);
+      messages.push({ role: 'tool', content: result });
+    }
+    // loop back to Ollama with tool results
+  }
 
-```typescript
-const RESEARCH_TRIGGERS = [
-  'research on',
-  'thesis about',
-  'literature on',
-  'academic resource',
-  'scholarly',
-  'publication',
-  'paper on',
-];
-
-// Examples:
-// MATCH: "Research on neural networks"
-// MATCH: "Help with my thesis about climate change"
-// NO MATCH: "What is research?"
-```
-
-### Admin Action Detection
-
-```typescript
-const ADMIN_ACTIONS = [
-  'delete user',
-  'deactivate user',
-  'activate user',
-  'approve material',
-  'reject material',
-  'manage user',
-  'change role',
-  'system setting',
-  'delete book',
-  'remove book',
-];
-
-// Non-admin asking: "Delete user john@test.com"
-// -> Blocked with permission message
-```
-
-### Query Complexity Detection
-
-```typescript
-const DEEP_REASONING = [
-  'analytics', 'compare', 'trend', 'why', 'forecast',
-  'analyze', 'correlation', 'insight', 'explain why', 'what if'
-];
-// -> Uses llama3 model
-
-const SIMPLE_QUERY = [
-  'how do i', 'what is the policy', 'when is', 'where is',
-  'how many days', 'can i borrow', 'opening hours', 'how to'
-];
-// -> Uses phi3 model
-```
-
----
-
-## Fallback Logic
-
-### Fallback Chain
-
-```
-User Message
-     |
-     v
-+--------------------+
-| Try Ollama Chat    |
-+--------------------+
-     |
-     +-- Success --> Return LLM response
-     |
-     +-- Failure (timeout, unavailable)
-             |
-             v
-+--------------------+
-| RoleResponseService|
-| (Rule-based)       |
-+--------------------+
-     |
-     v
-+--------------------+
-| Keyword Matching   |
-| per User Role      |
-+--------------------+
-     |
-     +-- Match Found --> Return structured response
-     |
-     +-- No Match --> Return generic help message
-```
-
-### Rule-Based Response Examples
-
-**Student asking about borrowing limits:**
-
-```typescript
-if (matches(lower, ['how many', 'can i borrow', 'limit', 'remaining'])) {
-  return {
-    reply: `Your Borrowing Status:
-- Active borrows: ${count} / ${max}
-- Remaining slots: ${remaining}
-- Borrow duration: ${days} days per book
-- Extensions: up to ${extensions} (${extensionDays} days each)`,
-    modelUsed: 'rule-based',
-    sources: ['/dashboard/borrowed']
-  };
-}
-```
-
-**Non-admin requesting admin action:**
-
-```typescript
-if (role !== 'ADMIN' && isAdminAction(message)) {
-  return {
-    reply: `That action requires administrator privileges.
-As a ${role.toLowerCase()}, you can:
-- Browse and search the Catalog
-- Manage your Borrowed Books and Reservations
-- Explore Reading Lists from instructors`,
-    modelUsed: 'rule-based',
-    sources: ['/dashboard/catalog']
-  };
+  // 4. Persist messages
+  await this.saveMessage(userId, 'user', message, conversationId);
+  await this.saveMessage(userId, 'assistant', fullResponse, conversationId);
 }
 ```
 
 ---
 
-## Security Considerations
+## Tool Definitions
 
-### Authentication Layer
+Each tool is an Ollama `Tool` object injected into the chat call.
 
-```
-Request --> JwtAuthGuard
-              |
-              +-- Extract JWT from cookie
-              +-- Verify signature with JWT_SECRET
-              +-- Check expiration
-              +-- Attach user to request
-              |
-              +-- PASS: Continue to controller
-              +-- FAIL: 401 Unauthorized
-```
-
-### Context Isolation
-
-- User can only see their own data
-- Borrows: `WHERE userId = currentUser.id`
-- Reservations: `WHERE userId = currentUser.id`
-- Admin stats: Only if `role === ADMIN`
-
-**No cross-user data leakage possible.**
-
-### Permission Gate
-
-Before any LLM processing:
+### search_catalog
 
 ```typescript
-if (userRole !== Role.ADMIN && isAdminAction(message)) {
-  // Block immediately with safe message
-  // Never reaches LLM
+{
+  name: 'search_catalog',
+  description: 'Search the library catalog by title, author, subject or keyword. Always call this before recommending a book.',
+  parameters: {
+    query: { type: 'string' },       // required
+    pageSize: { type: 'number' },    // default 5, max 10
+  }
 }
 ```
+
+Implementation: `GET /books?search={query}&pageSize={n}` via internal HTTP call with the user's session cookie forwarded.
+
+Returns: `{ total, results: [{ id, title, authors, isEbook, available, copies, link, description }] }`
+
+### get_book_details
+
+```typescript
+{
+  name: 'get_book_details',
+  description: 'Get full details for a specific book including availability and e-book link.',
+  parameters: { bookId: { type: 'string' } }
+}
+```
+
+Implementation: `GET /books/:bookId`
+
+### read_ebook
+
+```typescript
+{
+  name: 'read_ebook',
+  description: 'Fetch and read an e-book from its URL. Use to summarise or answer questions about book content.',
+  parameters: {
+    url: { type: 'string' },
+    question: { type: 'string' },
+  }
+}
+```
+
+Implementation: `fetch(url)` with 15s timeout, strips HTML tags, returns first 4000 characters.
+
+### fetch_webpage
+
+```typescript
+{
+  name: 'fetch_webpage',
+  description: 'Fetch any public URL. Use for Wikipedia, academic papers, or URLs the user provides.',
+  parameters: {
+    url: { type: 'string' },
+    purpose: { type: 'string' },
+  }
+}
+```
+
+Implementation: `fetch(url)` with 10s timeout, strips HTML, returns first 3000 characters.
+
+### get_my_borrows
+
+```typescript
+{
+  name: 'get_my_borrows',
+  description: "Get the current user's own active borrows and due dates.",
+  parameters: {}
+}
+```
+
+Implementation: Direct Prisma query scoped to `userId`. Returns `[{ title, dueDate, daysLeft, isOverdue }]`.
+
+### get_catalog_stats
+
+```typescript
+{
+  name: 'get_catalog_stats',
+  description: 'Get total book count, copy counts, and e-book count. Use for "how many books" questions.',
+  parameters: {}
+}
+```
+
+Implementation: 6 parallel Prisma counts in `Promise.all()`:
+
+```typescript
+const [totalBooks, totalCopies, availableCopies, borrowedCopies, ebookCount, activeBorrows] =
+  await Promise.all([
+    prisma.book.count({ where: { isActive: true } }),
+    prisma.bookCopy.count(),
+    prisma.bookCopy.count({ where: { status: 'AVAILABLE' } }),
+    prisma.bookCopy.count({ where: { status: 'BORROWED' } }),
+    prisma.book.count({ where: { isEbookAvailable: true } }),
+    prisma.borrow.count({ where: { status: 'ACTIVE' } }),
+  ]);
+```
+
+### get_active_borrows
+
+```typescript
+{
+  name: 'get_active_borrows',
+  description: 'All active borrows + top 5 most-borrowed books of all time.',
+  parameters: {}
+}
+```
+
+Implementation: Prisma `findMany` (status=ACTIVE, last 20, sorted by dueAt) + `$queryRaw` for most-borrowed aggregation:
+
+```sql
+SELECT b.title, COUNT(br.id) AS borrow_count
+FROM borrows br
+JOIN book_copies bc ON bc.id = br."bookCopyId"
+JOIN books b ON b.id = bc."bookId"
+GROUP BY b.id, b.title
+ORDER BY borrow_count DESC
+LIMIT 5
+```
+
+Note: `$queryRaw` returns `bigint` for `COUNT` — results are converted with `.toString()` before JSON serialisation.
+
+### get_active_reservations
+
+```typescript
+{
+  name: 'get_active_reservations',
+  description: 'All active (pending or ready for pickup) reservations.',
+  parameters: {}
+}
+```
+
+Implementation: Prisma `findMany` with `status: { in: ['PENDING', 'READY_FOR_PICKUP'] }`, includes book title, user name/role, branch name.
+
+---
+
+## Book Cover Scanning
+
+`OllamaService.scanBookCover(base64: string)` sends the image to Ollama using `gemma3:4b` (multimodal):
+
+```typescript
+const response = await fetch(`${this.baseUrl}/api/generate`, {
+  method: 'POST',
+  body: JSON.stringify({
+    model: 'gemma3:4b',
+    prompt: 'Extract from this book cover: title, authors (array), isbn, publisher, year. Return valid JSON only.',
+    images: [base64],
+    stream: false,
+  }),
+});
+```
+
+The response text is parsed as JSON. The admin book form receives `{ title, authors, isbn, publisher, year }` and auto-fills the input fields.
+
+DTO validation: `base64` string, max 2MB cap enforced in `ScanCoverDto`.
+
+---
+
+## SSE Streaming
+
+The controller uses NestJS `@Sse()` decorator returning an `Observable<MessageEvent>`:
+
+```typescript
+@Post('chat')
+@Sse()
+chat(@CurrentUser('id') userId, @Body() dto, @Headers('cookie') cookie, @Res() res): Observable<MessageEvent> {
+  return new Observable(subscriber => {
+    (async () => {
+      for await (const token of this.agentService.chatStream(userId, dto.message, dto.conversationId, cookie)) {
+        subscriber.next({ data: token });
+      }
+      subscriber.complete();
+    })();
+  });
+}
+```
+
+The frontend reads tokens via the browser `EventSource` API (or `fetch` with `ReadableStream`) and appends each token to the message display in real time.
+
+---
+
+## Conversation Persistence
+
+```
+POST /ai/conversations        → create new AiConversation
+GET  /ai/conversations        → list user's conversations (id, title, timestamps)
+DELETE /ai/conversations/:id  → delete (scoped: WHERE id AND userId)
+GET  /ai/history?conversationId=  → paginated AiMessage records (take: 50)
+```
+
+All `chatStream()` calls save user + assistant messages after the stream completes. The conversation title is set to the first 50 characters of the first user message.
+
+---
+
+## Security
+
+### Authentication
+
+Every `/ai/*` endpoint is protected by `JwtAuthGuard`. The guard:
+1. Extracts `access_token` from the HttpOnly cookie
+2. Verifies the JWT signature with `JWT_SECRET`
+3. Checks expiration
+4. Attaches `{ id, role, email }` to `request.user`
+
+### Data Scoping
+
+| Operation | Scope |
+|-----------|-------|
+| `get_my_borrows` | `WHERE userId = request.user.id` |
+| `getHistory()` | `WHERE userId = request.user.id` |
+| `deleteConversation()` | `WHERE id = :id AND userId = request.user.id` |
+| `get_active_borrows` | Admin tool — no user scope filter |
+| `get_active_reservations` | Admin tool — no user scope filter |
+
+### Role Guard
+
+`POST /ai/scan-cover` requires `@Roles(Role.ADMIN)` enforced by `RolesGuard`.
 
 ### Prompt Boundaries
 
-All system prompts include:
-
-```
-"Do not perform administrative actions - only provide information and guidance."
-```
-
-Role-specific boundaries:
-- Student: "Help the student find books, manage borrows..."
-- Admin: "Never execute actions - only inform"
-
-### Data Exposure
-
-| Data Type | Who Can See |
-|-----------|-------------|
-| Own borrows | User only |
-| Own reservations | User only |
-| Own interests | Staff only |
-| System stats | Admin only |
-| Catalog data | All users |
-| Public reading lists | All users |
+The system prompt explicitly prohibits:
+- Generating fake code to answer library questions
+- Using placeholder text (e.g., `{{book_count}}`)
+- Claiming lack of database access
+- Executing write actions
 
 ---
 
-## Response Format
+## Performance
 
-### ChatResponse Interface
+### Latency Profile
 
-```typescript
-interface ChatResponse {
-  reply: string;        // Markdown-formatted text
-  modelUsed: string;    // "llama3" | "qwen2.5" | "phi3" | "rule-based" | "system"
-  sources?: string[];   // ["/dashboard/catalog", "/dashboard/borrowed"]
-}
+| Step | Typical Time |
+|------|-------------|
+| JWT verify | <1ms |
+| System prompt queries (3 parallel) | 20–50ms |
+| History load (50 messages) | 10–20ms |
+| First Ollama response (mistral) | 800ms–1.5s |
+| Tool execution — Prisma direct | 10–50ms |
+| Tool execution — HTTP (books API) | 20–80ms |
+| Tool execution — web fetch | 500ms–2s |
+| Full answer (1 tool call) | ~2–3s to first token |
+
+### Error Handling
+
+**Ollama unavailable:**
+```
+agentService.chatStream() catches fetch error
+→ yields error message to SSE stream
+→ frontend displays "OZ AI is currently unavailable"
+→ GET /ai/status returns { available: false }
+→ frontend shows "Basic Mode" amber pill
 ```
 
-### Example Responses
+**Tool execution failure:**
+```
+executeTool() catches error
+→ returns string error message as tool result
+→ model receives the error and explains it to the user
+→ never throws — loop continues
+```
 
-**Rule-based response (fast, no LLM):**
+**DB error in prompt build:**
+```
+buildSystemPrompt() catches Prisma error
+→ falls back to minimal prompt with defaults
+→ chat proceeds with reduced context
+```
 
-```json
+---
+
+## Extending OZ AI
+
+### Adding a New Tool
+
+1. Add a `Tool` object to `getTools()`:
+
+```typescript
 {
-  "reply": "Your Borrowing Status:\n- Active borrows: **2** / 5\n- Remaining slots: **3**\n...",
-  "modelUsed": "rule-based",
-  "sources": ["/dashboard/borrowed"]
+  type: 'function',
+  function: {
+    name: 'my_new_tool',
+    description: 'Clear description so the model knows when to call it.',
+    parameters: {
+      type: 'object',
+      properties: {
+        param1: { type: 'string', description: 'What this is' },
+      },
+      required: ['param1'],
+    },
+  },
 }
 ```
 
-**LLM response (Ollama):**
-
-```json
-{
-  "reply": "Based on your interest in software engineering...\n\n1. **The Pragmatic Programmer**...",
-  "modelUsed": "qwen2.5",
-  "sources": ["/dashboard/catalog", "/dashboard/reading-lists"]
-}
-```
-
-**System response (interest save):**
-
-```json
-{
-  "reply": "Great! I've saved your interests: **finance**, **technology**...",
-  "modelUsed": "system",
-  "sources": ["/dashboard/catalog", "/dashboard/profile"]
-}
-```
-
----
-
-## Performance Characteristics
-
-### Request Latency
-
-| Request Type | Avg Latency | Components |
-|--------------|-------------|------------|
-| Rule-based | ~100-200ms | JWT + DB context + keyword match |
-| Catalog search | ~300-500ms | JWT + DB context + query + scoring |
-| Learning path (no LLM) | ~500-800ms | JWT + DB + search + classification |
-| Learning path (with LLM) | ~2-4s | Above + Ollama generate |
-| General chat (phi3) | ~1-2s | JWT + DB context + LLM |
-| General chat (qwen2.5) | ~2-3s | JWT + DB context + LLM |
-| General chat (llama3) | ~3-5s | JWT + DB context + LLM |
-
-### Database Load
-
-Queries per request (context building):
-- User profile: 1 query
-- Borrow policy: 1 query
-- Active borrows: 2 queries
-- Reservations: 3 queries
-- Catalog stats: 3 queries
-- Reading lists: 3 queries
-- Borrow history: 2 queries
-- [Admin] System stats: 4 queries
-
-**Total**: 15-19 queries (parallel)
-**DB time**: ~50-100ms
-
----
-
-## Error Handling
-
-### Ollama Unavailable
+2. Add a `case` to `executeTool()`:
 
 ```typescript
-try {
-  const result = await this.ollama.generate(model, message, system);
-  return { reply: result.response, modelUsed: result.model, sources };
-} catch (err) {
-  this.logger.warn(`Ollama failed, falling back: ${err}`);
-  return this.roleResponse.respond(ctx, message);
+case 'my_new_tool': {
+  const result = await this.prisma.someTable.findMany({ ... });
+  return JSON.stringify(result);
 }
 ```
 
-### Database Error
+3. If the tool needs routing guidance (e.g., the model might not call it naturally), add a rule to the system prompt behaviour rules section.
 
-```typescript
-// ContextBuilderService handles missing data gracefully
-const policy = await prisma.borrowPolicy.findUnique({ where: { role } });
-if (!policy) return DEFAULT_POLICY;
-```
-
-### Invalid User Input
-
-```typescript
-// DTOs validated by class-validator
-export class ChatDto {
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(2000)
-  message: string;
-}
-```
-
----
-
-## Extensibility
-
-### Adding New Intent
-
-1. Create detection method in new service:
-```typescript
-isMyIntent(message: string): boolean {
-  return TRIGGERS.some(t => message.toLowerCase().includes(t));
-}
-```
-
-2. Add to AiService routing:
-```typescript
-if (this.myService.isMyIntent(message)) {
-  return this.myService.handle(ctx, message);
-}
-```
-
-3. Implement handler with response format:
-```typescript
-async handle(ctx: AiContext, message: string): Promise<ChatResponse> {
-  // Process and return
-  return { reply, modelUsed, sources };
-}
-```
-
-### Adding New Model
-
-1. Update MODEL_MAP in OllamaService:
-```typescript
-const MODEL_MAP: Record<Role, string> = {
-  STAFF: 'phi3',
-  STUDENT: 'qwen2.5',
-  INSTRUCTOR: 'qwen2.5',
-  ADMIN: 'llama3',
-  // NEW_ROLE: 'new-model'
-};
-```
-
-2. Pull model:
-```bash
-ollama pull new-model
-```
-
-### Adding New Role Response
-
-1. Add method to RoleResponseService:
-```typescript
-private newRoleResponse(ctx: AiContext, lower: string): ChatResponse {
-  // Handle queries for new role
-}
-```
-
-2. Add case to switch:
-```typescript
-switch (ctx.user.role) {
-  case Role.NEW_ROLE:
-    return this.newRoleResponse(ctx, lower);
-}
-```
+4. Update `docs/ai/`.
