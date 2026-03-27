@@ -47,7 +47,8 @@ The **AI-Integrated University Library Management System** is a comprehensive we
 - 📋 **Reading Lists** — Instructor-curated collections with visibility control and student discovery
 - 📊 **Analytics Dashboard** — Real-time statistics and borrowing trends
 - 🌙 **Dark Mode Support** — Eye-friendly interface for extended use
-- 🤖 **Role-Aware AI Assistant** — Natural language search, personalized learning paths, research guidance, and context-driven recommendations powered by Ollama
+- 🎨 **Liquid Glass Design System** — WebGL aurora background, Framer Motion spring animations, glass chrome layer with content-aware opacity
+- 🤖 **OZ AI Agentic Assistant** — SSE streaming, tool-calling agent loop with real-time library data access, per-conversation history, and book cover scanning powered by Ollama
 
 ---
 
@@ -62,7 +63,8 @@ The **AI-Integrated University Library Management System** is a comprehensive we
 - Access research materials and e-books
 - Receive notifications for due dates and reservation updates
 - Follow instructors and discover their reading lists
-- AI assistant with personalized study guidance, learning paths, and research help
+- View and track fines (outstanding balance, paid/waived history)
+- AI assistant (OZ AI) with personalized study guidance, catalog search, and real-time library data
 
 ### For Instructors
 
@@ -88,6 +90,7 @@ The **AI-Integrated University Library Management System** is a comprehensive we
 - **Reading List Moderation**: View and manage all reading lists
 - **Statistics Dashboard**: View borrowing trends, popular books, and system metrics
 - **System Configuration**: Manage branches, policies, and settings
+- **Automated Notifications**: Scheduler sends overdue and due-soon alerts hourly (22-hour dedup window)
 
 ---
 
@@ -101,6 +104,9 @@ The **AI-Integrated University Library Management System** is a comprehensive we
 | **TypeScript**      | Type-safe JavaScript                     |
 | **Tailwind CSS**    | Utility-first styling                    |
 | **Lucide React**    | Icon library                             |
+| **Framer Motion**   | Spring physics animations                |
+| **Three.js**        | WebGL aurora mesh background             |
+| **@splinetool/react-spline** | Interactive 3D scene (login/signup) |
 | **Axios**           | HTTP client                              |
 
 ### Backend
@@ -133,15 +139,12 @@ library-system/
 │   ├── api/                    # NestJS Backend
 │   │   ├── src/
 │   │   │   ├── ai/             # AI assistant module
-│   │   │   │   ├── ai.controller.ts
-│   │   │   │   ├── ai.service.ts            # Chat orchestrator
+│   │   │   │   ├── ai.controller.ts            # REST + SSE endpoints
+│   │   │   │   ├── agent.service.ts            # Agentic loop (tool-calling, SSE)
+│   │   │   │   ├── ai.service.ts               # Legacy orchestrator
 │   │   │   │   ├── context-builder.service.ts  # Live user/library context
-│   │   │   │   ├── role-response.service.ts    # Role-specific strategies
-│   │   │   │   ├── catalog-search.service.ts   # Natural language search
-│   │   │   │   ├── semantic-search.service.ts  # Book ranking & scoring
-│   │   │   │   ├── learning-path.service.ts    # Learning path generation
-│   │   │   │   ├── research-assistant.service.ts # Research guidance
-│   │   │   │   └── ollama.service.ts           # LLM integration
+│   │   │   │   ├── ollama.service.ts           # LLM integration + cover scan
+│   │   │   │   └── dto/                        # Request/response DTOs
 │   │   │   ├── auth/           # Authentication (JWT + Google OAuth)
 │   │   │   ├── users/          # User management
 │   │   │   ├── books/          # Book catalog & copies
@@ -425,7 +428,8 @@ All protected endpoints require a JWT token sent via HttpOnly cookie.
 | **Reading Lists**        | 10        | CRUD, items, feed, instructor lists, admin moderation |
 | **Instructor Followers** | 3         | Follow, unfollow, list followed                |
 | **Dashboard**            | 3         | Statistics, analytics                          |
-| **AI**                   | 3         | Chat, update interests, get context            |
+| **AI**                   | 9         | SSE chat, conversations CRUD, history, status, scan cover, update interests, get context |
+| **External Books**       | 5         | Search (Open Library + Gutendex), single import, bulk import, check existing |
 | **Notifications**        | 4         | List, mark read                                |
 | **Branches**             | 5         | CRUD, activate/deactivate (admin)              |
 | **Borrow Policies**      | 2         | List, update per role (admin)                  |
@@ -555,9 +559,9 @@ Authorization: Cookie (access_token)
 
 ---
 
-## 🤖 AI Assistant
+## 🤖 OZ AI — Agentic Assistant
 
-The AI assistant is not a generic chatbot. It builds a live context per request and responds differently by role, leveraging the full library system state.
+OZ AI is the library's built-in AI assistant. It runs as a **tool-calling agent loop** with **Server-Sent Events (SSE) streaming**, giving it real-time access to library data rather than relying on static context injection.
 
 ### Architecture
 
@@ -565,71 +569,78 @@ The AI assistant is not a generic chatbot. It builds a live context per request 
 User Message
      │
      ▼
-┌─────────────────────┐
-│   Intent Router     │  ← ai.service.ts
-├─────────────────────┤
-│ 1. Staff interest   │
-│    bootstrap        │
-│ 2. Interest update  │
-│ 3. Admin gate       │
-│ 4. Catalog search   │  ← catalog-search.service.ts + semantic-search.service.ts
-│ 5. Learning path    │  ← learning-path.service.ts
-│ 6. Research assist  │  ← research-assistant.service.ts
-│ 7. Ollama / fallback│  ← ollama.service.ts + role-response.service.ts
-└─────────────────────┘
+┌──────────────────────────────────────────┐
+│  POST /ai/chat  →  SSE stream            │
+│  agent.service.ts — AgentService         │
+└───────────────┬──────────────────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────┐
+│  Ollama /api/chat  (mistral / llama3)    │
+│  System prompt + conversation history   │
+│  Tool definitions injected              │
+└───────────────┬──────────────────────────┘
+                │ tool_call?
+       ┌────────┴─────────┐
+       │ yes              │ no
+       ▼                  ▼
+┌─────────────┐   ┌───────────────────┐
+│ executeTool │   │ stream text token │
+│ (Prisma /   │   │ to client via SSE │
+│  fetch)     │   └───────────────────┘
+└──────┬──────┘
+       │ result injected as tool message
+       └──────────► back to Ollama (loop)
 ```
 
-### Context Built Per Request
+### Tools
 
-| Data                  | Source                      |
-| --------------------- | --------------------------- |
-| User identity & role  | JWT token + Users table     |
-| Faculty & interests   | User profile                |
-| Borrow policy         | BorrowPolicy table          |
-| Active borrows        | Borrow table (ACTIVE)       |
-| Borrow history        | Borrow table (RETURNED)     |
-| Reservation status    | Reservation table           |
-| Catalog snapshot      | Books + BookCopy aggregates |
-| Reading list stats    | ReadingList aggregates      |
-| Admin operational data| System-wide aggregates      |
+| Tool | Description |
+|------|-------------|
+| `search_catalog` | Search books by keyword; returns title, authors, availability, cover |
+| `get_book_details` | Full detail for a specific book ID |
+| `read_ebook` | Fetch and return e-book text content from URL |
+| `fetch_webpage` | General web fetch for research or external context |
+| `get_my_borrows` | Caller's currently active borrows with due dates |
+| `get_catalog_stats` | System-wide counts: books, copies, available, borrowed, e-books, active borrows |
+| `get_active_borrows` | Admin: all active borrows + top 5 most-borrowed titles |
+| `get_active_reservations` | Admin: pending and ready-for-pickup reservations |
 
-### Capabilities
+### Conversation History
 
-**Natural Language Catalog Search** — Users can search with phrases like "find books about machine learning" or "available psychology books". The system parses intent (keywords, category, audience level, availability), runs semantic search with multi-factor scoring, and returns ranked results with availability.
+Each conversation is persisted in the `AiConversation` database model. Users can:
+- Start new conversations
+- Switch between past conversations from the sidebar
+- Each conversation maintains its own full message history for multi-turn context
 
-**Personalized Learning Paths** — Triggered by phrases like "learning path for data science" or "what should I read to learn algorithms". Groups library books into three stages (Foundations → Core → Advanced) based on title/description analysis. Enriched with borrow history for personalization. Optionally enhanced by Ollama for stage descriptions.
+### Book Cover Scanning
 
-**Research Assistant** — Triggered by phrases like "research on neural networks" or "help with my thesis on machine learning". Searches both books and reading lists, provides role-specific next steps (students get different guidance than instructors), and optionally generates a literature landscape summary via Ollama.
+Administrators can scan a physical book cover image to auto-fill the add-book form:
 
-**Role-Aware Chat** — All other messages are handled by Ollama with role-specific system prompts that include live library context. Falls back to rule-based responses when Ollama is unavailable.
+```bash
+POST /ai/scan-cover
+Content-Type: application/json
+{ "image": "<base64 JPEG>" }
+```
 
-### Role-Specific Behavior
-
-| Role       | Behavior                                                                       |
-| ---------- | ------------------------------------------------------------------------------ |
-| Student    | Borrow/reservation help, faculty-relevant recommendations, due-date guidance   |
-| Instructor | Course-oriented recommendations, reading-list workflow guidance                |
-| Staff      | Interest bootstrap flow (collect/store interests first, then personalize)      |
-| Admin      | Operational insights (pending reservations, overdue loans, system stats)       |
+Uses `gemma3:4b` multimodal model. Extracts title, authors, ISBN, publisher, and publication year.
 
 ### Permission Safety
 
-- AI guidance respects backend permissions
-- Non-admin users are refused admin-only action requests with safe alternatives
-- The AI informs but never executes actions
+- Tool results are scoped: `get_my_borrows` returns only the requesting user's data
+- Admin-only tools (`get_active_borrows`, `get_active_reservations`) are gated by `RolesGuard`
+- The AI informs but never executes write actions
 
 ### LLM Integration (Ollama)
 
-The system uses Ollama for local LLM inference with role-based model selection:
+Requires a running Ollama instance. Recommended models:
 
-| Role       | Default Model | Deep Reasoning |
-| ---------- | ------------- | -------------- |
-| Staff      | phi3          | llama3         |
-| Student    | qwen2.5       | llama3         |
-| Instructor | qwen2.5       | llama3         |
-| Admin      | llama3        | llama3         |
+```bash
+ollama pull mistral    # primary chat model
+ollama pull gemma3:4b  # book cover scanning (multimodal)
+```
 
-When Ollama is not available, all AI features gracefully fall back to rule-based responses.
+When Ollama is unavailable, the `/ai/status` endpoint returns `{ "available": false }` and the frontend shows a "Basic Mode" indicator.
 
 ---
 
@@ -678,12 +689,24 @@ When Ollama is not available, all AI features gracefully fall back to rule-based
 - [x] Security Hardening (Helmet, CORS allowlist, rate limiting)
 - [x] Performance Optimization (query shaping, pagination, compound indexes)
 
-### 📋 Phase 5: Admin Enhancements (In Progress)
+### ✅ Phase 5: Admin Enhancements (Completed)
 
 - [x] Branch Management (CRUD + activate/deactivate)
 - [x] Configurable Borrow Policies (admin UI for role-based limits)
 - [x] Fine Payment Tracking (auto-create on overdue return, admin pay/waive)
 - [x] Report Generation (PDF/Excel export with date range, summary metrics, top books)
+- [x] External E-Book Import (Open Library + Gutendex, single + bulk, duplicate prevention)
+
+### ✅ Phase 6: UI/UX & AI Overhaul (Completed)
+
+- [x] Liquid Glass Design System (WebGL aurora background, glass chrome layer, Framer Motion spring animations)
+- [x] 3D Login/Signup redesign (Spline interactive robot, glassmorphism form card, traveling border beams)
+- [x] OZ AI — full agentic rewrite (SSE streaming, tool-calling loop, replaces intent-router)
+- [x] AI conversation history persistence (AiConversation model, conversation sidebar)
+- [x] Book cover scanning via gemma3:4b multimodal model
+- [x] Student UX audit — fines page, department-based recommendations, borrow history fine cross-reference, a11y toggle roles
+- [x] Instructor dashboard — new-list flow, share-research widget, followers widget
+- [x] Automated overdue/due-soon notification scheduler (hourly, 22h dedup)
 
 ---
 
