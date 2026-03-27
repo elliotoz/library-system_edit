@@ -4,6 +4,29 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-27 — Reservation hardening: concurrency, borrow limit, reject guard
+
+**Goal**: Close three production risks in the reservation system: duplicate active reservations per user+book, duplicate borrows from concurrent collects, borrow-limit bypass during collect, and invalid reject on non-active reservations.
+
+**Root cause**:
+- `create()` ran the duplicate-book check and reservation-limit count outside the transaction, making both invisible to concurrent requests. The `bookCopy.update` had no conditional guard so concurrent requests could each claim a different copy of the same book.
+- `collect()` checked reservation status outside the transaction and used an array transaction — two concurrent collects both passed the status check and both created a borrow record. Borrow policy limit was fetched but never checked against active borrow count.
+- `reject()` had no status guard — could reject COLLECTED/CANCELLED/EXPIRED reservations and incorrectly free the bookCopy.
+
+**Changes**:
+- `apps/api/prisma/schema.prisma` — added `bookId String` field to `Reservation` model; added `@@index([userId, bookId])`
+- `apps/api/prisma/migrations/20260327000001_.../migration.sql` — adds `book_id` column, backfills from `book_copies`, enforces NOT NULL, creates partial unique index `(userId, book_id) WHERE status IN ('PENDING', 'READY_FOR_PICKUP')`
+- `apps/api/src/reservations/reservations.service.ts`:
+  - `create()`: moved limit count inside transaction; replaced unconditional `update` with `updateMany({ where: { id, status: AVAILABLE } })` + count=0 guard; `bookId` server-derived from selected copy; P2002 caught and converted to clean 409
+  - `collect()`: converted to interactive transaction; advisory lock `pg_advisory_xact_lock(hashtext(userId))` at top; atomic `updateMany` on reservation status + count=0 guard; borrow limit checked inside locked transaction; notification sent after commit
+  - `reject()`: added explicit status guard — only PENDING or READY_FOR_PICKUP allowed; throws clean BadRequestException for all other states
+
+**Verification**: `npx prisma generate` ✓ | `npx nest build` ✓ | `npx prisma migrate dev` — pending DB start
+
+**Next**: Run `npx prisma migrate dev` when DB is up to apply the migration. Then proceed to Action 2 from CURRENT_STATE.md: reservation expiry scheduler + overdue borrow state reconciliation.
+
+---
+
 ## 2026-03-26 — Instructor dashboard: new-list flow, share-research, followers widget, uploads gitkeep
 
 **Goal**: Fix 4 diagnosed instructor dashboard issues.
@@ -1695,4 +1718,48 @@ Implement reading list visibility/discovery system with instructor public profil
 - `apps/web/next.config.js` — removed `@react-three/drei` and `@react-spring/three` from transpilePackages
 - `apps/web/package.json` — removed @react-three/drei, added @types/three (devDep)
   **Verification**: tsc --noEmit ✓ | next build ✓
-  **Next**: Robot 3D is fully functional with auto-rotation. Login, signup, and dashboard logo are all in place.
+
+---
+
+## 2026-03-17 — Wire reading streak stat card to backend value
+
+**Goal**: Make the student dashboard "Reading Streak" stat card display the real backend-calculated value.
+**Root cause**: The 4th stat card was rendering `totalBorrowed` (all-time history count from a separate endpoint) while `readingStreak` was already returned by `GET /api/dashboard/student` and stored in `stats` state — but never rendered.
+**Changes**:
+- `apps/web/app/dashboard/student/page.tsx` — removed `totalBorrowed` state + `historyRes` parallel fetch; changed 4th stat card value to `stats?.readingStreak ?? 0` with label "Reading Streak"
+**Verification**: tsc --noEmit ✓
+**Next**: All roadmap phases complete. Awaiting next directive.
+
+---
+
+## 2026-03-26 — Agentic AI assistant with SSE streaming and tool calls
+
+**Goal**: Transform the basic Ollama AI chat into a full agentic assistant with tool calls, SSE streaming, history persistence, and a new UI.
+**Root cause**: Existing assistant called Ollama directly from frontend with no backend, no user context, no tools, and no memory.
+**Changes**:
+- `apps/api/src/ai/agent.service.ts` — NEW: full agentic loop using `ollama` npm package; `chatStream` async generator (max 3 tool rounds); 5 tools: `search_catalog`, `get_book_details`, `read_ebook`, `fetch_webpage`, `get_my_borrows`; dynamic system prompt with user context; `AiMessage` persistence; cookie-forwarding for backend-to-backend API calls
+- `apps/api/src/ai/ai.module.ts` — added PrismaModule + AgentService; kept all existing providers (Path B unchanged)
+- `apps/api/src/ai/ai.controller.ts` — replaced `POST /ai/chat` with SSE streaming version; added `GET /ai/history`; kept scan-cover, interests, context endpoints
+- `apps/api/prisma/schema.prisma` — added `AiMessage` model + `User.aiMessages` relation; migrated (`20260326133733_add_ai_messages`)
+- `apps/web/lib/renderMessage.tsx` — NEW: markdown + fenced code block renderer; 12-language syntax highlighter (regex-based, no external deps); copy button
+- `apps/web/app/api/ai/chat/route.ts` — NEW: Next.js SSE proxy forwarding cookie header
+- `apps/web/app/api/ai/history/route.ts` — NEW: history proxy forwarding cookie header
+- `apps/web/app/dashboard/ai-assistant/page.tsx` — REPLACED: streaming UI; role-aware suggestions; image attach; "● ÜLIB AI" teal status badge; typing indicator; code block rendering via renderMessage
+**Key adaptations from spec**: Auth is cookie-based (HttpOnly) not Bearer token — controller passes `req.headers.cookie` to agent service; `get_my_borrows` queries Prisma directly; `BorrowPolicy` fetched separately (not a User relation); `Borrow` has no `branch` field in schema.
+**Verification**: tsc --noEmit ✓ (API — pre-existing Multer errors in materials/storage/users excluded) | tsc --noEmit ✓ (web)
+**Next**: Awaiting next directive.
+
+## 2026-03-27 — AI assistant: conversations, OZ AI rebrand, tool fixes
+**Goal**: Add conversation history, sidebar, fix hallucination and missing tools
+**Root cause**: Flat message log had no conversation concept; model lacked tools for count/borrows/reservations and was hallucinating fake Python code
+**Changes**:
+- `apps/api/prisma/schema.prisma` — Added AiConversation model, conversationId FK on AiMessage
+- `apps/api/src/ai/agent.service.ts` — OZ AI rebrand, English-default language, conversation CRUD, 3 new tools (get_catalog_stats, get_active_borrows, get_active_reservations), anti-hallucination prompt rules, catalog links in results
+- `apps/api/src/ai/ai.controller.ts` — Conversation endpoints (GET/POST/DELETE), conversationId on history + chat
+- `apps/web/app/api/ai/conversations/route.ts` — New proxy route
+- `apps/web/app/api/ai/conversations/[id]/route.ts` — DELETE proxy
+- `apps/web/app/api/ai/history/route.ts` — Forward conversationId query param
+- `apps/web/lib/renderMessage.tsx` — Markdown link parsing ([text](url) → Next.js Link)
+- `apps/web/app/dashboard/ai-assistant/page.tsx` — Slide-out history sidebar, New Chat, conversation switching, delete, image feedback fallback
+**Verification**: nest build ✓ | tsc --noEmit ✓
+**Next**: Monitor model tool-calling reliability; consider adding get_overdue_borrows tool

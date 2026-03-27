@@ -154,84 +154,103 @@ export class ReservationsService {
       throw new NotFoundException("User not found");
     }
 
-    const activeReservations = await this.prisma.reservation.count({
-      where: {
-        userId,
-        status: {
-          in: [ReservationStatus.PENDING, ReservationStatus.READY_FOR_PICKUP],
-        },
-      },
-    });
+    let result: {
+      id: string;
+      status: ReservationStatus;
+      createdAt: Date;
+      expiresAt: Date | null;
+      book: { id: string; title: string; authors: string[] };
+      branch: { id: string; name: string; code: string };
+    };
 
-    const limit = RESERVATION_LIMITS[user.role];
-    if (activeReservations >= limit) {
-      throw new BadRequestException(
-        `You have reached your reservation limit (${limit}). Please cancel or collect existing reservations first.`
-      );
-    }
+    try {
+      result = await this.prisma.$transaction(async (tx) => {
+        // Reservation limit check is inside the transaction so it is consistent
+        // with concurrent creates for the same user.
+        const activeReservations = await tx.reservation.count({
+          where: {
+            userId,
+            status: {
+              in: [ReservationStatus.PENDING, ReservationStatus.READY_FOR_PICKUP],
+            },
+          },
+        });
 
-    const existingForBook = await this.prisma.reservation.findFirst({
-      where: {
-        userId,
-        bookCopy: { bookId: dto.bookId },
-        status: {
-          in: [ReservationStatus.PENDING, ReservationStatus.READY_FOR_PICKUP],
-        },
-      },
-    });
+        const limit = RESERVATION_LIMITS[user.role];
+        if (activeReservations >= limit) {
+          throw new BadRequestException(
+            `You have reached your reservation limit (${limit}). Please cancel or collect existing reservations first.`
+          );
+        }
 
-    if (existingForBook) {
-      throw new BadRequestException(
-        "You already have an active reservation for this book"
-      );
-    }
+        // Find one available copy — the partial unique index on (userId, bookId)
+        // enforces the per-book uniqueness constraint at DB level, so no
+        // application-level duplicate check is needed here.
+        const availableCopy = await tx.bookCopy.findFirst({
+          where: {
+            bookId: dto.bookId,
+            branchId: dto.branchId,
+            status: BookCopyStatus.AVAILABLE,
+          },
+          include: {
+            book: { select: { id: true, title: true, authors: true } },
+            branch: { select: { id: true, name: true, code: true } },
+          },
+        });
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      const availableCopy = await tx.bookCopy.findFirst({
-        where: {
-          bookId: dto.bookId,
-          branchId: dto.branchId,
-          status: BookCopyStatus.AVAILABLE,
-        },
-        include: {
-          book: { select: { id: true, title: true, authors: true } },
-          branch: { select: { id: true, name: true, code: true } },
-        },
+        if (!availableCopy) {
+          throw new BadRequestException(
+            "No available copies at the selected branch"
+          );
+        }
+
+        // Claim the copy atomically. If a concurrent request already took it
+        // the count will be 0 and we surface a clean error.
+        const claimed = await tx.bookCopy.updateMany({
+          where: { id: availableCopy.id, status: BookCopyStatus.AVAILABLE },
+          data: { status: BookCopyStatus.RESERVED },
+        });
+
+        if (claimed.count === 0) {
+          throw new BadRequestException(
+            "No available copies at the selected branch"
+          );
+        }
+
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7);
+
+        // bookId is server-derived from the selected copy — never from client input.
+        const reservation = await tx.reservation.create({
+          data: {
+            userId,
+            bookCopyId: availableCopy.id,
+            bookId: availableCopy.bookId,
+            branchId: dto.branchId,
+            status: ReservationStatus.PENDING,
+            expiresAt,
+          },
+        });
+
+        return {
+          id: reservation.id,
+          status: reservation.status,
+          createdAt: reservation.createdAt,
+          expiresAt: reservation.expiresAt,
+          book: availableCopy.book,
+          branch: availableCopy.branch,
+        };
       });
-
-      if (!availableCopy) {
+    } catch (err: any) {
+      // Partial unique index violation — user already has an active reservation
+      // for this book (caught here to give a human-readable 409).
+      if (err?.code === 'P2002') {
         throw new BadRequestException(
-          "No available copies at the selected branch"
+          "You already have an active reservation for this book"
         );
       }
-
-      await tx.bookCopy.update({
-        where: { id: availableCopy.id },
-        data: { status: BookCopyStatus.RESERVED },
-      });
-
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7);
-
-      const reservation = await tx.reservation.create({
-        data: {
-          userId,
-          bookCopyId: availableCopy.id,
-          branchId: dto.branchId,
-          status: ReservationStatus.PENDING,
-          expiresAt,
-        },
-      });
-
-      return {
-        id: reservation.id,
-        status: reservation.status,
-        createdAt: reservation.createdAt,
-        expiresAt: reservation.expiresAt,
-        book: availableCopy.book,
-        branch: availableCopy.branch,
-      };
-    });
+      throw err;
+    }
 
     await this.notificationsService.notifyReservationCreated(
       userId,
@@ -366,6 +385,15 @@ export class ReservationsService {
       throw new NotFoundException("Reservation not found");
     }
 
+    if (
+      reservation.status !== ReservationStatus.PENDING &&
+      reservation.status !== ReservationStatus.READY_FOR_PICKUP
+    ) {
+      throw new BadRequestException(
+        "Only pending or ready-for-pickup reservations can be rejected"
+      );
+    }
+
     const [updatedReservation] = await this.prisma.$transaction([
       this.prisma.reservation.update({
         where: { id: reservationId },
@@ -473,29 +501,47 @@ export class ReservationsService {
 
     if (reservation.status !== ReservationStatus.READY_FOR_PICKUP) {
       throw new BadRequestException(
-        "Can only collect reservations that are ready for pickup"
+        "Reservation is no longer ready for pickup"
       );
     }
 
-    const borrowPolicy = await this.prisma.borrowPolicy.findUnique({
-      where: { role: reservation.user.role },
-    });
+    const { updatedReservation, borrow } = await this.prisma.$transaction(async (tx) => {
+      // Serialize all concurrent collect calls for this user so that the
+      // borrow-limit check and borrow insert are atomic for that user.
+      // This is the only borrow-creation path for reserved-copy collection.
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${reservation.user.id}))`;
 
-    const borrowDays = borrowPolicy?.maxBorrowDays || 14;
-    const dueAt = new Date();
-    dueAt.setDate(dueAt.getDate() + borrowDays);
-
-    const [updatedReservation, borrow] = await this.prisma.$transaction([
-      this.prisma.reservation.update({
-        where: { id: reservationId },
+      // Atomically transition the reservation. If count is 0 a concurrent
+      // request already collected or the state changed — surface a clean error.
+      const transitioned = await tx.reservation.updateMany({
+        where: { id: reservationId, status: ReservationStatus.READY_FOR_PICKUP },
         data: { status: ReservationStatus.COLLECTED },
-        include: {
-          bookCopy: { include: { book: true } },
-          branch: true,
-          user: { select: { id: true, name: true, email: true } },
-        },
-      }),
-      this.prisma.borrow.create({
+      });
+
+      if (transitioned.count === 0) {
+        throw new BadRequestException("Reservation is no longer ready for pickup");
+      }
+
+      // Fetch borrow policy and enforce the limit inside the locked transaction.
+      const borrowPolicy = await tx.borrowPolicy.findUnique({
+        where: { role: reservation.user.role },
+      });
+
+      const maxBorrows = borrowPolicy?.maxActiveBorrows ?? 5;
+      const borrowDays = borrowPolicy?.maxBorrowDays ?? 14;
+
+      const activeBorrowCount = await tx.borrow.count({
+        where: { userId: reservation.user.id, status: "ACTIVE" },
+      });
+
+      if (activeBorrowCount >= maxBorrows) {
+        throw new BadRequestException("You have reached your borrow limit");
+      }
+
+      const dueAt = new Date();
+      dueAt.setDate(dueAt.getDate() + borrowDays);
+
+      const borrow = await tx.borrow.create({
         data: {
           userId: reservation.user.id,
           bookCopyId: reservation.bookCopyId,
@@ -506,12 +552,24 @@ export class ReservationsService {
         include: {
           bookCopy: { include: { book: true } },
         },
-      }),
-      this.prisma.bookCopy.update({
+      });
+
+      await tx.bookCopy.update({
         where: { id: reservation.bookCopyId },
         data: { status: BookCopyStatus.BORROWED },
-      }),
-    ]);
+      });
+
+      const updatedReservation = await tx.reservation.findUniqueOrThrow({
+        where: { id: reservationId },
+        include: {
+          bookCopy: { include: { book: true } },
+          branch: true,
+          user: { select: { id: true, name: true, email: true } },
+        },
+      });
+
+      return { updatedReservation, borrow };
+    });
 
     await this.notificationsService.notifyBookCollected(
       updatedReservation.user.id,
