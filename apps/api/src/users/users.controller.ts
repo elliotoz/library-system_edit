@@ -11,6 +11,7 @@ import {
   UploadedFile,
   ParseIntPipe,
   DefaultValuePipe,
+  ForbiddenException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiConsumes } from '@nestjs/swagger';
@@ -118,10 +119,17 @@ export class UsersController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get user by ID' })
+  @ApiOperation({ summary: 'Get user by ID — ADMIN or own record only' })
   @ApiResponse({ status: 200, description: 'User retrieved' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async findById(@Param('id') id: string) {
+  async findById(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: { id: string; role: Role },
+  ) {
+    if (currentUser.role !== Role.ADMIN && currentUser.id !== id) {
+      throw new ForbiddenException();
+    }
     return this.usersService.findById(id);
   }
 
