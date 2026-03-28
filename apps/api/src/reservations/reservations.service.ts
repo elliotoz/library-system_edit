@@ -509,7 +509,7 @@ export class ReservationsService {
       // Serialize all concurrent collect calls for this user so that the
       // borrow-limit check and borrow insert are atomic for that user.
       // This is the only borrow-creation path for reserved-copy collection.
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${reservation.user.id}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${reservation.user.id}))`;
 
       // Atomically transition the reservation. If count is 0 a concurrent
       // request already collected or the state changed — surface a clean error.
