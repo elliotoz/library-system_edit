@@ -8,13 +8,13 @@
 * Sensitive auth and reset tokens are never loaded by user-profile queries. All methods in `UsersService` that return data to callers use an explicit `SAFE_USER_SELECT` constant that excludes `password`, `emailVerificationToken`, `emailVerificationExpiry`, `passwordResetToken`, and `passwordResetExpiry` at the query level. References: [users.service.ts](/C:/Projects/library-system_edit/apps/api/src/users/users.service.ts#L11)
 * `verify-email` and `resend-verification` endpoints are rate-limited to 5 requests per 60 seconds via `ThrottlerGuard`. References: [auth.controller.ts](/C:/Projects/library-system_edit/apps/api/src/auth/auth.controller.ts#L122)
 * API error contract is standardized. The global exception filter returns `{ success: false, message, requestId, timestamp }` for all errors. `message` is extracted from the HttpException response and preserves `string[]` arrays from `ValidationPipe`. `statusCode` and `error` fields are not included in the body. References: [global-exception.filter.ts](/C:/Projects/library-system_edit/apps/api/src/common/filters/global-exception.filter.ts#L24)
-* A scheduler now reconciles overdue borrows and expires stale reservations. Active borrows past their `dueAt` are bulk-transitioned to `OVERDUE` each hour. Stale `PENDING` and `READY_FOR_PICKUP` reservations past `expiresAt` are expired per-record in a transaction that also releases the reserved copy back to `AVAILABLE`. References: [borrow-scheduler.service.ts](/C:/Projects/library-system_edit/apps/api/src/borrows/borrow-scheduler.service.ts)
+* A scheduler now reconciles overdue borrows and expires stale reservations. Active borrows past `dueAt` are transitioned to `OVERDUE`, and stale reservations are expired with reserved copies released back to `AVAILABLE`. References: [borrow-scheduler.service.ts](/C:/Projects/library-system_edit/apps/api/src/borrows/borrow-scheduler.service.ts)
 
 ## In Progress
 
-* Overdue fine handling is not fully reconciled with the scheduler. The scheduler now sets borrows to `OVERDUE` and sends notifications, but `returnBook` still auto-upserts the fine as `PAID` immediately on return, which bypasses the explicit admin pay/waive flow. The `OVERDUE` state transition is real; the fine payment state is still incorrect.
-* Role enforcement on user endpoints is not at least-privilege. Any authenticated user can call `GET /users/:id` and retrieve another user's full profile. `PATCH /users/interests` is not role-restricted despite being described as a staff action.
-* Reservation lifecycle timing is still inconsistent. The scheduler expires stale reservations using `expiresAt`, while approval sets `pickupDeadline` without fully reconciling the pickup window model. The two fields are not aligned in the current service logic.
+* Overdue fine handling is not fully reconciled with the scheduler. The scheduler now sets borrows to `OVERDUE` and sends notifications, but `returnBook` still auto-upserts the fine as `PAID` immediately on return, which bypasses the explicit admin pay/waive flow.
+* Reservation lifecycle timing is still inconsistent. The scheduler expires stale reservations using `expiresAt`, while approval sets `pickupDeadline` without fully reconciling the pickup window model.
+* Role enforcement on user endpoints is not at least-privilege. Any authenticated user can call `GET /users/:id` and retrieve another user's profile. `PATCH /users/interests` is not role-restricted despite being described as a staff action.
 
 ## Production Readiness Score
 
@@ -30,15 +30,17 @@ Reason:
 
 * None currently identified at critical severity.
 
+
 ## High Priority Issues
 
-* `returnBook` sets overdue fines directly to `PAID` on return. When a borrow is returned late, the service upserts a fine record with `status: PAID`, which means the fine is never visible in the unpaid state that triggers the admin pay/waive flow. This corrupts the meaning of fine payment status. References: [borrows.service.ts](/C:/Projects/library-system_edit/apps/api/src/borrows/borrows.service.ts#L295)
-* `GET /users/:id` is accessible to any authenticated user. There is no guard preventing a student from fetching another user's full profile by ID. The query now excludes tokens, but name, email, interests, faculty, and role are still returned for arbitrary IDs. References: [users.controller.ts](/C:/Projects/library-system_edit/apps/api/src/users/users.controller.ts#L120)
+* `returnBook` sets overdue fines directly to `PAID` on return. When a borrow is returned late, the service upserts a fine record with `status: PAID`, which means the fine is never visible in the unpaid state that should feed the admin pay/waive flow. References: [borrows.service.ts](/C:/Projects/library-system_edit/apps/api/src/borrows/borrows.service.ts#L295)
+* `GET /users/:id` is accessible to any authenticated user. The query now excludes tokens, but name, email, interests, faculty, and role are still returned for arbitrary IDs. References: [users.controller.ts](/C:/Projects/library-system_edit/apps/api/src/users/users.controller.ts#L120)
 * `PATCH /users/interests` is not role-restricted. The endpoint is described as a staff action in comments but has no `RolesGuard`. References: [users.controller.ts](/C:/Projects/library-system_edit/apps/api/src/users/users.controller.ts#L128)
 
 ## Medium Priority Issues
 
-* The reservation workflow does not implement the `APPROVED` state. The enum and service logic go directly from `PENDING` to `READY_FOR_PICKUP`; there is no `APPROVED` transition. This is a model and lifecycle mismatch, not a security or consistency exploit. References: [schema.prisma](/C:/Projects/library-system_edit/apps/api/prisma/schema.prisma#L33), [reservations.service.ts](/C:/Projects/library-system_edit/apps/api/src/reservations/reservations.service.ts#L323)
+* Reservation workflow does not implement the intended `APPROVED` state. The code goes directly from `PENDING` to `READY_FOR_PICKUP`; there is no `APPROVED` status in the enum or service logic. References: [schema.prisma](/C:/Projects/library-system_edit/apps/api/prisma/schema.prisma#L33), [reservations.service.ts](/C:/Projects/library-system_edit/apps/api/src/reservations/reservations.service.ts#L342)
+* Reservation lifecycle timing is still not modeled cleanly. Expiry reconciliation is driven by `expiresAt`, while approval sets `pickupDeadline`, so the pickup-window behavior is not fully aligned in the data model. References: [borrow-scheduler.service.ts](/C:/Projects/library-system_edit/apps/api/src/borrows/borrow-scheduler.service.ts#L57), [reservations.service.ts](/C:/Projects/library-system_edit/apps/api/src/reservations/reservations.service.ts#L339)
 * Frontend route protection decodes the JWT payload in middleware without signature verification. Backend authorization still protects APIs, so this is not the main security boundary, but frontend role gating can be spoofed at the UI layer. References: [middleware.ts](/C:/Projects/library-system_edit/apps/web/middleware.ts#L37), [middleware.ts](/C:/Projects/library-system_edit/apps/web/middleware.ts#L67)
 
 ## Low Priority Improvements
@@ -116,8 +118,8 @@ Reason:
 
 ## Next Best Actions (Ordered)
 
-1. Fix `returnBook` to create overdue fines as `UNPAID` so the admin pay/waive flow is not bypassed.
-2. Restrict `GET /users/:id` to admin/staff or the requesting user themselves, and add a `RolesGuard` to `PATCH /users/interests`.
-3. Add the `APPROVED` reservation state and the corresponding admin-approve transition.
+1. Fix `returnBook` so overdue fines are created in an unpaid state and do not bypass the admin pay/waive flow.
+2. Restrict `GET /users/:id` to admin/staff or the requesting user, and add role protection to `PATCH /users/interests`.
+3. Add the `APPROVED` reservation state and align `expiresAt` / `pickupDeadline` with the intended approval and pickup lifecycle.
 
 ---
