@@ -292,13 +292,12 @@ export class BorrowsService {
             borrowId,
             userId: borrow.user.id,
             amount: fine,
-            status: FineStatus.PAID,
-          paidAt: now,
+            status: FineStatus.PENDING,
           },
           update: {
             amount: fine,
-            status: FineStatus.PAID,
-            paidAt: now,
+            status: FineStatus.PENDING,
+            paidAt: null,
           },
         }),
       );
