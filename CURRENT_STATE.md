@@ -9,20 +9,20 @@
 * `verify-email` and `resend-verification` endpoints are rate-limited to 5 requests per 60 seconds via `ThrottlerGuard`. References: [auth.controller.ts](/C:/Projects/library-system_edit/apps/api/src/auth/auth.controller.ts#L122)
 * API error contract is standardized. The global exception filter returns `{ success: false, message, requestId, timestamp }` for all errors. `message` is extracted from the HttpException response and preserves `string[]` arrays from `ValidationPipe`. `statusCode` and `error` fields are not included in the body. References: [global-exception.filter.ts](/C:/Projects/library-system_edit/apps/api/src/common/filters/global-exception.filter.ts#L24)
 * A scheduler now reconciles overdue borrows and expires stale reservations. Active borrows past `dueAt` are transitioned to `OVERDUE`, and stale reservations are expired with reserved copies released back to `AVAILABLE`. References: [borrow-scheduler.service.ts](/C:/Projects/library-system_edit/apps/api/src/borrows/borrow-scheduler.service.ts)
+* Overdue fines created by `returnBook` are now set to `PENDING` status. `paidAt` is not written at return time. The admin pay/waive flow (`fine-payments.service.markPaid` / `waive`) is the only path to marking a fine resolved. References: [borrows.service.ts](/C:/Projects/library-system_edit/apps/api/src/borrows/borrows.service.ts#L287)
+* `GET /users/:id` is restricted to ADMIN or the requesting user's own record. Any other role requesting a different user's ID receives 403. Self-service profile access via `/auth/me` and `/auth/profile` is unaffected. References: [users.controller.ts](/C:/Projects/library-system_edit/apps/api/src/users/users.controller.ts#L120)
 
 ## In Progress
 
-* Overdue fine handling is not fully reconciled with the scheduler. The scheduler now sets borrows to `OVERDUE` and sends notifications, but `returnBook` still auto-upserts the fine as `PAID` immediately on return, which bypasses the explicit admin pay/waive flow.
 * Reservation lifecycle timing is still inconsistent. The scheduler expires stale reservations using `expiresAt`, while approval sets `pickupDeadline` without fully reconciling the pickup window model.
-* Role enforcement on user endpoints is not at least-privilege. Any authenticated user can call `GET /users/:id` and retrieve another user's profile. `PATCH /users/interests` is not role-restricted despite being described as a staff action.
 
 ## Production Readiness Score
 
-Score: 6/10
+Score: 7/10
 
 Reason:
 
-* Core concurrency risks in the reservation and borrow path are closed. Sensitive token leakage and the error contract are fixed. The remaining gaps — fine payment state corruption on return, lifecycle gaps in the reservation model, and incomplete least-privilege on user endpoints — are real production issues but are not data-destroying or auth-bypassing.
+* Core concurrency, fine payment state, token leakage, error contract, and user endpoint access are all closed. The remaining open gaps are medium-priority model and lifecycle issues — missing APPROVED state, pickup window timing mismatch, and frontend JWT decode — none of which are auth-bypassing or data-corrupting.
 
 ---
 
@@ -33,9 +33,7 @@ Reason:
 
 ## High Priority Issues
 
-* `returnBook` sets overdue fines directly to `PAID` on return. When a borrow is returned late, the service upserts a fine record with `status: PAID`, which means the fine is never visible in the unpaid state that should feed the admin pay/waive flow. References: [borrows.service.ts](/C:/Projects/library-system_edit/apps/api/src/borrows/borrows.service.ts#L295)
-* `GET /users/:id` is accessible to any authenticated user. The query now excludes tokens, but name, email, interests, faculty, and role are still returned for arbitrary IDs. References: [users.controller.ts](/C:/Projects/library-system_edit/apps/api/src/users/users.controller.ts#L120)
-* `PATCH /users/interests` is not role-restricted. The endpoint is described as a staff action in comments but has no `RolesGuard`. References: [users.controller.ts](/C:/Projects/library-system_edit/apps/api/src/users/users.controller.ts#L128)
+* None currently identified at high priority.
 
 ## Medium Priority Issues
 
@@ -63,13 +61,13 @@ Reason:
 
 ### Borrow System
 
-* Status: Fair
+* Status: Good
 * Issues:
 * Core borrow creation goes through reservation collection.
 * Extension flow checks ownership, status, overdue condition, and extension count correctly.
-* Overdue borrows are now transitioned to `OVERDUE` by the scheduler.
-* Return flow still sets overdue fines directly to `PAID`, bypassing the pay/waive flow.
-* Borrow-limit enforcement inside `collect()` is now transaction-safe.
+* Overdue borrows are transitioned to `OVERDUE` by the scheduler.
+* Return flow creates overdue fines as `PENDING`; admin pay/waive flow is the resolution path.
+* Borrow-limit enforcement inside `collect()` is transaction-safe.
 
 ### Reservation System
 
@@ -103,23 +101,22 @@ Reason:
 * Transactions are used in core write flows.
 * Reservation create and collect are protected against duplicate concurrent actions by DB-level unique index and advisory lock.
 * Overdue borrows and stale reservations are reconciled by the scheduler.
-* Remaining consistency gap: `returnBook` writes overdue fines as `PAID` immediately, bypassing the pay/waive flow.
+* All known write-consistency gaps are closed. Fine payment state is correct; reservation concurrency is DB-enforced.
 
 ### Role Enforcement
 
-* Status: Fair
+* Status: Good
 * Issues:
 * Admin reservation and borrow actions are protected with `RolesGuard`.
-* `GET /users/:id` is accessible to any authenticated user.
-* `PATCH /users/interests` is not role-restricted.
+* `GET /users/:id` is restricted to ADMIN or own record; arbitrary profile fetch is blocked.
+* `PATCH /users/interests` updates only the authenticated user's own record via `@CurrentUser`.
 * Frontend role gating should not be treated as a security boundary.
 
 ---
 
 ## Next Best Actions (Ordered)
 
-1. Fix `returnBook` so overdue fines are created in an unpaid state and do not bypass the admin pay/waive flow.
-2. Restrict `GET /users/:id` to admin/staff or the requesting user, and add role protection to `PATCH /users/interests`.
-3. Add the `APPROVED` reservation state and align `expiresAt` / `pickupDeadline` with the intended approval and pickup lifecycle.
+1. Add the `APPROVED` reservation state and align `expiresAt` / `pickupDeadline` with the intended approval and pickup lifecycle.
+2. Add integration tests (Supertest) for the reservation and borrow HTTP paths to give the test suite real HTTP wiring coverage.
 
 ---
