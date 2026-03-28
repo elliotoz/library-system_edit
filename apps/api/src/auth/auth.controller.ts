@@ -119,6 +119,8 @@ export class AuthController {
 
   @Public()
   @Post('verify-email')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify email with 6-digit code' })
   @ApiResponse({ status: 200, description: 'Email verified successfully' })
@@ -129,6 +131,8 @@ export class AuthController {
 
   @Public()
   @Post('resend-verification')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Resend email verification code' })
   @ApiResponse({ status: 200, description: 'Verification code resent' })

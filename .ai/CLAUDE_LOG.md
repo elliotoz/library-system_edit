@@ -4,6 +4,26 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-29 — Security: token exposure fix, verify-email rate limit, error contract
+
+**Goal**: Close critical token exposure in user profile endpoint, add rate limiting to verification endpoints, standardize API error shape.
+
+**Root cause**:
+- `UsersService` used no `select` on user queries — returned `emailVerificationToken`, `passwordResetToken` etc. to any caller. Any authenticated user could read another user's live reset token via `GET /users/:id`.
+- `verifyEmail` and `resendVerification` had no rate limit — 6-digit code was brute-forceable within the 15-minute window.
+- `GlobalExceptionFilter` spread the full NestJS envelope (`statusCode`, `error`) into response bodies with no consistent shape.
+
+**Changes**:
+- `apps/api/src/users/users.service.ts` — added `SAFE_USER_SELECT` constant (all safe scalar fields, explicitly excludes password/tokens); applied to `findAll`, `findById`, `updateProfile`, `updateInterests` — query never loads sensitive fields
+- `apps/api/src/auth/auth.controller.ts` — added `@UseGuards(ThrottlerGuard)` + `@Throttle({ ttl: 60000, limit: 5 })` to `verifyEmail` and `resendVerification`
+- `apps/api/src/common/filters/global-exception.filter.ts` — standardized to `{ success: false, message, requestId, timestamp }`; `message` preserved as string or string[] (validation errors); removed `statusCode` and `error` from body
+
+**Verification**: `npx nest build` ✓
+
+**Next**: Remaining audit items — AI tool role enforcement, SSRF guard on fetch tools, timing oracle fix, AddCopiesDto validation.
+
+---
+
 ## 2026-03-29 — Scheduler: reservation expiry + overdue borrow state transition
 
 **Goal**: Enforce `expiresAt` on reservations and write `BorrowStatus.OVERDUE` to borrows that have passed their due date.

@@ -25,28 +25,27 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
 
-      // Preserve structured validation errors from ValidationPipe
-      if (typeof exceptionResponse === "object" && exceptionResponse !== null) {
-        body = {
-          ...(exceptionResponse as Record<string, unknown>),
-          requestId,
-          timestamp: new Date().toISOString(),
-        };
-      } else {
-        body = {
-          statusCode: status,
-          message: exceptionResponse,
-          requestId,
-          timestamp: new Date().toISOString(),
-        };
-      }
+      // Extract message — may be a string or a string[] from ValidationPipe.
+      // Always include success: false. Never spread the full NestJS envelope
+      // (statusCode, error) into the response body — HTTP status in the header
+      // is the authoritative signal.
+      const message =
+        typeof exceptionResponse === "object" && exceptionResponse !== null
+          ? (exceptionResponse as Record<string, unknown>).message
+          : exceptionResponse;
+
+      body = {
+        success: false,
+        message,
+        requestId,
+        timestamp: new Date().toISOString(),
+      };
     } else {
       // Unknown error — never leak internals
       status = HttpStatus.INTERNAL_SERVER_ERROR;
       body = {
-        statusCode: status,
+        success: false,
         message: "Internal server error",
-        error: "Internal Server Error",
         requestId,
         timestamp: new Date().toISOString(),
       };

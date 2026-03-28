@@ -5,6 +5,30 @@ import { Role } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
+// Fields that are safe to return to any caller. Sensitive auth fields
+// (password, verification tokens, reset tokens) are intentionally absent —
+// they must never be loaded by a query that returns data to the client.
+const SAFE_USER_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  role: true,
+  authProvider: true,
+  emailVerifiedAt: true,
+  studentId: true,
+  staffId: true,
+  facultyId: true,
+  interests: true,
+  bio: true,
+  department: true,
+  courses: true,
+  avatarUrl: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+  lastLogin: true,
+} as const;
+
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
@@ -50,19 +74,14 @@ export class UsersService {
         where,
         skip,
         take,
-        include: {
-          faculty: true,
-        },
+        select: { ...SAFE_USER_SELECT, faculty: true },
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.user.count({ where }),
     ]);
 
-    // Remove passwords
-    const usersWithoutPasswords = users.map(({ password, ...user }) => user);
-
     return {
-      data: usersWithoutPasswords,
+      data: users,
       meta: {
         total,
         page: Math.floor(skip / take) + 1,
@@ -78,9 +97,15 @@ export class UsersService {
   async findById(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: {
+      select: {
+        ...SAFE_USER_SELECT,
         faculty: {
-          include: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            description: true,
+            defaultBranchId: true,
             defaultBranch: true,
           },
         },
@@ -91,8 +116,7 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    return user;
   }
 
   /**
@@ -133,14 +157,11 @@ export class UsersService {
     if (dto.department !== undefined) data.department = dto.department;
     if (dto.courses !== undefined) data.courses = dto.courses;
 
-    const updated = await this.prisma.user.update({
+    return this.prisma.user.update({
       where: { id: userId },
       data,
-      include: { faculty: true },
+      select: { ...SAFE_USER_SELECT, faculty: true },
     });
-
-    const { password, ...userWithoutPassword } = updated;
-    return userWithoutPassword;
   }
 
   /**
@@ -155,14 +176,11 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    const updated = await this.prisma.user.update({
+    return this.prisma.user.update({
       where: { id: userId },
       data: { interests },
-      include: { faculty: true },
+      select: { ...SAFE_USER_SELECT, faculty: true },
     });
-
-    const { password, ...userWithoutPassword } = updated;
-    return userWithoutPassword;
   }
 
   /**
