@@ -8,12 +8,13 @@
 * Sensitive auth and reset tokens are never loaded by user-profile queries. All methods in `UsersService` that return data to callers use an explicit `SAFE_USER_SELECT` constant that excludes `password`, `emailVerificationToken`, `emailVerificationExpiry`, `passwordResetToken`, and `passwordResetExpiry` at the query level. References: [users.service.ts](/C:/Projects/library-system_edit/apps/api/src/users/users.service.ts#L11)
 * `verify-email` and `resend-verification` endpoints are rate-limited to 5 requests per 60 seconds via `ThrottlerGuard`. References: [auth.controller.ts](/C:/Projects/library-system_edit/apps/api/src/auth/auth.controller.ts#L122)
 * API error contract is standardized. The global exception filter returns `{ success: false, message, requestId, timestamp }` for all errors. `message` is extracted from the HttpException response and preserves `string[]` arrays from `ValidationPipe`. `statusCode` and `error` fields are not included in the body. References: [global-exception.filter.ts](/C:/Projects/library-system_edit/apps/api/src/common/filters/global-exception.filter.ts#L24)
-* Overdue state transition and reservation expiration are enforced by a scheduler. `BorrowStatus.ACTIVE` records past their `dueAt` are bulk-transitioned to `OVERDUE` each hour. Stale `PENDING` and `READY_FOR_PICKUP` reservations past `expiresAt` are expired per-record in a transaction that also frees the reserved copy back to `AVAILABLE`. References: [borrow-scheduler.service.ts](/C:/Projects/library-system_edit/apps/api/src/borrows/borrow-scheduler.service.ts)
+* A scheduler now reconciles overdue borrows and expires stale reservations. Active borrows past their `dueAt` are bulk-transitioned to `OVERDUE` each hour. Stale `PENDING` and `READY_FOR_PICKUP` reservations past `expiresAt` are expired per-record in a transaction that also releases the reserved copy back to `AVAILABLE`. References: [borrow-scheduler.service.ts](/C:/Projects/library-system_edit/apps/api/src/borrows/borrow-scheduler.service.ts)
 
 ## In Progress
 
 * Overdue fine handling is not fully reconciled with the scheduler. The scheduler now sets borrows to `OVERDUE` and sends notifications, but `returnBook` still auto-upserts the fine as `PAID` immediately on return, which bypasses the explicit admin pay/waive flow. The `OVERDUE` state transition is real; the fine payment state is still incorrect.
 * Role enforcement on user endpoints is not at least-privilege. Any authenticated user can call `GET /users/:id` and retrieve another user's full profile. `PATCH /users/interests` is not role-restricted despite being described as a staff action.
+* Reservation lifecycle timing is still inconsistent. The scheduler expires stale reservations using `expiresAt`, while approval sets `pickupDeadline` without fully reconciling the pickup window model. The two fields are not aligned in the current service logic.
 
 ## Production Readiness Score
 
@@ -27,7 +28,7 @@ Reason:
 
 ## Critical Issues (Fix Immediately)
 
-* Reservation expiration enforcement has a lifecycle gap. The scheduler now expires stale reservations and frees copies, but the reservation model has no separate `APPROVED` state. The workflow goes `PENDING -> READY_FOR_PICKUP -> COLLECTED`, skipping the intended `APPROVED` step. `expiresAt` is set at creation and covers the pickup window, but there is no approval gate. This is a known model gap, not a crash risk, but it means the reservation lifecycle does not match the intended design. References: [schema.prisma](/C:/Projects/library-system_edit/apps/api/prisma/schema.prisma#L33), [reservations.service.ts](/C:/Projects/library-system_edit/apps/api/src/reservations/reservations.service.ts#L323)
+* None currently identified at critical severity.
 
 ## High Priority Issues
 
@@ -37,7 +38,7 @@ Reason:
 
 ## Medium Priority Issues
 
-* Reservation workflow does not implement the `APPROVED` state. The code goes directly from `PENDING` to `READY_FOR_PICKUP`; there is no `APPROVED` status in the enum or service logic. References: [schema.prisma](/C:/Projects/library-system_edit/apps/api/prisma/schema.prisma#L33), [reservations.service.ts](/C:/Projects/library-system_edit/apps/api/src/reservations/reservations.service.ts#L323)
+* The reservation workflow does not implement the `APPROVED` state. The enum and service logic go directly from `PENDING` to `READY_FOR_PICKUP`; there is no `APPROVED` transition. This is a model and lifecycle mismatch, not a security or consistency exploit. References: [schema.prisma](/C:/Projects/library-system_edit/apps/api/prisma/schema.prisma#L33), [reservations.service.ts](/C:/Projects/library-system_edit/apps/api/src/reservations/reservations.service.ts#L323)
 * Frontend route protection decodes the JWT payload in middleware without signature verification. Backend authorization still protects APIs, so this is not the main security boundary, but frontend role gating can be spoofed at the UI layer. References: [middleware.ts](/C:/Projects/library-system_edit/apps/web/middleware.ts#L37), [middleware.ts](/C:/Projects/library-system_edit/apps/web/middleware.ts#L67)
 
 ## Low Priority Improvements
@@ -74,8 +75,8 @@ Reason:
 * Issues:
 * Duplicate active reservation per user-book pair is prevented at the DB level by partial unique index.
 * Copy claim in `create()` is atomic. Borrow-limit check in `collect()` is inside the advisory-locked transaction.
-* Stale reservations are expired and copies freed by the scheduler.
-* No separate `APPROVED` state exists in the lifecycle.
+* The scheduler expires stale reservations and frees reserved copies.
+* Reservation lifecycle has timing and model gaps: `expiresAt` and `pickupDeadline` are not consistently reconciled, and no separate `APPROVED` state exists.
 
 ### Error Handling
 
@@ -98,9 +99,9 @@ Reason:
 * Status: Fair
 * Issues:
 * Transactions are used in core write flows.
-* Reservation create and collect are now protected against duplicate concurrent actions.
+* Reservation create and collect are protected against duplicate concurrent actions by DB-level unique index and advisory lock.
 * Overdue borrows and stale reservations are reconciled by the scheduler.
-* Fine payment state is still corrupted by `returnBook`.
+* Remaining consistency gap: `returnBook` writes overdue fines as `PAID` immediately, bypassing the pay/waive flow.
 
 ### Role Enforcement
 
