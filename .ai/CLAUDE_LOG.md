@@ -4,6 +4,25 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-03-29 — Scheduler: reservation expiry + overdue borrow state transition
+
+**Goal**: Enforce `expiresAt` on reservations and write `BorrowStatus.OVERDUE` to borrows that have passed their due date.
+
+**Root cause**: The scheduler only sent notifications — it never performed state transitions. `RESERVED` copies were never freed when reservations expired, blocking availability indefinitely. `BorrowStatus.OVERDUE` existed in the schema but was never written.
+
+**Changes**:
+- `apps/api/src/borrows/borrow-scheduler.service.ts`:
+  - `transitionOverdueBorrows()` — bulk `updateMany` ACTIVE→OVERDUE where `dueAt < now`. Runs first each tick.
+  - `expireReservations()` — finds PENDING/READY_FOR_PICKUP reservations with `expiresAt < now`; for each: transaction sets reservation→EXPIRED + bookCopy→AVAILABLE; sends RESERVATION_EXPIRED notification after commit.
+  - `sendOverdueAndDueSoonNotifications()` — updated to query `status IN (ACTIVE, OVERDUE)` so overdue notifications continue after status transition.
+  - `runChecks()` — now calls all three methods with independent error handling.
+
+**Verification**: `npx nest build` ✓
+
+**Next**: Action 3 — sensitive field stripping from `GET /users/:id` (CRITICAL security fix) and `verifyEmail` rate limiting.
+
+---
+
 ## 2026-03-27 — Reservation hardening: concurrency, borrow limit, reject guard
 
 **Goal**: Close three production risks in the reservation system: duplicate active reservations per user+book, duplicate borrows from concurrent collects, borrow-limit bypass during collect, and invalid reject on non-active reservations.

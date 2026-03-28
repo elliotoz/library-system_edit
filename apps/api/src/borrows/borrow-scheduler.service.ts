@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { BorrowStatus, NotificationType } from '@prisma/client';
+import { BorrowStatus, BookCopyStatus, NotificationType, ReservationStatus } from '@prisma/client';
 
 const FINE_RATE_PER_DAY = 5;
 const DEDUP_WINDOW_HOURS = 22;
@@ -29,9 +29,73 @@ export class BorrowSchedulerService implements OnModuleInit, OnModuleDestroy {
 
   async runChecks() {
     try {
+      await this.transitionOverdueBorrows();
+    } catch (err) {
+      this.logger.error(`Overdue transition error: ${err}`);
+    }
+    try {
+      await this.expireReservations();
+    } catch (err) {
+      this.logger.error(`Reservation expiry error: ${err}`);
+    }
+    try {
       await this.sendOverdueAndDueSoonNotifications();
     } catch (err) {
-      this.logger.error(`Scheduler error: ${err}`);
+      this.logger.error(`Notification error: ${err}`);
+    }
+  }
+
+  private async transitionOverdueBorrows() {
+    const now = new Date();
+    const result = await this.prisma.borrow.updateMany({
+      where: { status: BorrowStatus.ACTIVE, dueAt: { lt: now } },
+      data: { status: BorrowStatus.OVERDUE },
+    });
+    if (result.count > 0) {
+      this.logger.log(`Borrows transitioned to OVERDUE: ${result.count}`);
+    }
+  }
+
+  private async expireReservations() {
+    const now = new Date();
+
+    const stale = await this.prisma.reservation.findMany({
+      where: {
+        status: { in: [ReservationStatus.PENDING, ReservationStatus.READY_FOR_PICKUP] },
+        expiresAt: { lt: now },
+      },
+      include: {
+        bookCopy: { include: { book: { select: { id: true, title: true } } } },
+      },
+    });
+
+    let expired = 0;
+
+    for (const reservation of stale) {
+      await this.prisma.$transaction([
+        this.prisma.reservation.updateMany({
+          where: { id: reservation.id, status: { in: [ReservationStatus.PENDING, ReservationStatus.READY_FOR_PICKUP] } },
+          data: { status: ReservationStatus.EXPIRED },
+        }),
+        this.prisma.bookCopy.updateMany({
+          where: { id: reservation.bookCopyId, status: BookCopyStatus.RESERVED },
+          data: { status: BookCopyStatus.AVAILABLE },
+        }),
+      ]);
+
+      await this.notifications.create({
+        userId: reservation.userId,
+        type: NotificationType.RESERVATION_EXPIRED,
+        title: 'Reservation Expired',
+        message: `Your reservation for "${reservation.bookCopy.book.title}" has expired and the copy has been released.`,
+        bookId: reservation.bookCopy.book.id,
+      });
+
+      expired++;
+    }
+
+    if (expired > 0) {
+      this.logger.log(`Reservations expired: ${expired}`);
     }
   }
 
@@ -39,8 +103,11 @@ export class BorrowSchedulerService implements OnModuleInit, OnModuleDestroy {
     const now = new Date();
     const dedupCutoff = new Date(now.getTime() - DEDUP_WINDOW_HOURS * 60 * 60 * 1000);
 
+    // Include OVERDUE as well — transitionOverdueBorrows() runs first and moves
+    // past-due borrows out of ACTIVE. Without this, overdue notifications would
+    // stop being sent after the first scheduler tick.
     const activeBorrows = await this.prisma.borrow.findMany({
-      where: { status: BorrowStatus.ACTIVE },
+      where: { status: { in: [BorrowStatus.ACTIVE, BorrowStatus.OVERDUE] } },
       include: {
         bookCopy: { include: { book: { select: { id: true, title: true } } } },
       },
