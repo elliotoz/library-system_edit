@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
@@ -245,7 +246,7 @@ export class ReservationsService {
       // Partial unique index violation — user already has an active reservation
       // for this book (caught here to give a human-readable 409).
       if (err?.code === 'P2002') {
-        throw new BadRequestException(
+        throw new ConflictException(
           "You already have an active reservation for this book"
         );
       }
