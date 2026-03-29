@@ -2,13 +2,30 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import {
-  BookOpen, Users, BookMarked, Clock, AlertTriangle, UserPlus,
-  Plus, BarChart3, ChevronRight, Activity,
+  BookOpen,
+  Users,
+  BookMarked,
+  Clock,
+  AlertTriangle,
+  UserPlus,
+  Plus,
+  BarChart3,
+  ChevronRight,
+  Activity,
+  Sparkles,
+  Brain,
+  ArrowUpRight,
+  BellRing,
+  ShieldAlert,
+  Bot,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { GlassCard } from '@/components/ui/glass-card';
+import { Spotlight } from '@/components/ui/spotlight';
 
 interface AdminStats {
   totalBooks: number;
@@ -23,6 +40,19 @@ interface ActivityItem {
   type: string;
   message: string;
   time: string;
+}
+
+const CONTAINER_MOTION = {
+  initial: { opacity: 0, y: 18 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.42, ease: 'easeOut' as const },
+};
+
+function getOpsStatus(pendingReservations: number, overdueBooks: number) {
+  const critical = pendingReservations + overdueBooks;
+  if (critical >= 20) return { label: 'High attention', tone: 'text-rose-100 bg-rose-400/15 border-rose-300/20' };
+  if (critical >= 8) return { label: 'Watch closely', tone: 'text-amber-100 bg-amber-400/15 border-amber-300/20' };
+  return { label: 'Stable flow', tone: 'text-emerald-100 bg-emerald-400/15 border-emerald-300/20' };
 }
 
 export default function AdminDashboard() {
@@ -59,159 +89,432 @@ export default function AdminDashboard() {
   if (isLoading) {
     return (
       <div className="space-y-6 animate-pulse">
-        <div className="h-28 bg-gray-200 dark:bg-gray-700 rounded-2xl" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[...Array(3)].map((_, i) => <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded-xl" />)}
+        <div className="h-40 rounded-[28px] bg-gray-200 dark:bg-gray-700" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-28 rounded-2xl bg-gray-200 dark:bg-gray-700" />
+          ))}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[...Array(3)].map((_, i) => <div key={i} className="h-20 bg-gray-200 dark:bg-gray-700 rounded-xl" />)}
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+          <div className="h-72 rounded-[28px] bg-gray-200 dark:bg-gray-700" />
+          <div className="h-72 rounded-[28px] bg-gray-200 dark:bg-gray-700" />
         </div>
       </div>
     );
   }
 
-  const mainStats = [
-    { label: 'Total Books', value: stats?.totalBooks ?? 0, icon: BookOpen, gradient: 'from-blue-500 to-blue-600', light: 'bg-blue-50 dark:bg-blue-900/30', color: 'text-blue-500' },
-    { label: 'Active Users', value: stats?.activeUsers ?? 0, icon: Users, gradient: 'from-emerald-500 to-emerald-600', light: 'bg-emerald-50 dark:bg-emerald-900/30', color: 'text-emerald-500' },
-    { label: 'Currently Borrowed', value: stats?.currentlyBorrowed ?? 0, icon: BookMarked, gradient: 'from-purple-500 to-purple-600', light: 'bg-purple-50 dark:bg-purple-900/30', color: 'text-purple-500' },
+  const kpiCards = [
+    {
+      label: 'Total Books',
+      value: stats?.totalBooks ?? 0,
+      icon: BookOpen,
+      iconBg: 'from-sky-400/30 to-blue-500/20',
+      iconColor: 'text-sky-600 dark:text-sky-300',
+      meta: 'Catalog inventory',
+    },
+    {
+      label: 'Active Users',
+      value: stats?.activeUsers ?? 0,
+      icon: Users,
+      iconBg: 'from-emerald-400/30 to-green-500/20',
+      iconColor: 'text-emerald-600 dark:text-emerald-300',
+      meta: 'Currently using the system',
+    },
+    {
+      label: 'Currently Borrowed',
+      value: stats?.currentlyBorrowed ?? 0,
+      icon: BookMarked,
+      iconBg: 'from-fuchsia-400/25 to-violet-500/15',
+      iconColor: 'text-violet-600 dark:text-violet-300',
+      meta: 'Active circulation load',
+    },
+    {
+      label: 'Pending Reservations',
+      value: stats?.pendingReservations ?? 0,
+      icon: Clock,
+      href: '/dashboard/admin/reservations',
+      accent: 'border-l-amber-400',
+      iconBg: 'from-amber-300/35 to-orange-500/15',
+      iconColor: 'text-amber-600 dark:text-amber-300',
+      meta: 'Needs review',
+    },
+    {
+      label: 'Overdue Books',
+      value: stats?.overdueBooks ?? 0,
+      icon: AlertTriangle,
+      href: '/dashboard/admin/books',
+      accent: 'border-l-rose-400',
+      iconBg: 'from-rose-300/35 to-red-500/15',
+      iconColor: 'text-rose-600 dark:text-rose-300',
+      meta: 'Requires follow-up',
+    },
+    {
+      label: 'New Users This Week',
+      value: stats?.newUsersThisWeek ?? 0,
+      icon: UserPlus,
+      href: '/dashboard/admin/users',
+      accent: 'border-l-teal-400',
+      iconBg: 'from-teal-300/35 to-cyan-500/15',
+      iconColor: 'text-teal-600 dark:text-teal-300',
+      meta: 'Recent signups',
+    },
   ];
 
-  const alertStats = [
-    { label: 'Pending Reservations', value: stats?.pendingReservations ?? 0, icon: Clock, border: 'border-l-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20', iconBg: 'bg-amber-100 dark:bg-amber-900/40', color: 'text-amber-600 dark:text-amber-400', link: '/dashboard/admin/reservations' },
-    { label: 'Overdue Books', value: stats?.overdueBooks ?? 0, icon: AlertTriangle, border: 'border-l-red-500', bg: 'bg-red-50 dark:bg-red-900/20', iconBg: 'bg-red-100 dark:bg-red-900/40', color: 'text-red-600 dark:text-red-400', link: '/dashboard/admin/books' },
-    { label: 'New Users This Week', value: stats?.newUsersThisWeek ?? 0, icon: UserPlus, border: 'border-l-green-500', bg: 'bg-green-50 dark:bg-green-900/20', iconBg: 'bg-green-100 dark:bg-green-900/40', color: 'text-green-600 dark:text-green-400', link: '/dashboard/admin/users' },
+  const focusActions = [
+    {
+      label: 'Manage Reservations',
+      description: `${stats?.pendingReservations ?? 0} pending requests waiting for admin review.`,
+      href: '/dashboard/admin/reservations',
+      icon: BellRing,
+      style: 'text-amber-700 dark:text-amber-200',
+      surface: 'from-amber-300/20 to-transparent',
+    },
+    {
+      label: 'Review Overdue Loans',
+      description: `${stats?.overdueBooks ?? 0} overdue items need outreach or enforcement.`,
+      href: '/dashboard/admin/borrows',
+      icon: ShieldAlert,
+      style: 'text-rose-700 dark:text-rose-200',
+      surface: 'from-rose-300/20 to-transparent',
+    },
+    {
+      label: 'Maintain Book Catalog',
+      description: 'Create or update records before demand spikes across branches.',
+      href: '/dashboard/admin/books/new',
+      icon: Plus,
+      style: 'text-sky-700 dark:text-sky-200',
+      surface: 'from-sky-300/20 to-transparent',
+    },
+    {
+      label: 'Export Reports',
+      description: 'Open reporting tools for trends, usage summaries, and audits.',
+      href: '/dashboard/admin/reports',
+      icon: BarChart3,
+      style: 'text-violet-700 dark:text-violet-200',
+      surface: 'from-violet-300/20 to-transparent',
+    },
   ];
 
-  const quickActions = [
-    { label: 'Add New Book', icon: Plus, href: '/dashboard/admin/books/new', color: 'text-primary-500', bg: 'bg-primary-50 dark:bg-primary-900/30', hover: 'hover:border-primary-300 dark:hover:border-primary-700' },
-    { label: 'Manage Users', icon: Users, href: '/dashboard/admin/users', color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/30', hover: 'hover:border-blue-300 dark:hover:border-blue-700' },
-    { label: 'Reservations', icon: Clock, href: '/dashboard/admin/reservations', color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/30', hover: 'hover:border-amber-300 dark:hover:border-amber-700' },
-    { label: 'View Reports', icon: BarChart3, href: '/dashboard/admin/reports', color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/30', hover: 'hover:border-purple-300 dark:hover:border-purple-700' },
+  const aiPrompts = [
+    'Summarize reservation backlog by urgency',
+    'Show overdue borrowing trends by category',
+    'Highlight unusual circulation activity today',
+    'Identify user growth changes this week',
   ];
+
+  const criticalCount = (stats?.pendingReservations ?? 0) + (stats?.overdueBooks ?? 0);
+  const opsStatus = getOpsStatus(stats?.pendingReservations ?? 0, stats?.overdueBooks ?? 0);
 
   return (
     <div className="space-y-6">
-
-      {/* ── Welcome Banner ── */}
-      <div className="relative overflow-hidden rounded-2xl p-6 text-white shadow-lg animate-slide-up stagger-1"
-        style={{ background: 'linear-gradient(135deg,#0d1b2e 0%,#0f2336 60%,#0b1a2b 100%)' }}>
-        <div className="absolute inset-0 animate-pulse-slow"
-          style={{ backgroundImage: 'radial-gradient(circle at 70% 50%, rgba(74,191,191,0.6) 1px, transparent 1px)', backgroundSize: '28px 28px', opacity: 0.06 }} />
-        <div className="absolute right-0 top-0 h-full w-56 bg-gradient-to-l from-teal-500/20 to-transparent" />
-        <div className="absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-transparent via-teal-400/30 to-transparent" />
-        <div className="relative flex items-center justify-between">
-          <div>
-            <p className="text-gray-400 text-sm font-medium mb-1">{greeting()}</p>
-            <h1 className="text-2xl font-bold">{user?.name?.split(' ')[0] || 'Admin'}</h1>
-            <p className="text-gray-400 text-sm mt-1">Here's your library system overview</p>
+      <motion.section {...CONTAINER_MOTION}>
+        <GlassCard
+          liquid
+          className="relative overflow-hidden rounded-[30px] border border-white/10 p-6 sm:p-7"
+          style={{
+            background:
+              'linear-gradient(135deg, rgba(4,14,27,0.88) 0%, rgba(10,30,46,0.82) 56%, rgba(7,24,39,0.9) 100%)',
+          }}
+        >
+          <div className="pointer-events-none absolute inset-0">
+            <Spotlight className="left-[45%] top-[-38%] opacity-100" fill="#5eead4" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(45,212,191,0.18),transparent_28%),radial-gradient(circle_at_left,rgba(56,189,248,0.12),transparent_24%)]" />
+            <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-cyan-300/30 to-transparent" />
+            <div className="absolute right-5 top-5 h-32 w-32 rounded-full bg-cyan-300/10 blur-3xl" />
           </div>
-          <div className="hidden sm:flex flex-col items-end gap-2">
-            <span className="px-3 py-1 bg-primary-500/20 border border-primary-500/30 rounded-full text-xs font-medium text-primary-300">
-              Administrator
-            </span>
-          </div>
-        </div>
-      </div>
 
-      {/* ── Main Stats ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {mainStats.map((s, i) => (
-          <div key={i} className={cn('glass-card glass-card-interactive group p-5 animate-slide-up', `stagger-${i + 1}`)}>
-            <div className="flex items-center gap-4">
-              <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center ring-1 ring-transparent group-hover:ring-primary-400/30 transition-all', s.light)}>
-                <s.icon className={cn('w-6 h-6', s.color)} />
+          <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-sm font-medium text-teal-200/85">{greeting()}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                  {user?.name?.split(' ')[0] || 'Admin'} control center
+                </h1>
+                <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-cyan-100/85">
+                  Administrator
+                </span>
+                <span className={cn('rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.18em]', opsStatus.tone)}>
+                  {opsStatus.label}
+                </span>
               </div>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200/78 sm:text-base">
+                Monitor circulation health, resolve operational risks, and move directly into the highest-priority library workflows.
+              </p>
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-white/45">Reservations</p>
+                  <p className="mt-1 text-lg font-semibold text-white">{(stats?.pendingReservations ?? 0).toLocaleString()}</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-white/45">Overdue</p>
+                  <p className="mt-1 text-lg font-semibold text-white">{(stats?.overdueBooks ?? 0).toLocaleString()}</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-white/45">New users</p>
+                  <p className="mt-1 text-lg font-semibold text-white">{(stats?.newUsersThisWeek ?? 0).toLocaleString()}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[520px]">
+              <div className="rounded-2xl border border-white/10 bg-white/8 px-4 py-4 backdrop-blur-md">
+                <p className="text-xs uppercase tracking-[0.22em] text-white/45">Critical Queue</p>
+                <p className="mt-2 text-3xl font-semibold text-white">{criticalCount}</p>
+                <p className="mt-1 text-xs text-white/60">Pending + overdue items</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/8 px-4 py-4 backdrop-blur-md">
+                <p className="text-xs uppercase tracking-[0.22em] text-white/45">Active Circulation</p>
+                <p className="mt-2 text-3xl font-semibold text-white">{(stats?.currentlyBorrowed ?? 0).toLocaleString()}</p>
+                <p className="mt-1 text-xs text-white/60">Books currently out</p>
+              </div>
+              <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-4 backdrop-blur-md">
+                <div className="flex items-center gap-2 text-cyan-100">
+                  <Brain className="h-4 w-4" />
+                  <span className="text-xs font-medium uppercase tracking-[0.22em]">AI Ops</span>
+                </div>
+                <p className="mt-2 text-sm font-medium text-white">Assistant is ready for admin queries</p>
+                <p className="mt-1 text-xs text-cyan-100/70">Use summaries and anomaly checks without leaving the dashboard.</p>
+              </div>
+            </div>
+          </div>
+        </GlassCard>
+      </motion.section>
+
+      <motion.section
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.06, duration: 0.35 }}
+        className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3"
+      >
+        {kpiCards.map((card, index) => {
+          const Icon = card.icon;
+          const content = (
+            <GlassCard
+              liquid={index === 0}
+              className={cn(
+                'group relative h-full overflow-hidden rounded-[26px] border border-white/10 p-5',
+                'transition-transform duration-200 hover:-translate-y-0.5',
+                card.accent
+              )}
+            >
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-70" />
+              <div className="relative flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-white/62">{card.label}</p>
+                  <p className="mt-3 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">
+                    {card.value.toLocaleString()}
+                  </p>
+                  <div className="mt-3 h-px w-12 bg-gradient-to-r from-cyan-400/45 to-transparent" />
+                  <p className="mt-2 text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-white/45">
+                    {card.meta}
+                  </p>
+                </div>
+                <div className={cn('flex h-12 w-12 items-center justify-center rounded-2xl border border-white/15 bg-gradient-to-br', card.iconBg)}>
+                  <Icon className={cn('h-5 w-5', card.iconColor)} />
+                </div>
+              </div>
+              {card.href && (
+                <div className="relative mt-5 flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-white/65">
+                  <span>Open details</span>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </div>
+              )}
+            </GlassCard>
+          );
+
+          return card.href ? (
+            <Link key={card.label} href={card.href} className="block">
+              {content}
+            </Link>
+          ) : (
+            <div key={card.label}>{content}</div>
+          );
+        })}
+      </motion.section>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <motion.section
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12, duration: 0.35 }}
+        >
+          <GlassCard className="overflow-hidden rounded-[30px] border border-white/10">
+            <div className="border-b border-black/[0.06] px-5 py-5 dark:border-white/[0.06] sm:px-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-cyan-700 dark:text-cyan-200/80">Today&apos;s Focus</p>
+                  <h2 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
+                    Priority admin actions
+                  </h2>
+                </div>
+                <Link
+                  href="/dashboard/admin/reports"
+                  className="glass-button self-start px-4 py-2 text-xs font-semibold sm:text-sm"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  Open reports
+                </Link>
+              </div>
+            </div>
+
+            <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
+              {focusActions.map((action, index) => {
+                const Icon = action.icon;
+                return (
+                  <Link key={action.label} href={action.href} className="block">
+                    <GlassCard
+                      beams={index === 0}
+                      liquid={index === 0}
+                      className="group relative h-full overflow-hidden rounded-[24px] border border-white/10 p-5 transition-transform duration-200 hover:-translate-y-1"
+                    >
+                      <div className={cn('pointer-events-none absolute inset-0 bg-gradient-to-br', action.surface)} />
+                      <div className="relative flex h-full flex-col">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className={cn('flex h-11 w-11 items-center justify-center rounded-2xl border border-white/12 bg-white/10', action.style)}>
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <ArrowUpRight className="h-4 w-4 text-gray-400 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 dark:text-white/45" />
+                        </div>
+                        <div className="mt-4">
+                          <span className="rounded-full border border-black/5 bg-white/55 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-gray-500 dark:border-white/10 dark:bg-white/8 dark:text-white/50">
+                            {index === 0 ? 'Immediate' : index === 1 ? 'Attention' : index === 2 ? 'Catalog' : 'Reporting'}
+                          </span>
+                        </div>
+                        <h3 className="mt-5 text-lg font-semibold text-gray-900 dark:text-white">{action.label}</h3>
+                        <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-white/68">{action.description}</p>
+                        <div className="mt-5 text-xs font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-white/42">
+                          Open workflow
+                        </div>
+                      </div>
+                    </GlassCard>
+                  </Link>
+                );
+              })}
+            </div>
+          </GlassCard>
+        </motion.section>
+
+        <motion.section
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18, duration: 0.35 }}
+          className="space-y-6"
+        >
+          <GlassCard className="overflow-hidden rounded-[30px] border border-white/10">
+            <div className="flex items-center justify-between border-b border-black/[0.06] px-5 py-4 dark:border-white/[0.06]">
               <div>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{s.value.toLocaleString()}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{s.label}</p>
+                <p className="text-sm text-gray-500 dark:text-white/55">Live activity</p>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Operations feed</h2>
+              </div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10">
+                <Activity className="h-4 w-4 text-gray-500 dark:text-white/70" />
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+            <div className="p-5">
+              {activities.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-black/10 px-4 py-10 text-center dark:border-white/10">
+                  <Activity className="mx-auto h-9 w-9 text-gray-300 dark:text-white/25" />
+                  <p className="mt-3 text-sm text-gray-500 dark:text-white/55">No recent activity</p>
+                </div>
+              ) : (
+                <div className="relative">
+                  <div className="mb-4 rounded-2xl border border-black/[0.05] bg-black/[0.02] px-4 py-3 dark:border-white/[0.06] dark:bg-white/[0.03]">
+                    <p className="text-xs uppercase tracking-[0.18em] text-gray-400 dark:text-white/35">Feed summary</p>
+                    <p className="mt-1 text-sm text-gray-600 dark:text-white/68">
+                      {activities.length} recent event{activities.length === 1 ? '' : 's'} across circulation and admin activity.
+                    </p>
+                  </div>
+                  <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gradient-to-b from-cyan-400/45 via-cyan-400/20 to-transparent" />
+                  <div className="space-y-4">
+                    {activities.slice(0, 6).map((item, index) => {
+                      const isBorrow = item.type === 'borrow';
+                      const tone = isBorrow
+                        ? 'bg-sky-100 text-sky-600 dark:bg-sky-400/15 dark:text-sky-300'
+                        : item.type === 'user'
+                          ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-300'
+                          : 'bg-violet-100 text-violet-600 dark:bg-violet-400/15 dark:text-violet-300';
 
-      {/* ── Alert Stats ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {alertStats.map((s, i) => (
-          <Link key={i} href={s.link}
-            className={cn('glass-card glass-card-interactive group border-l-4 p-4 animate-slide-up', s.border, `stagger-${i + 1}`)}>
-            <div className="flex items-center gap-3">
-              <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', s.iconBg)}>
-                <s.icon className={cn('w-5 h-5', s.color)} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className={cn('text-2xl font-bold', s.color)}>{s.value}</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">{s.label}</p>
-              </div>
-              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
+                      return (
+                        <div key={`${item.time}-${index}`} className="relative flex items-start gap-4">
+                          <div className={cn('relative z-10 flex h-8 w-8 items-center justify-center rounded-full ring-4 ring-white dark:ring-[#101823]', tone)}>
+                            {isBorrow ? <BookMarked className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                          </div>
+                          <div className="min-w-0 flex-1 rounded-2xl border border-black/[0.05] bg-white/50 px-4 py-3 dark:border-white/[0.08] dark:bg-white/[0.03]">
+                            <p className="text-sm leading-6 text-gray-700 dark:text-white/80">{item.message}</p>
+                            <p className="mt-1 text-xs uppercase tracking-[0.16em] text-gray-400 dark:text-white/35">
+                              {new Date(item.time).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
-          </Link>
-        ))}
-      </div>
+          </GlassCard>
 
-      {/* ── Activity + Quick Actions ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Activity Feed */}
-        <div className="glass-card">
-          <div className="flex items-center gap-2 px-5 py-4 border-b border-black/[0.06] dark:border-white/[0.06]">
-            <Activity className="w-4 h-4 text-gray-400" />
-            <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Recent Activity</h2>
-          </div>
-          <div className="p-5">
-            {activities.length === 0 ? (
-              <div className="text-center py-6">
-                <Activity className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-                <p className="text-sm text-gray-500 dark:text-gray-400">No recent activity</p>
-              </div>
-            ) : (
-              <div className="relative">
-                {/* Timeline line */}
-                <div className="absolute left-4 top-2 bottom-2 w-px bg-gradient-to-b from-teal-400/40 via-teal-400/20 to-transparent" />
-                <div className="space-y-4">
-                  {activities.slice(0, 5).map((a, i) => (
-                    <div key={i} className="flex items-start gap-4 relative">
-                      <div className={cn(
-                        'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ring-2 ring-white dark:ring-gray-800 z-10',
-                        a.type === 'borrow' ? 'bg-blue-100 dark:bg-blue-900/40' : 'bg-purple-100 dark:bg-purple-900/40'
-                      )}>
-                        {a.type === 'borrow'
-                          ? <BookMarked className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                          : <Plus className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />}
-                      </div>
-                      <div className="flex-1 min-w-0 pt-0.5">
-                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-snug">{a.message}</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                          {new Date(a.time).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+          <GlassCard
+            liquid
+            className="relative overflow-hidden rounded-[30px] border border-cyan-300/15 p-5 sm:p-6"
+            style={{
+              background:
+                'linear-gradient(180deg, rgba(17,58,74,0.18) 0%, rgba(8,19,31,0.06) 100%)',
+            }}
+          >
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(45,212,191,0.18),transparent_25%),radial-gradient(circle_at_left,rgba(125,211,252,0.14),transparent_20%)]" />
+            <div className="relative">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 text-cyan-700 dark:text-cyan-200">
+                    <Bot className="h-4 w-4" />
+                    <p className="text-sm font-medium">AI operations assistant</p>
+                  </div>
+                  <h2 className="mt-2 text-xl font-semibold text-gray-900 dark:text-white">Ask for admin insights</h2>
                 </div>
+                <Link
+                  href="/dashboard/ai-assistant"
+                  className="glass-button glass-button-primary relative inline-flex items-center justify-center gap-2 overflow-hidden px-4 py-2 text-xs font-semibold sm:text-sm"
+                >
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -inset-px overflow-hidden"
+                    style={{ borderRadius: 'inherit' }}
+                  >
+                    <div className="beam beam-top" />
+                    <div className="beam beam-right" />
+                    <div className="beam beam-bottom" />
+                    <div className="beam beam-left" />
+                  </div>
+                  <Sparkles className="relative z-10 h-4 w-4" />
+                  <span className="relative z-10">Open AI</span>
+                </Link>
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* Quick Actions */}
-        <div className="glass-card">
-          <div className="px-5 py-4 border-b border-black/[0.06] dark:border-white/[0.06]">
-            <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Quick Actions</h2>
-          </div>
-          <div className="p-5 grid grid-cols-2 gap-3">
-            {quickActions.map((a, i) => (
-              <Link key={i} href={a.href}
-                className={cn('glass-card glass-card-interactive group flex flex-col items-center justify-center gap-2 p-4', a.hover)}>
-                <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110', a.bg)}>
-                  <a.icon className={cn('w-5 h-5', a.color)} />
-                </div>
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 text-center leading-tight">{a.label}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
+              <p className="mt-3 text-sm leading-6 text-gray-600 dark:text-white/70">
+                Use the assistant to summarize risk, spot anomalies, and move from overview to action without leaving the admin workflow.
+              </p>
+
+              <div className="mt-5 space-y-3">
+                {aiPrompts.map((prompt) => (
+                  <Link
+                    key={prompt}
+                    href="/dashboard/ai-assistant"
+                    className="block rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-gray-700 transition-colors hover:bg-white/15 dark:text-white/82"
+                  >
+                    {prompt}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </GlassCard>
+        </motion.section>
       </div>
-
     </div>
   );
 }
