@@ -1,16 +1,36 @@
 // middleware.ts - Next.js 14 Route Protection Middleware
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { jwtVerify } from 'jose';
 
-// Role-based route permissions
+// Edge-safe secret bytes — computed once at module load
+const secret = process.env.JWT_SECRET
+  ? new TextEncoder().encode(process.env.JWT_SECRET)
+  : null;
+
+if (!secret) {
+  console.error('[middleware] JWT_SECRET is not set — middleware will fail closed (all dashboard requests redirect to login)');
+}
+
+// Role-based route permissions (complete audit of all admin + user surfaces)
 const ROUTE_PERMISSIONS: Record<string, string[]> = {
+  // Admin routes
   '/dashboard/admin': ['ADMIN'],
   '/dashboard/admin/books': ['ADMIN'],
-  '/dashboard/admin/users': ['ADMIN'],
+  '/dashboard/admin/borrows': ['ADMIN'],
+  '/dashboard/admin/branches': ['ADMIN'],
+  '/dashboard/admin/fines': ['ADMIN'],
+  '/dashboard/admin/import-books': ['ADMIN'],
+  '/dashboard/admin/materials': ['ADMIN'],
+  '/dashboard/admin/policies': ['ADMIN'],
+  '/dashboard/admin/reading-lists': ['ADMIN'],
+  '/dashboard/admin/reports': ['ADMIN'],
   '/dashboard/admin/reservations': ['ADMIN'],
   '/dashboard/admin/settings': ['ADMIN'],
+  '/dashboard/admin/statistics': ['ADMIN'],
   '/dashboard/admin/upload': ['ADMIN'],
-  '/dashboard/admin/import-books': ['ADMIN'],
+  '/dashboard/admin/users': ['ADMIN'],
+  // User routes
   '/dashboard/student': ['STUDENT', 'ADMIN'],
   '/dashboard/instructor': ['INSTRUCTOR', 'ADMIN'],
   '/dashboard/staff': ['STAFF', 'ADMIN'],
@@ -33,19 +53,17 @@ const ROLE_DASHBOARDS: Record<string, string> = {
   STAFF: '/dashboard/staff',
 };
 
-// Decode JWT payload (without verification - verification happens on API)
-function decodeJwtPayload(token: string): { role?: string; sub?: string; email?: string } | null {
+async function verifyToken(token: string): Promise<{ role?: string; sub?: string } | null> {
+  if (!secret) return null;
   try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(atob(parts[1]));
-    return payload;
+    const { payload } = await jwtVerify(token, secret, { algorithms: ['HS256'] });
+    return payload as { role?: string; sub?: string };
   } catch {
     return null;
   }
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Skip non-dashboard routes and static files
@@ -63,10 +81,10 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Decode JWT to get role
-  const payload = decodeJwtPayload(token);
+  // Verify JWT signature and extract payload
+  const payload = await verifyToken(token);
   if (!payload || !payload.role) {
-    // Invalid token format - redirect to login
+    // Invalid or tampered token — redirect to login
     const loginUrl = new URL('/login', request.url);
     return NextResponse.redirect(loginUrl);
   }

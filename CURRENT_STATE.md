@@ -12,6 +12,8 @@
 * Overdue fines created by `returnBook` are now set to `PENDING` status. `paidAt` is not written at return time. The admin pay/waive flow (`fine-payments.service.markPaid` / `waive`) is the only path to marking a fine resolved. References: [borrows.service.ts](/C:/Projects/library-system_edit/apps/api/src/borrows/borrows.service.ts#L287)
 * `GET /users/:id` is restricted to ADMIN or the requesting user's own record. Any other role requesting a different user's ID receives 403. Self-service profile access via `/auth/me` and `/auth/profile` is unaffected. References: [users.controller.ts](/C:/Projects/library-system_edit/apps/api/src/users/users.controller.ts#L120)
 * Reservation lifecycle implements the full APPROVED state. `approve()` transitions PENDING → APPROVED (no pickup deadline), `markReady()` transitions APPROVED → READY_FOR_PICKUP (sets 2-day pickup deadline), and `reject()` accepts PENDING, APPROVED, or READY_FOR_PICKUP reservations. The scheduler expires PENDING/APPROVED by `expiresAt` and READY_FOR_PICKUP by `pickupDeadline`, resolving the timing model gap. Active reservation counts include APPROVED. Admin UI has three tabs (pending, approved, ready) with distinct actions. User UI shows APPROVED as a distinct active state. References: [reservations.service.ts](/C:/Projects/library-system_edit/apps/api/src/reservations/reservations.service.ts), [reservations.controller.ts](/C:/Projects/library-system_edit/apps/api/src/reservations/reservations.controller.ts), [borrow-scheduler.service.ts](/C:/Projects/library-system_edit/apps/api/src/borrows/borrow-scheduler.service.ts)
+* Real DB-backed integration tests (Supertest + PostgreSQL) cover the full reservation lifecycle (20 tests: create, approve, mark-ready, collect, reject, cancel, my reservations) and borrow operations (8 tests: extend, return, overdue fine with PENDING status). Test harness includes global setup/teardown, NestJS app bootstrap with scheduler disabled, cookie auth helpers, and dynamic table truncation. References: [reservations.e2e-spec.ts](/C:/Projects/library-system_edit/apps/api/test/reservations.e2e-spec.ts), [borrows.e2e-spec.ts](/C:/Projects/library-system_edit/apps/api/test/borrows.e2e-spec.ts)
+* Frontend middleware now verifies JWT signatures using `jose` with HS256 algorithm constraint, replacing raw base64 decode. Forged tokens redirect to login (fail-closed). Missing `JWT_SECRET` also fails closed. All admin routes are covered in `ROUTE_PERMISSIONS` (borrows, branches, fines, materials, policies, reports, statistics, reading-lists added). References: [middleware.ts](/C:/Projects/library-system_edit/apps/web/middleware.ts)
 
 ## In Progress
 
@@ -19,11 +21,11 @@
 
 ## Production Readiness Score
 
-Score: 8/10
+Score: 9/10
 
 Reason:
 
-* Core concurrency, fine payment state, token leakage, error contract, user endpoint access, and reservation lifecycle are all closed. The remaining open gap is medium-priority — frontend JWT decode for route protection — which is not the security boundary (backend authorization is).
+* Core concurrency, fine payment state, token leakage, error contract, user endpoint access, reservation lifecycle, integration test coverage, and frontend JWT verification are all closed. Remaining gaps are low-priority: uneven DTO validation and inconsistent frontend error consumption.
 
 ---
 
@@ -38,7 +40,7 @@ Reason:
 
 ## Medium Priority Issues
 
-* Frontend route protection decodes the JWT payload in middleware without signature verification. Backend authorization still protects APIs, so this is not the main security boundary, but frontend role gating can be spoofed at the UI layer. References: [middleware.ts](/C:/Projects/library-system_edit/apps/web/middleware.ts#L37), [middleware.ts](/C:/Projects/library-system_edit/apps/web/middleware.ts#L67)
+* None currently identified at medium priority.
 
 ## Low Priority Improvements
 
@@ -51,12 +53,12 @@ Reason:
 
 ### Auth
 
-* Status: Fair
+* Status: Good
 * Issues:
 * JWT is issued and validated through an `httpOnly` cookie correctly.
 * `verify-email` and `resend-verification` are now rate-limited.
 * Cookie flags are environment-aware, but there is no token rotation or server-side revocation strategy.
-* Frontend middleware only decodes the JWT for routing and does not verify signature integrity.
+* Frontend middleware verifies JWT signatures using `jose` (HS256) and fails closed on missing secret or invalid tokens. All admin routes are covered in `ROUTE_PERMISSIONS`.
 
 ### Borrow System
 
@@ -115,7 +117,7 @@ Reason:
 
 ## Next Best Actions (Ordered)
 
-1. Add integration tests (Supertest) for the reservation and borrow HTTP paths to give the test suite real HTTP wiring coverage.
-2. Address frontend JWT decode in middleware (medium priority) or accept it as a known non-security-critical gap.
+1. Normalize DTO validation across remaining endpoints that use ad hoc parsing or primitive body extraction.
+2. Update frontend pages to consume the standardized `error.message` shape consistently.
 
 ---

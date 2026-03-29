@@ -296,7 +296,12 @@ NEXT_PUBLIC_API_URL=http://localhost:3001
 
 # App Configuration
 NEXT_PUBLIC_APP_NAME="Library System"
+
+# JWT secret — must match apps/api JWT_SECRET for middleware signature verification
+JWT_SECRET="change-me-must-match-api"
 ```
+
+> **JWT_SECRET Note:** The web middleware verifies JWT signatures to enforce role-based route protection at the UI layer. This secret **must match** the API's `JWT_SECRET`. If missing or mismatched, all dashboard requests redirect to the login page (fail-closed).
 
 ### Optional Feature Configuration
 
