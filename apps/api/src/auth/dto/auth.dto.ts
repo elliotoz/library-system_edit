@@ -1,5 +1,5 @@
 // src/auth/dto/auth.dto.ts
-import { IsEmail, IsNotEmpty, IsString, MinLength, IsOptional } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MinLength, IsOptional, Matches } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class LoginDto {
@@ -64,10 +64,13 @@ export class RegisterDto {
   @IsNotEmpty({ message: 'Email is required' })
   email: string;
 
-  @ApiProperty({ example: 'yourPassword', description: 'Password (min 6 chars)' })
+  @ApiProperty({ example: 'Password1', description: 'Password (min 8 chars, must contain at least one uppercase letter, one lowercase letter, and one digit)' })
   @IsString()
   @IsNotEmpty({ message: 'Password is required' })
-  @MinLength(6, { message: 'Password must be at least 6 characters' })
+  @MinLength(8, { message: 'Password must be at least 8 characters' })
+  @Matches(/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
+    message: 'Password must contain at least one uppercase letter, one lowercase letter, and one digit',
+  })
   password: string;
 
   @ApiPropertyOptional({ example: 'S12345', description: 'Student ID (optional)' })
@@ -108,9 +111,12 @@ export class ResetPasswordDto {
   @IsNotEmpty({ message: 'Reset token is required' })
   token: string;
 
-  @ApiProperty({ example: 'newPassword123', description: 'New password (min 6 chars)' })
+  @ApiProperty({ example: 'NewPassword1', description: 'New password (min 8 chars, must contain at least one uppercase letter, one lowercase letter, and one digit)' })
   @IsString()
   @IsNotEmpty({ message: 'New password is required' })
-  @MinLength(6, { message: 'Password must be at least 6 characters' })
+  @MinLength(8, { message: 'Password must be at least 8 characters' })
+  @Matches(/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
+    message: 'Password must contain at least one uppercase letter, one lowercase letter, and one digit',
+  })
   password: string;
 }
