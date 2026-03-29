@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import toast from 'react-hot-toast';
+import { extractApiError } from '@/lib/api-error';
 
 const materialTypes = [
   { value: 'PROFESSOR_PUBLICATION', label: 'Professor Publication' },
@@ -158,8 +159,7 @@ export default function SubmitMaterialPage() {
         );
         router.push('/dashboard/instructor/my-submissions');
       } else {
-        const error = await response.json();
-        toast.error(error.message || 'Failed to submit material');
+        toast.error(await extractApiError(response, 'Failed to submit material'));
       }
     } catch (error) {
       toast.error('Failed to submit material');

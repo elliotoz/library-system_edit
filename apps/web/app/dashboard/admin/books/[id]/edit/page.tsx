@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { extractApiError } from '@/lib/api-error';
 
 interface Branch {
   id: string;
@@ -213,8 +214,7 @@ export default function EditBookPage() {
         toast.success('Book updated successfully!');
         router.push('/dashboard/admin/books');
       } else {
-        const error = await response.json();
-        toast.error(error.message || 'Failed to update book');
+        toast.error(await extractApiError(response, 'Failed to update book'));
       }
     } catch (error) {
       toast.error('Failed to update book');
@@ -247,8 +247,7 @@ export default function EditBookPage() {
         toast.success(`Added ${addCopiesCount} copies successfully!`);
         setAddCopiesCount(1);
       } else {
-        const error = await response.json();
-        toast.error(error.message || 'Failed to add copies');
+        toast.error(await extractApiError(response, 'Failed to add copies'));
       }
     } catch (error) {
       toast.error('Failed to add copies');

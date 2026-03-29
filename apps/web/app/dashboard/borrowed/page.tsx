@@ -6,6 +6,7 @@ import { BookOpen, AlertTriangle, CheckCircle, Clock, RefreshCw, Calendar, Badge
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { fineApi, MyFine } from '@/lib/api';
+import { extractApiError } from '@/lib/api-error';
 
 interface Borrow {
   id: string;
@@ -116,8 +117,7 @@ export default function BorrowedBooksPage() {
         // Refresh borrows
         fetchBorrows();
       } else {
-        const error = await response.json();
-        toast.error(error.message || 'Failed to extend borrow');
+        toast.error(await extractApiError(response, 'Failed to extend borrow'));
       }
     } catch (error) {
       console.error('Error extending borrow:', error);

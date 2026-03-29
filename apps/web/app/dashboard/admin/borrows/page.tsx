@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { extractApiError } from '@/lib/api-error';
 
 interface Borrow {
   id: string;
@@ -115,8 +116,7 @@ export default function AdminBorrowsPage() {
         }
         fetchData();
       } else {
-        const error = await response.json();
-        toast.error(error.message || 'Failed to return book');
+        toast.error(await extractApiError(response, 'Failed to return book'));
       }
     } catch (error) {
       toast.error('Failed to return book');

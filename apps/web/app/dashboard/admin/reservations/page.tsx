@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { extractApiError } from '@/lib/api-error';
 
 interface Reservation {
   id: string;
@@ -77,8 +78,7 @@ export default function AdminReservationsPage() {
         toast.success('Reservation approved. Mark as ready when the book is prepared.');
         fetchReservations();
       } else {
-        const error = await response.json();
-        toast.error(error.message || 'Failed to approve');
+        toast.error(await extractApiError(response, 'Failed to approve'));
       }
     } catch (error) {
       toast.error('Failed to approve reservation');
@@ -107,8 +107,7 @@ export default function AdminReservationsPage() {
         toast.success('Reservation rejected');
         fetchReservations();
       } else {
-        const error = await response.json().catch(() => null);
-        toast.error(error?.message || 'Failed to reject reservation');
+        toast.error(await extractApiError(response, 'Failed to reject reservation'));
       }
     } catch (error) {
       toast.error('Failed to reject reservation');
@@ -128,8 +127,7 @@ export default function AdminReservationsPage() {
         toast.success('Book marked as ready for pickup. User has 2 days to collect.');
         fetchReservations();
       } else {
-        const error = await response.json().catch(() => null);
-        toast.error(error?.message || 'Failed to mark as ready');
+        toast.error(await extractApiError(response, 'Failed to mark as ready'));
       }
     } catch (error) {
       toast.error('Failed to mark as ready');
@@ -158,8 +156,7 @@ export default function AdminReservationsPage() {
         );
         fetchReservations();
       } else {
-        const error = await response.json();
-        toast.error(error.message || 'Failed to mark as collected');
+        toast.error(await extractApiError(response, 'Failed to mark as collected'));
       }
     } catch (error) {
       toast.error('Failed to mark as collected');

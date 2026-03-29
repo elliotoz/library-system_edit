@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { ShieldCheck, Edit, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { borrowPoliciesApi } from '@/lib/api';
+import { extractAxiosError } from '@/lib/api-error';
 import { BorrowPolicy, ROLE_LABELS, ROLE_COLORS } from '@/types';
 
 interface PolicyForm {
@@ -61,9 +62,8 @@ export default function ManagePoliciesPage() {
       toast.success(`${ROLE_LABELS[editingPolicy.role]} policy updated`);
       setEditingPolicy(null);
       fetchPolicies();
-    } catch (error: any) {
-      const msg = error?.response?.data?.message || 'Failed to update policy';
-      toast.error(Array.isArray(msg) ? msg[0] : msg);
+    } catch (error) {
+      toast.error(extractAxiosError(error, 'Failed to update policy'));
     } finally {
       setSaving(false);
     }

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { extractApiError } from '@/lib/api-error';
 
 const materialTypes = [
   { value: 'PROFESSOR_PUBLICATION', label: 'Professor Publication' },
@@ -167,8 +168,7 @@ export default function AdminUploadPage() {
         toast.success('Material uploaded successfully!');
         router.push('/dashboard/admin/materials');
       } else {
-        const error = await response.json();
-        toast.error(error.message || 'Failed to create material');
+        toast.error(await extractApiError(response, 'Failed to create material'));
       }
     } catch (error) {
       toast.error('Failed to create material');

@@ -26,6 +26,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import toast from 'react-hot-toast';
+import { extractApiError } from '@/lib/api-error';
 
 interface BookDetail {
   id: string;
@@ -181,8 +182,7 @@ export default function BookDetailPage() {
           setBook(await bookResponse.json());
         }
       } else {
-        const error = await response.json();
-        toast.error(error.message || 'Failed to create reservation');
+        toast.error(await extractApiError(response, 'Failed to create reservation'));
       }
     } catch (error) {
       console.error('Error creating reservation:', error);

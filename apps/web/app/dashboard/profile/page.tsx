@@ -5,6 +5,7 @@ import { User, Mail, Building, BookOpen, Tag, Save, X, Pencil, Camera } from 'lu
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import toast from 'react-hot-toast';
+import { extractApiError } from '@/lib/api-error';
 
 interface UserProfile {
   id: string;
@@ -168,9 +169,7 @@ export default function ProfilePage() {
         }
         setAvatarFile(null);
       } else {
-        const err = await response.json().catch(() => null);
-        const msg = err?.message;
-        toast.error(Array.isArray(msg) ? msg[0] : msg || 'Failed to update profile');
+        toast.error(await extractApiError(response, 'Failed to update profile'));
       }
     } catch {
       toast.error('Failed to update profile');

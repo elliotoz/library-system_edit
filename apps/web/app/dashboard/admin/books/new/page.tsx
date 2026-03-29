@@ -7,6 +7,7 @@ import { ArrowLeft, BookOpen, Plus, Trash2, Save, Loader2, ScanLine } from 'luci
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { aiApi } from '@/lib/api';
+import { extractApiError } from '@/lib/api-error';
 
 interface Branch {
   id: string;
@@ -266,8 +267,7 @@ export default function AddBookPage() {
         toast.success('Book added successfully!');
         router.push('/dashboard/admin/books');
       } else {
-        const error = await response.json();
-        toast.error(error.message || 'Failed to add book');
+        toast.error(await extractApiError(response, 'Failed to add book'));
       }
     } catch (error) {
       toast.error('Failed to add book');
