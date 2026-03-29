@@ -8,6 +8,20 @@ Format for each entry:
 
 ## YYYY-MM-DD HH:MM - <short title>
 
+## 2026-03-29 - Security Hardening (Password Strength, Branch Copy Validation, Auth Rate Limiting, AI Status Guard)
+
+### What changed
+- `apps/api/src/auth/dto/auth.dto.ts` — RegisterDto + ResetPasswordDto: `@MinLength(6)` → `@MinLength(8)` + `@Matches(/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)` with explicit error messages and updated Swagger descriptions
+- `apps/api/src/books/dto/books.dto.ts` — CreateBookDto.branches: added `@ValidateNested({ each: true })` + `@Type(() => BranchCopiesDto)` so `@Max(50)` on `numberOfCopies` is enforced
+- `apps/api/src/auth/auth.controller.ts` — POST /auth/reset-password: added `@UseGuards(ThrottlerGuard)` + `@Throttle({ default: { ttl: 60000, limit: 5 } })`
+- `apps/api/src/ai/ai.controller.ts` — GET /ai/status: added `@UseGuards(JwtAuthGuard)` + `@ApiBearerAuth()` + `@ApiResponse({ status: 401 })` (auth-required, not admin-only)
+- `apps/api/test/security.e2e-spec.ts` — 9 new e2e tests covering all four hardening items
+
+### Verification
+- `npm run typecheck:api` — PASS
+- `npm run test:api:critical` — PASS (24 tests)
+- `npm run test:api:e2e` — PASS (37 tests: 28 prior + 9 new security tests)
+
 ## 2026-03-29 - DTO Validation + Frontend Error Normalization
 
 ### What changed
