@@ -32,6 +32,7 @@ enum BookCopyStatus {
 
 enum ReservationStatus {
   PENDING
+  APPROVED
   READY_FOR_PICKUP
   COLLECTED
   CANCELLED
