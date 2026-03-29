@@ -19,6 +19,7 @@ interface Reservation {
   id: string;
   status:
     | 'PENDING'
+    | 'APPROVED'
     | 'READY_FOR_PICKUP'
     | 'COLLECTED'
     | 'CANCELLED'
@@ -42,6 +43,13 @@ const statusConfig = {
     color:
       'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
     icon: Clock,
+  },
+  APPROVED: {
+    label: 'Approved',
+    description: 'Your reservation is approved and being prepared for pickup',
+    color:
+      'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+    icon: CheckCircle,
   },
   READY_FOR_PICKUP: {
     label: 'Ready for Pickup',
@@ -119,7 +127,7 @@ export default function ReservationsPage() {
 
   const filteredReservations = reservations.filter((r) => {
     if (filter === 'active')
-      return ['PENDING', 'READY_FOR_PICKUP'].includes(r.status);
+      return ['PENDING', 'APPROVED', 'READY_FOR_PICKUP'].includes(r.status);
     if (filter === 'completed')
       return ['COLLECTED', 'CANCELLED', 'EXPIRED'].includes(r.status);
     return true;
@@ -127,7 +135,7 @@ export default function ReservationsPage() {
 
   const stats = {
     active: reservations.filter((r) =>
-      ['PENDING', 'READY_FOR_PICKUP'].includes(r.status)
+      ['PENDING', 'APPROVED', 'READY_FOR_PICKUP'].includes(r.status)
     ).length,
     ready: reservations.filter((r) => r.status === 'READY_FOR_PICKUP').length,
     collected: reservations.filter((r) => r.status === 'COLLECTED').length,
@@ -386,7 +394,7 @@ export default function ReservationsPage() {
                       {config.label}
                     </span>
 
-                    {['PENDING', 'READY_FOR_PICKUP'].includes(
+                    {['PENDING', 'APPROVED', 'READY_FOR_PICKUP'].includes(
                       reservation.status
                     ) && (
                       <button

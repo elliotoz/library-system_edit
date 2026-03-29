@@ -30,13 +30,14 @@ interface Reservation {
   branch: { id: string; name: string; code: string };
 }
 
-type TabType = 'pending' | 'ready';
+type TabType = 'pending' | 'approved' | 'ready';
 
 export default function AdminReservationsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('pending');
   const [pendingReservations, setPendingReservations] = useState<Reservation[]>(
     []
   );
+  const [approvedReservations, setApprovedReservations] = useState<Reservation[]>([]);
   const [readyReservations, setReadyReservations] = useState<Reservation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -44,12 +45,14 @@ export default function AdminReservationsPage() {
   const fetchReservations = async () => {
     setIsLoading(true);
     try {
-      const [pendingRes, readyRes] = await Promise.all([
+      const [pendingRes, approvedRes, readyRes] = await Promise.all([
         fetch('/api/reservations/pending', { credentials: 'include' }),
+        fetch('/api/reservations/approved', { credentials: 'include' }),
         fetch('/api/reservations/ready', { credentials: 'include' }),
       ]);
 
       if (pendingRes.ok) setPendingReservations(await pendingRes.json());
+      if (approvedRes.ok) setApprovedReservations(await approvedRes.json());
       if (readyRes.ok) setReadyReservations(await readyRes.json());
     } catch (error) {
       console.error('Error fetching reservations:', error);
@@ -71,7 +74,7 @@ export default function AdminReservationsPage() {
         credentials: 'include',
       });
       if (response.ok) {
-        toast.success('Reservation approved! User has 2 days to pick up.');
+        toast.success('Reservation approved. Mark as ready when the book is prepared.');
         fetchReservations();
       } else {
         const error = await response.json();
@@ -109,6 +112,27 @@ export default function AdminReservationsPage() {
       }
     } catch (error) {
       toast.error('Failed to reject reservation');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleMarkReady = async (id: string) => {
+    setProcessingId(id);
+    try {
+      const response = await fetch(`/api/reservations/${id}/mark-ready`, {
+        method: 'PATCH',
+        credentials: 'include',
+      });
+      if (response.ok) {
+        toast.success('Book marked as ready for pickup. User has 2 days to collect.');
+        fetchReservations();
+      } else {
+        const error = await response.json().catch(() => null);
+        toast.error(error?.message || 'Failed to mark as ready');
+      }
+    } catch (error) {
+      toast.error('Failed to mark as ready');
     } finally {
       setProcessingId(null);
     }
@@ -169,7 +193,9 @@ export default function AdminReservationsPage() {
   };
 
   const reservations =
-    activeTab === 'pending' ? pendingReservations : readyReservations;
+    activeTab === 'pending' ? pendingReservations
+    : activeTab === 'approved' ? approvedReservations
+    : readyReservations;
 
   return (
     <div className="space-y-6">
@@ -183,7 +209,7 @@ export default function AdminReservationsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-800">
@@ -195,6 +221,22 @@ export default function AdminReservationsPage() {
               </p>
               <p className="text-sm text-amber-600 dark:text-amber-400">
                 Pending Approval
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-800">
+              <CheckCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-blue-800 dark:text-blue-200">
+                {approvedReservations.length}
+              </p>
+              <p className="text-sm text-blue-600 dark:text-blue-400">
+                Approved
               </p>
             </div>
           </div>
@@ -231,6 +273,17 @@ export default function AdminReservationsPage() {
           Pending Approval ({pendingReservations.length})
         </button>
         <button
+          onClick={() => setActiveTab('approved')}
+          className={cn(
+            'border-b-2 px-4 py-2 text-sm font-medium transition-colors',
+            activeTab === 'approved'
+              ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
+          )}
+        >
+          Approved ({approvedReservations.length})
+        </button>
+        <button
           onClick={() => setActiveTab('ready')}
           className={cn(
             'border-b-2 px-4 py-2 text-sm font-medium transition-colors',
@@ -265,11 +318,13 @@ export default function AdminReservationsPage() {
         <div className="rounded-xl border border-gray-200 bg-white py-12 text-center dark:border-gray-700 dark:bg-gray-800">
           <CheckCircle className="mx-auto mb-4 h-16 w-16 text-green-300 dark:text-green-600" />
           <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-white">
-            {activeTab === 'pending' ? 'All caught up!' : 'No pickups waiting'}
+            {activeTab === 'pending' ? 'All caught up!' : activeTab === 'approved' ? 'No approved reservations' : 'No pickups waiting'}
           </h3>
           <p className="text-gray-500 dark:text-gray-400">
             {activeTab === 'pending'
               ? 'No pending reservations to process'
+              : activeTab === 'approved'
+              ? 'No reservations waiting to be prepared'
               : 'No books waiting to be collected'}
           </p>
         </div>
@@ -288,6 +343,8 @@ export default function AdminReservationsPage() {
                   'rounded-xl border bg-white p-4 dark:bg-gray-800',
                   activeTab === 'ready'
                     ? 'border-green-200 dark:border-green-800'
+                    : activeTab === 'approved'
+                    ? 'border-blue-200 dark:border-blue-800'
                     : 'border-gray-200 dark:border-gray-700'
                 )}
               >
@@ -365,6 +422,25 @@ export default function AdminReservationsPage() {
                         >
                           <CheckCircle className="h-4 w-4" />
                           Approve
+                        </button>
+                        <button
+                          onClick={() => handleReject(reservation.id)}
+                          disabled={processingId === reservation.id}
+                          className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-red-200 px-4 py-2 text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 md:flex-none"
+                        >
+                          <XCircle className="h-4 w-4" />
+                          Reject
+                        </button>
+                      </>
+                    ) : activeTab === 'approved' ? (
+                      <>
+                        <button
+                          onClick={() => handleMarkReady(reservation.id)}
+                          disabled={processingId === reservation.id}
+                          className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-blue-500 px-4 py-2 text-white transition-colors hover:bg-blue-600 disabled:opacity-50 md:flex-none"
+                        >
+                          <Package className="h-4 w-4" />
+                          Mark Ready
                         </button>
                         <button
                           onClick={() => handleReject(reservation.id)}
