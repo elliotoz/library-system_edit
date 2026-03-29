@@ -8,6 +8,23 @@ Format for each entry:
 
 ## YYYY-MM-DD HH:MM - <short title>
 
+## 2026-03-29 - DTO Validation + Frontend Error Normalization
+
+### What changed
+- Created `apps/api/src/users/dto/update-interests.dto.ts` — closes primitive `@Body('interests')` extraction gap; `PATCH /users/interests` now validates through `UpdateInterestsDto`
+- Expanded `apps/api/src/borrows/dto/borrows.dto.ts` — replaced loose `@IsString()` guards with typed query DTOs: `BorrowQueryDto` (`@IsEnum(BorrowStatus)`), `BorrowHistoryQueryDto` (`@IsIn(['all', ...Role/BorrowStatus values])`), `MostBorrowedQueryDto` (`@Max(50)`), `TrendsQueryDto` (`@Max(24)`); all use `@Type(() => Number)` coercion
+- Updated `apps/api/src/borrows/borrows.controller.ts` — five handlers now use typed `@Query() dto` instead of individual `@Query("param")` + `parseInt()`
+- Updated `apps/api/src/borrows/borrows.service.ts` — added `Math.min(..., 100)` clamping to `findMyHistory` and `findAllHistory` as defence-in-depth
+- Created `apps/web/lib/api-error.ts` — `extractApiError` (fetch, async) and `extractAxiosError` (axios, sync) helpers normalizing `string | string[]` backend messages
+- Updated 11 frontend pages to use helpers: `admin/reservations`, `admin/borrows`, `borrowed`, `reservations`, `profile`, `catalog/[id]`, `instructor/submit-material`, `admin/upload`, `admin/books/new`, `admin/books/[id]/edit`, `admin/policies`
+
+### Verification
+- `npm run typecheck:api` — PASS
+- `npm run test:api:critical` — PASS (24 tests)
+- `npm run test:api:e2e` — PASS (28 tests)
+- `npm run typecheck:web` — PASS
+- `npm run build:web` — PASS (45 static pages, no errors)
+
 Goal:
 Changes:
 Files:

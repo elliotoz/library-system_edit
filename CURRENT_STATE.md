@@ -4,7 +4,7 @@
 
 * Cookie-based authentication is implemented and server-validated through an `httpOnly` `access_token` cookie, with login, logout, profile, email verification, and password reset flows in place. References: [auth.controller.ts](/C:/Projects/library-system_edit/apps/api/src/auth/auth.controller.ts#L48), [jwt.strategy.ts](/C:/Projects/library-system_edit/apps/api/src/auth/strategies/jwt.strategy.ts#L11), [auth.service.ts](/C:/Projects/library-system_edit/apps/api/src/auth/auth.service.ts#L401)
 * Global request validation and a global exception filter are enabled at the NestJS bootstrap layer. References: [main.ts](/C:/Projects/library-system_edit/apps/api/src/main.ts#L57), [global-exception.filter.ts](/C:/Projects/library-system_edit/apps/api/src/common/filters/global-exception.filter.ts#L12)
-* Reservation concurrency is hardened end to end. `create()` uses a conditional `updateMany` to claim the copy atomically, a partial unique index (`userId`, `bookId`, `status IN (PENDING, READY_FOR_PICKUP)`) enforces one active reservation per user-book pair at the database level (P2002 returns 409), and all limit checks run inside the transaction. `collect()` acquires a PostgreSQL advisory transaction lock via `$executeRaw` to serialize concurrent collects for the same user, uses a conditional `updateMany` to transition status atomically, and enforces the borrow limit inside the locked transaction before creating the borrow record. `reject()` guards against invalid starting states. References: [reservations.service.ts](/C:/Projects/library-system_edit/apps/api/src/reservations/reservations.service.ts), [migration 20260327](/C:/Projects/library-system_edit/apps/api/prisma/migrations/20260327000001_reservation_book_id_and_active_unique/migration.sql)
+* Reservation concurrency is hardened end to end. `create()` uses a conditional `updateMany` to claim the copy atomically, a partial unique index (`userId`, `bookId`, `status IN (PENDING, READY_FOR_PICKUP)`) enforces at most one `PENDING`/`READY_FOR_PICKUP` reservation per user-book pair at the database level (P2002 returns 409), and all limit checks run inside the transaction. `collect()` acquires a PostgreSQL advisory transaction lock via `$executeRaw` to serialize concurrent collects for the same user, uses a conditional `updateMany` to transition status atomically, and enforces the borrow limit inside the locked transaction before creating the borrow record. `reject()` guards against invalid starting states. References: [reservations.service.ts](/C:/Projects/library-system_edit/apps/api/src/reservations/reservations.service.ts), [migration 20260327](/C:/Projects/library-system_edit/apps/api/prisma/migrations/20260327000001_reservation_book_id_and_active_unique/migration.sql)
 * Sensitive auth and reset tokens are never loaded by user-profile queries. All methods in `UsersService` that return data to callers use an explicit `SAFE_USER_SELECT` constant that excludes `password`, `emailVerificationToken`, `emailVerificationExpiry`, `passwordResetToken`, and `passwordResetExpiry` at the query level. References: [users.service.ts](/C:/Projects/library-system_edit/apps/api/src/users/users.service.ts#L11)
 * `verify-email` and `resend-verification` endpoints are rate-limited to 5 requests per 60 seconds via `ThrottlerGuard`. References: [auth.controller.ts](/C:/Projects/library-system_edit/apps/api/src/auth/auth.controller.ts#L122)
 * API error contract is standardized. The global exception filter returns `{ success: false, message, requestId, timestamp }` for all errors. `message` is extracted from the HttpException response and preserves `string[]` arrays from `ValidationPipe`. `statusCode` and `error` fields are not included in the body. References: [global-exception.filter.ts](/C:/Projects/library-system_edit/apps/api/src/common/filters/global-exception.filter.ts#L24)
@@ -14,6 +14,7 @@
 * Reservation lifecycle implements the full APPROVED state. `approve()` transitions PENDING → APPROVED (no pickup deadline), `markReady()` transitions APPROVED → READY_FOR_PICKUP (sets 2-day pickup deadline), and `reject()` accepts PENDING, APPROVED, or READY_FOR_PICKUP reservations. The scheduler expires PENDING/APPROVED by `expiresAt` and READY_FOR_PICKUP by `pickupDeadline`, resolving the timing model gap. Active reservation counts include APPROVED. Admin UI has three tabs (pending, approved, ready) with distinct actions. User UI shows APPROVED as a distinct active state. References: [reservations.service.ts](/C:/Projects/library-system_edit/apps/api/src/reservations/reservations.service.ts), [reservations.controller.ts](/C:/Projects/library-system_edit/apps/api/src/reservations/reservations.controller.ts), [borrow-scheduler.service.ts](/C:/Projects/library-system_edit/apps/api/src/borrows/borrow-scheduler.service.ts)
 * Real DB-backed integration tests (Supertest + PostgreSQL) cover the full reservation lifecycle (20 tests: create, approve, mark-ready, collect, reject, cancel, my reservations) and borrow operations (8 tests: extend, return, overdue fine with PENDING status). Test harness includes global setup/teardown, NestJS app bootstrap with scheduler disabled, cookie auth helpers, and dynamic table truncation. References: [reservations.e2e-spec.ts](/C:/Projects/library-system_edit/apps/api/test/reservations.e2e-spec.ts), [borrows.e2e-spec.ts](/C:/Projects/library-system_edit/apps/api/test/borrows.e2e-spec.ts)
 * Frontend middleware now verifies JWT signatures using `jose` with HS256 algorithm constraint, replacing raw base64 decode. Forged tokens redirect to login (fail-closed). Missing `JWT_SECRET` also fails closed. All admin routes are covered in `ROUTE_PERMISSIONS` (borrows, branches, fines, materials, policies, reports, statistics, reading-lists added). References: [middleware.ts](/C:/Projects/library-system_edit/apps/web/middleware.ts)
+* DTO validation gaps closed. `PATCH /users/interests` validates via `UpdateInterestsDto` (`@IsArray`, `@IsString({ each: true })`). Borrow query endpoints use `BorrowQueryDto`, `BorrowHistoryQueryDto`, `MostBorrowedQueryDto`, and `TrendsQueryDto` with `@Type(() => Number)` coercion and `@Max` caps; service-side clamping added to `findMyHistory` and `findAllHistory`. Frontend error handlers consolidated via `extractApiError` (fetch) and `extractAxiosError` (axios) helpers that normalize `string | string[]` backend messages across 11 pages. References: [update-interests.dto.ts](/C:/Projects/library-system_edit/apps/api/src/users/dto/update-interests.dto.ts), [borrows.dto.ts](/C:/Projects/library-system_edit/apps/api/src/borrows/dto/borrows.dto.ts), [api-error.ts](/C:/Projects/library-system_edit/apps/web/lib/api-error.ts)
 
 ## In Progress
 
@@ -21,11 +22,11 @@
 
 ## Production Readiness Score
 
-Score: 9/10
+Score: 10/10
 
 Reason:
 
-* Core concurrency, fine payment state, token leakage, error contract, user endpoint access, reservation lifecycle, integration test coverage, and frontend JWT verification are all closed. Remaining gaps are low-priority: uneven DTO validation and inconsistent frontend error consumption.
+* All previously identified gaps are closed. Core concurrency, fine payment state, token leakage, error contract, user endpoint access, reservation lifecycle, integration test coverage, frontend JWT verification, DTO validation coverage, and frontend error normalization are all complete.
 
 ---
 
@@ -44,8 +45,7 @@ Reason:
 
 ## Low Priority Improvements
 
-* Validation coverage is uneven. Global DTO validation exists, but some query and body inputs still use ad hoc parsing or primitive body extraction instead of DTOs. References: [main.ts](/C:/Projects/library-system_edit/apps/api/src/main.ts#L61), [users.controller.ts](/C:/Projects/library-system_edit/apps/api/src/users/users.controller.ts#L131), [borrows.controller.ts](/C:/Projects/library-system_edit/apps/api/src/borrows/borrows.controller.ts#L32)
-* Some frontend pages still read error messages directly from backend responses rather than a normalized frontend-safe contract. Now that the backend contract is standardized, the frontend can be updated to consume `error.message` consistently. References: [reservations/page.tsx](/C:/Projects/library-system_edit/apps/web/app/dashboard/reservations/page.tsx#L110), [borrowed/page.tsx](/C:/Projects/library-system_edit/apps/web/app/dashboard/borrowed/page.tsx#L119)
+* None currently identified.
 
 ---
 
@@ -85,15 +85,14 @@ Reason:
 * Issues:
 * Global exception handling exists and returns a consistent `{ success: false, message, requestId, timestamp }` shape.
 * `ValidationPipe` error arrays are preserved in the `message` field.
-* Some frontend pages do not yet consume the standardized shape uniformly.
+* All frontend pages now consume the standardized `{ success, message }` shape via `extractApiError`/`extractAxiosError` helpers.
 
 ### Validation
 
-* Status: Fair
+* Status: Good
 * Issues:
 * Global `ValidationPipe` with whitelist/forbid settings is enabled.
-* DTO validation exists in auth, books, reservations, branches, and other modules.
-* Some endpoints still use primitive extraction instead of DTOs.
+* DTO validation is uniform across all endpoints. Borrow query endpoints use typed DTOs with `@Type(() => Number)` coercion and `@Max` caps. `PATCH /users/interests` uses `UpdateInterestsDto`.
 
 ### Database
 
@@ -117,7 +116,6 @@ Reason:
 
 ## Next Best Actions (Ordered)
 
-1. Normalize DTO validation across remaining endpoints that use ad hoc parsing or primitive body extraction.
-2. Update frontend pages to consume the standardized `error.message` shape consistently.
+* No outstanding production issues identified.
 
 ---
