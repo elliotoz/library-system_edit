@@ -26,6 +26,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateInterestsDto } from './dto/update-interests.dto';
 
 const avatarStorage = diskStorage({
   destination: './uploads/avatars',
@@ -138,9 +139,9 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Interests updated' })
   async updateMyInterests(
     @CurrentUser('id') userId: string,
-    @Body('interests') interests: string[],
+    @Body() dto: UpdateInterestsDto,
   ) {
-    return this.usersService.updateInterests(userId, interests);
+    return this.usersService.updateInterests(userId, dto.interests);
   }
 
   @Patch(':id/deactivate')
