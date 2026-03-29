@@ -14,6 +14,10 @@
     "build": "npm run build:api && npm run build:web",
     "build:api": "cd apps/api && npm run build",
     "build:web": "cd apps/web && npm run build",
+    "typecheck:api": "cd apps/api && npm run typecheck",
+    "typecheck:web": "cd apps/web && npm run typecheck",
+    "test:api": "cd apps/api && npm run test:unit",
+    "test:api:critical": "cd apps/api && npm run test:critical",
     "db:start": "docker-compose up -d postgres",
     "db:stop": "docker-compose down",
     "db:studio": "cd apps/api && npx prisma studio",
@@ -42,6 +46,7 @@
   },
   "dependencies": {
     "exceljs": "^4.4.0",
-    "pdfkit": "^0.17.2"
+    "pdfkit": "^0.17.2",
+    "tailwindcss": "^3.4.19"
   }
 }
