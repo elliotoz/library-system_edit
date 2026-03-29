@@ -2,16 +2,13 @@ import { NextRequest } from 'next/server';
 
 export async function GET(request: NextRequest) {
   const cookieHeader = request.headers.get('cookie') || '';
+  const conversationId = request.nextUrl.searchParams.get('conversationId');
 
-  const backendUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/ai/history`;
+  const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/ai/history${
+    conversationId ? `?conversationId=${conversationId}` : ''
+  }`;
 
-  const response = await fetch(backendUrl, {
-    headers: {
-      Cookie: cookieHeader,
-    },
-  });
-
+  const response = await fetch(url, { headers: { Cookie: cookieHeader } });
   if (!response.ok) return Response.json([]);
-  const data = await response.json();
-  return Response.json(data);
+  return Response.json(await response.json());
 }

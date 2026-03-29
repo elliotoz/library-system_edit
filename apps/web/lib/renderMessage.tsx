@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 
 // ── Syntax highlighting ────────────────────────────────────────────────────────
 
@@ -168,7 +169,8 @@ function CodeBlock({ code, lang }: { code: string; lang: string }) {
 // ── Inline text renderer ──────────────────────────────────────────────────────
 
 function renderInlineText(text: string): React.ReactNode[] {
-  const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g);
+  // Split on inline code, bold, italic, and markdown links
+  const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/g);
   return parts.map((part, i) => {
     if (/^`[^`]+`$/.test(part)) {
       return (
@@ -182,6 +184,34 @@ function renderInlineText(text: string): React.ReactNode[] {
     }
     if (/^\*[^*]+\*$/.test(part)) {
       return <em key={i} className="italic text-white/80">{part.slice(1, -1)}</em>;
+    }
+    // Markdown link [label](href)
+    const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (linkMatch) {
+      const [, label, href] = linkMatch;
+      const isInternal = href.startsWith('/');
+      if (isInternal) {
+        return (
+          <Link
+            key={i}
+            href={href}
+            className="text-[#2A9D9D] underline underline-offset-2 hover:text-[#4bbfbf] transition-colors"
+          >
+            {label}
+          </Link>
+        );
+      }
+      return (
+        <a
+          key={i}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[#2A9D9D] underline underline-offset-2 hover:text-[#4bbfbf] transition-colors"
+        >
+          {label}
+        </a>
+      );
     }
     return <span key={i}>{part}</span>;
   });

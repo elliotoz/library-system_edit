@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Send, ImageIcon, X, BookOpen } from 'lucide-react';
+import { Send, ImageIcon, X, BookOpen, History, Plus, Trash2, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { renderMessage } from '@/lib/renderMessage';
@@ -17,6 +17,13 @@ interface ChatMessage {
   imagePreview?: string;
 }
 
+interface Conversation {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface BookContext {
   id: string;
   title: string;
@@ -24,7 +31,7 @@ interface BookContext {
   category: string | null;
 }
 
-// ── Role-aware suggested questions ────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function getSuggestions(role?: string, facultyName?: string | null): string[] {
   const faculty = facultyName || 'my faculty';
@@ -67,7 +74,16 @@ function getSuggestions(role?: string, facultyName?: string | null): string[] {
   }
 }
 
-// ── Image compression ─────────────────────────────────────────────────────────
+function formatConvTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
 
 async function compressImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -98,6 +114,7 @@ export default function AIAssistantPage() {
   const searchParams = useSearchParams();
   const bookId = searchParams.get('book');
 
+  // Chat state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -107,19 +124,102 @@ export default function AIAssistantPage() {
   const [bookContextDismissed, setBookContextDismissed] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
 
+  // Conversation state
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Refs for stale-closure-free access
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const contextSentRef = useRef(false);
   const messagesRef = useRef<ChatMessage[]>([]);
+  const activeConvRef = useRef<string | null>(null);
 
-  // Keep ref in sync with state for stale-closure-free access in sendMessage
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
   useEffect(() => {
-    messagesRef.current = messages;
+    activeConvRef.current = activeConversationId;
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [activeConversationId, messages]);
 
-  // Check AI status
+  // ── Load conversations ────────────────────────────────────────────────────────
+
+  const loadConversations = useCallback(async () => {
+    try {
+      const res = await fetch('/api/ai/conversations', { credentials: 'include' });
+      const data: Conversation[] = res.ok ? await res.json() : [];
+      setConversations(data);
+      return data;
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const loadConversationMessages = useCallback(async (convId: string) => {
+    try {
+      const res = await fetch(`/api/ai/history?conversationId=${convId}`, { credentials: 'include' });
+      const history: { id: string; role: string; content: string }[] = res.ok ? await res.json() : [];
+      setMessages(
+        history.map((m) => ({ id: m.id, role: m.role as 'user' | 'assistant', content: m.content })),
+      );
+    } catch {
+      setMessages([]);
+    }
+    setHistoryLoaded(true);
+  }, []);
+
+  const switchConversation = useCallback(async (convId: string) => {
+    setActiveConversationId(convId);
+    setSidebarOpen(false);
+    setMessages([]);
+    setHistoryLoaded(false);
+    await loadConversationMessages(convId);
+  }, [loadConversationMessages]);
+
+  const createNewChat = useCallback(async () => {
+    try {
+      const res = await fetch('/api/ai/conversations', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) return;
+      const conv: Conversation = await res.json();
+      setConversations((prev) => [conv, ...prev]);
+      setActiveConversationId(conv.id);
+      setMessages([]);
+      setHistoryLoaded(true);
+      setSidebarOpen(false);
+      inputRef.current?.focus();
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleDeleteConversation = useCallback(async (convId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeletingId(convId);
+    try {
+      await fetch(`/api/ai/conversations/${convId}`, { method: 'DELETE', credentials: 'include' });
+      setConversations((prev) => {
+        const remaining = prev.filter((c) => c.id !== convId);
+        // If deleting the active conversation, switch to next or create new
+        if (activeConvRef.current === convId) {
+          if (remaining.length > 0) {
+            switchConversation(remaining[0].id);
+          } else {
+            setActiveConversationId(null);
+            setMessages([]);
+            setHistoryLoaded(true);
+          }
+        }
+        return remaining;
+      });
+    } catch { /* ignore */ }
+    setDeletingId(null);
+  }, [switchConversation]);
+
+  // ── Bootstrap on mount ───────────────────────────────────────────────────────
+
   useEffect(() => {
     fetch('/api/ai/status', { credentials: 'include' })
       .then((r) => r.ok ? r.json() : null)
@@ -127,26 +227,29 @@ export default function AIAssistantPage() {
       .catch(() => setAiOnline(false));
   }, []);
 
-  // Load conversation history
   useEffect(() => {
-    fetch('/api/ai/history', { credentials: 'include' })
-      .then((r) => r.ok ? r.json() : [])
-      .then((history: { id: string; role: string; content: string }[]) => {
-        if (history.length > 0) {
-          setMessages(
-            history.map((m) => ({
-              id: m.id,
-              role: m.role as 'user' | 'assistant',
-              content: m.content,
-            })),
-          );
-        }
+    (async () => {
+      const convs = await loadConversations();
+      if (convs.length > 0) {
+        setActiveConversationId(convs[0].id);
+        await loadConversationMessages(convs[0].id);
+      } else {
+        // Auto-create first conversation
+        try {
+          const res = await fetch('/api/ai/conversations', { method: 'POST', credentials: 'include' });
+          if (res.ok) {
+            const conv: Conversation = await res.json();
+            setConversations([conv]);
+            setActiveConversationId(conv.id);
+          }
+        } catch { /* ignore */ }
         setHistoryLoaded(true);
-      })
-      .catch(() => setHistoryLoaded(true));
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fetch book context
+  // Book context
   useEffect(() => {
     if (!bookId) return;
     fetch(`/api/books/${bookId}`, { credentials: 'include' })
@@ -160,6 +263,8 @@ export default function AIAssistantPage() {
   const sendMessage = useCallback(async (text: string, imgBase64?: string | null) => {
     if ((!text.trim() && !imgBase64) || isStreaming) return;
 
+    const convId = activeConvRef.current;
+
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -170,7 +275,6 @@ export default function AIAssistantPage() {
     const assistantMsgId = `assistant-${Date.now() + 1}`;
     const assistantMsg: ChatMessage = { id: assistantMsgId, role: 'assistant', content: '' };
 
-    // Capture history BEFORE adding new messages
     const history = messagesRef.current
       .slice(-10)
       .map((m) => ({ role: m.role, content: m.content }));
@@ -181,7 +285,6 @@ export default function AIAssistantPage() {
     setIsStreaming(true);
 
     try {
-
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -191,6 +294,7 @@ export default function AIAssistantPage() {
           history,
           hasImage: !!imgBase64,
           imageBase64: imgBase64 ?? null,
+          conversationId: convId,
         }),
       });
 
@@ -221,9 +325,7 @@ export default function AIAssistantPage() {
                 ),
               );
             }
-          } catch {
-            // ignore malformed SSE chunks
-          }
+          } catch { /* ignore malformed chunks */ }
         }
       }
     } catch {
@@ -237,7 +339,10 @@ export default function AIAssistantPage() {
     }
 
     setIsStreaming(false);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Refresh conversation list to get updated title
+    loadConversations().then((updated) => setConversations(updated));
+  }, [isStreaming, loadConversations]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-send book context
   useEffect(() => {
@@ -266,15 +371,115 @@ export default function AIAssistantPage() {
   const suggestions = getSuggestions(user?.role, user?.facultyName);
   const showSuggestions = historyLoaded && messages.length === 0 && !bookId;
 
-  // ── Render ────────────────────────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-[calc(100vh-180px)] flex flex-col gap-3">
+    <div className="h-[calc(100vh-180px)] flex flex-col gap-3 relative overflow-hidden">
 
-      {/* Header */}
+      {/* ── History sidebar ───────────────────────────────────────────────────── */}
+
+      {/* Backdrop */}
+      <div
+        className={cn(
+          'absolute inset-0 z-20 bg-black/50 backdrop-blur-sm transition-opacity duration-300',
+          sidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
+        )}
+        onClick={() => setSidebarOpen(false)}
+      />
+
+      {/* Sidebar panel */}
+      <div
+        className={cn(
+          'absolute inset-y-0 left-0 z-30 w-72 flex flex-col',
+          'bg-gray-950/98 backdrop-blur-xl border-r border-white/10',
+          'transition-transform duration-300 ease-in-out',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+        )}
+      >
+        {/* Sidebar header */}
+        <div className="flex items-center justify-between px-4 py-4 border-b border-white/10">
+          <span className="text-sm font-semibold text-white/90">Chat History</span>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* New chat button */}
+        <div className="px-3 py-3 border-b border-white/[0.06]">
+          <button
+            onClick={createNewChat}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-[#2A9D9D]/15 border border-[#2A9D9D]/30 text-[#2A9D9D] hover:bg-[#2A9D9D]/25 transition-colors text-sm font-medium"
+          >
+            <Plus className="w-4 h-4" />
+            New Chat
+          </button>
+        </div>
+
+        {/* Conversation list */}
+        <div className="flex-1 overflow-y-auto py-2">
+          {conversations.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full gap-2 px-4 text-center">
+              <MessageSquare className="w-8 h-8 text-white/20" />
+              <p className="text-xs text-white/30">No conversations yet</p>
+            </div>
+          ) : (
+            conversations.map((conv) => (
+              <button
+                key={conv.id}
+                onClick={() => switchConversation(conv.id)}
+                className={cn(
+                  'w-full text-left px-3 py-2.5 mx-1 rounded-xl transition-colors group',
+                  'flex items-start justify-between gap-2',
+                  conv.id === activeConversationId
+                    ? 'bg-[#2A9D9D]/15 text-white'
+                    : 'text-white/70 hover:bg-white/[0.05] hover:text-white',
+                )}
+                style={{ width: 'calc(100% - 8px)' }}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate leading-tight">
+                    {conv.title || 'New Chat'}
+                  </p>
+                  <p className="text-[11px] text-white/35 mt-0.5">
+                    {formatConvTime(conv.updatedAt)}
+                  </p>
+                </div>
+                <button
+                  onClick={(e) => handleDeleteConversation(conv.id, e)}
+                  disabled={deletingId === conv.id}
+                  className={cn(
+                    'flex-shrink-0 p-1 rounded-lg transition-colors mt-0.5',
+                    'opacity-0 group-hover:opacity-100',
+                    'text-white/30 hover:text-red-400 hover:bg-red-400/10',
+                    conv.id === activeConversationId && 'opacity-40 group-hover:opacity-100',
+                    deletingId === conv.id && 'opacity-100 animate-pulse',
+                  )}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* ── Header ────────────────────────────────────────────────────────────── */}
+
       <div className="flex items-center gap-3">
+        {/* History toggle */}
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="p-2 rounded-xl border border-white/20 text-gray-400 hover:text-[#2A9D9D] hover:border-[#2A9D9D]/40 transition-colors flex-shrink-0"
+          title="Chat history"
+        >
+          <History className="w-5 h-5" />
+        </button>
+
         <div className="w-11 h-11 bg-gradient-to-br from-[#2A9D9D] to-[#1a7a7a] rounded-xl flex items-center justify-center shadow-md shadow-[#2A9D9D]/20 flex-shrink-0">
-          <span className="text-white font-bold text-sm">AI</span>
+          <span className="text-white font-bold text-sm">OZ</span>
         </div>
         <div className="flex-1 min-w-0">
           {user && (
@@ -282,8 +487,20 @@ export default function AIAssistantPage() {
               Hello, <span className="font-medium text-gray-700 dark:text-gray-300">{user.name}</span>
             </p>
           )}
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">AI Library Assistant</h1>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">OZ AI</h1>
         </div>
+
+        {/* New chat button */}
+        <button
+          onClick={createNewChat}
+          disabled={isStreaming}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/20 text-gray-400 hover:text-[#2A9D9D] hover:border-[#2A9D9D]/40 transition-colors text-xs font-medium flex-shrink-0 disabled:opacity-40"
+          title="New chat"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          New
+        </button>
+
         {aiOnline !== null && (
           <span className={cn(
             'px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0',
@@ -291,12 +508,13 @@ export default function AIAssistantPage() {
               ? 'bg-[#2A9D9D]/15 text-[#2A9D9D] dark:text-[#4bbfbf]'
               : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
           )}>
-            {aiOnline ? '● ÜLIB AI' : '● Offline'}
+            {aiOnline ? '● OZ AI' : '● Offline'}
           </span>
         )}
       </div>
 
-      {/* Book context banner */}
+      {/* ── Book context banner ───────────────────────────────────────────────── */}
+
       {bookContext && !bookContextDismissed && (
         <div className="flex items-start gap-3 px-4 py-3 bg-[#2A9D9D]/10 border border-[#2A9D9D]/30 rounded-xl">
           <BookOpen className="w-4 h-4 text-[#2A9D9D] flex-shrink-0 mt-0.5" />
@@ -317,7 +535,8 @@ export default function AIAssistantPage() {
         </div>
       )}
 
-      {/* Chat container */}
+      {/* ── Chat container ────────────────────────────────────────────────────── */}
+
       <div className="flex-1 glass-card overflow-hidden flex flex-col min-h-0">
 
         {/* Messages */}
@@ -328,7 +547,7 @@ export default function AIAssistantPage() {
             <div className="h-full flex flex-col items-center justify-center gap-6 py-8">
               <div className="text-center">
                 <div className="w-16 h-16 bg-gradient-to-br from-[#2A9D9D] to-[#1a7a7a] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[#2A9D9D]/20">
-                  <span className="text-white font-bold text-xl">AI</span>
+                  <span className="text-white font-bold text-xl">OZ</span>
                 </div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
                   {user ? `Hello, ${user.name.split(' ')[0]}!` : 'Hello!'}
@@ -358,7 +577,7 @@ export default function AIAssistantPage() {
                 {/* Avatar */}
                 {msg.role === 'assistant' ? (
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#2A9D9D] to-[#1a7a7a] flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-white font-bold text-[10px]">AI</span>
+                    <span className="text-white font-bold text-[10px]">OZ</span>
                   </div>
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -375,7 +594,6 @@ export default function AIAssistantPage() {
                     ? 'bg-[#2A9D9D]/20 border border-[#2A9D9D]/30 backdrop-blur-sm rounded-tr-sm'
                     : 'bg-white/[0.05] border border-white/[0.08] backdrop-blur-sm rounded-tl-sm',
                 )}>
-                  {/* Image preview in user message */}
                   {msg.imagePreview && (
                     <img
                       src={msg.imagePreview}
@@ -383,12 +601,9 @@ export default function AIAssistantPage() {
                       className="max-w-xs rounded-lg mb-2 border border-white/20"
                     />
                   )}
-
-                  {/* Content */}
                   {msg.role === 'assistant' ? (
                     <div className="leading-relaxed">
                       {renderMessage(msg.content)}
-                      {/* Streaming cursor */}
                       {isStreaming && isLast && (
                         <span className="inline-block w-2 h-4 bg-[#2A9D9D] rounded-sm animate-pulse ml-0.5 align-middle" />
                       )}
@@ -401,11 +616,11 @@ export default function AIAssistantPage() {
             );
           })}
 
-          {/* Typing indicator (before first token arrives) */}
+          {/* Typing indicator */}
           {isStreaming && messages[messages.length - 1]?.content === '' && (
             <div className="flex gap-3 items-start">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#2A9D9D] to-[#1a7a7a] flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-bold text-[10px]">AI</span>
+                <span className="text-white font-bold text-[10px]">OZ</span>
               </div>
               <div className="bg-white/[0.05] border border-white/[0.08] rounded-2xl rounded-tl-sm px-4 py-3">
                 <div className="flex items-center gap-1">
@@ -432,14 +647,13 @@ export default function AIAssistantPage() {
                 <X className="w-3 h-3" />
               </button>
             </div>
-            <span className="text-xs text-gray-400">Image ready to send</span>
+            <span className="text-xs text-gray-400">Image ready — ask a question or send as-is</span>
           </div>
         )}
 
         {/* Input bar */}
         <div className="border-t border-white/[0.08] p-3">
           <div className="flex gap-2 items-end">
-            {/* Image upload */}
             <input
               ref={fileInputRef}
               type="file"

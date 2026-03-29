@@ -1,4 +1,4 @@
-import { Controller, Post, Patch, Get, Body, Req, Res, UseGuards, HttpCode } from '@nestjs/common';
+import { Controller, Post, Patch, Get, Delete, Body, Req, Res, Param, Query, UseGuards, HttpCode } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -30,12 +30,44 @@ export class AiController {
     return this.agentService.getStatus();
   }
 
+  @Get('conversations')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List all conversations for the current user' })
+  async getConversations(@CurrentUser('id') userId: string) {
+    return this.agentService.getConversations(userId);
+  }
+
+  @Post('conversations')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(201)
+  @ApiOperation({ summary: 'Create a new conversation' })
+  async createConversation(@CurrentUser('id') userId: string) {
+    return this.agentService.createConversation(userId);
+  }
+
+  @Delete('conversations/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Delete a conversation and its messages' })
+  async deleteConversation(
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+  ) {
+    await this.agentService.deleteConversation(id, userId);
+  }
+
   @Get('history')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get last 20 AI conversation messages for the current user' })
-  async getHistory(@CurrentUser('id') userId: string) {
-    return this.agentService.getHistory(userId);
+  @ApiOperation({ summary: 'Get messages for a conversation' })
+  async getHistory(
+    @CurrentUser('id') userId: string,
+    @Query('conversationId') conversationId?: string,
+  ) {
+    return this.agentService.getHistory(userId, conversationId);
   }
 
   @Post('chat')
@@ -46,7 +78,13 @@ export class AiController {
   @ApiOperation({ summary: 'Send a message to the agentic AI assistant (SSE streaming)' })
   async chat(
     @CurrentUser('id') userId: string,
-    @Body() body: { message: string; history?: { role: string; content: string }[]; hasImage?: boolean; imageBase64?: string },
+    @Body() body: {
+      message: string;
+      history?: { role: string; content: string }[];
+      hasImage?: boolean;
+      imageBase64?: string;
+      conversationId?: string;
+    },
     @Req() req: Request,
     @Res() res: Response,
   ) {
@@ -65,6 +103,7 @@ export class AiController {
         body.hasImage ?? false,
         body.imageBase64 ?? null,
         cookieHeader,
+        body.conversationId,
       );
 
       for await (const chunk of stream) {
