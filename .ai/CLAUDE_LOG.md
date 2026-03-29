@@ -1802,3 +1802,23 @@ Implement reading list visibility/discovery system with instructor public profil
 - `apps/web/app/dashboard/ai-assistant/page.tsx` — Slide-out history sidebar, New Chat, conversation switching, delete, image feedback fallback
 **Verification**: nest build ✓ | tsc --noEmit ✓
 **Next**: Monitor model tool-calling reliability; consider adding get_overdue_borrows tool
+
+---
+
+## Phase: Complete APPROVED Reservation Lifecycle (2026-03-29)
+
+**Problem**: Reservation lifecycle was partially wired — APPROVED enum and migration existed, but runtime code still went PENDING → READY_FOR_PICKUP. Tests referenced a non-existent `markReady()` method, causing typecheck failures.
+
+**Changes**:
+- `apps/api/src/reservations/reservations.service.ts` — `approve()` now transitions PENDING → APPROVED (no pickupDeadline); new `markReady()` transitions APPROVED → READY_FOR_PICKUP (sets 2-day pickupDeadline); `reject()` now accepts APPROVED; `getUserReservationInfo()` and `getStats()` include APPROVED; new `findApprovedReservations()` query
+- `apps/api/src/reservations/reservations.controller.ts` — Added `PATCH :id/mark-ready` and `GET approved` endpoints (admin-only)
+- `apps/api/src/notifications/notifications.service.ts` — `notifyReservationApproved()` no longer mentions pickup; new `notifyReservationReady()` with pickup deadline messaging using RESERVATION_READY type
+- `apps/api/src/borrows/borrow-scheduler.service.ts` — Scheduler now expires PENDING/APPROVED by `expiresAt` and READY_FOR_PICKUP by `pickupDeadline` (two separate queries)
+- `apps/api/src/reservations/dto/reservations.dto.ts` — Added APPROVED to status union
+- `apps/api/src/reservations/reservations.service.spec.ts` — Added `notifyReservationReady` to mock; all 13 tests pass
+- `apps/api/src/borrows/borrow-scheduler.service.spec.ts` — Updated to expect two `findMany` calls for the split expiry logic; both tests pass
+- `apps/web/app/dashboard/admin/reservations/page.tsx` — Three tabs (pending/approved/ready), approve moves to APPROVED, new Mark Ready action for approved, reject available on approved tab
+- `apps/web/app/dashboard/reservations/page.tsx` — APPROVED added to status config, active filters, cancel eligibility, and stats
+- `CURRENT_STATE.md` — Removed two medium APPROVED/timing issues, added to Last Completed, upgraded Reservation System to Good, score 7→8
+
+**Verification**: typecheck (api) ✓ | typecheck (web) ✓ | test:critical 24/24 ✓ | nest build ✓

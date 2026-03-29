@@ -11,18 +11,19 @@
 * A scheduler now reconciles overdue borrows and expires stale reservations. Active borrows past `dueAt` are transitioned to `OVERDUE`, and stale reservations are expired with reserved copies released back to `AVAILABLE`. References: [borrow-scheduler.service.ts](/C:/Projects/library-system_edit/apps/api/src/borrows/borrow-scheduler.service.ts)
 * Overdue fines created by `returnBook` are now set to `PENDING` status. `paidAt` is not written at return time. The admin pay/waive flow (`fine-payments.service.markPaid` / `waive`) is the only path to marking a fine resolved. References: [borrows.service.ts](/C:/Projects/library-system_edit/apps/api/src/borrows/borrows.service.ts#L287)
 * `GET /users/:id` is restricted to ADMIN or the requesting user's own record. Any other role requesting a different user's ID receives 403. Self-service profile access via `/auth/me` and `/auth/profile` is unaffected. References: [users.controller.ts](/C:/Projects/library-system_edit/apps/api/src/users/users.controller.ts#L120)
+* Reservation lifecycle implements the full APPROVED state. `approve()` transitions PENDING → APPROVED (no pickup deadline), `markReady()` transitions APPROVED → READY_FOR_PICKUP (sets 2-day pickup deadline), and `reject()` accepts PENDING, APPROVED, or READY_FOR_PICKUP reservations. The scheduler expires PENDING/APPROVED by `expiresAt` and READY_FOR_PICKUP by `pickupDeadline`, resolving the timing model gap. Active reservation counts include APPROVED. Admin UI has three tabs (pending, approved, ready) with distinct actions. User UI shows APPROVED as a distinct active state. References: [reservations.service.ts](/C:/Projects/library-system_edit/apps/api/src/reservations/reservations.service.ts), [reservations.controller.ts](/C:/Projects/library-system_edit/apps/api/src/reservations/reservations.controller.ts), [borrow-scheduler.service.ts](/C:/Projects/library-system_edit/apps/api/src/borrows/borrow-scheduler.service.ts)
 
 ## In Progress
 
-* Reservation lifecycle timing is still inconsistent. The scheduler expires stale reservations using `expiresAt`, while approval sets `pickupDeadline` without fully reconciling the pickup window model.
+* None currently identified.
 
 ## Production Readiness Score
 
-Score: 7/10
+Score: 8/10
 
 Reason:
 
-* Core concurrency, fine payment state, token leakage, error contract, and user endpoint access are all closed. The remaining open gaps are medium-priority model and lifecycle issues — missing APPROVED state, pickup window timing mismatch, and frontend JWT decode — none of which are auth-bypassing or data-corrupting.
+* Core concurrency, fine payment state, token leakage, error contract, user endpoint access, and reservation lifecycle are all closed. The remaining open gap is medium-priority — frontend JWT decode for route protection — which is not the security boundary (backend authorization is).
 
 ---
 
@@ -37,8 +38,6 @@ Reason:
 
 ## Medium Priority Issues
 
-* Reservation workflow does not implement the intended `APPROVED` state. The code goes directly from `PENDING` to `READY_FOR_PICKUP`; there is no `APPROVED` status in the enum or service logic. References: [schema.prisma](/C:/Projects/library-system_edit/apps/api/prisma/schema.prisma#L33), [reservations.service.ts](/C:/Projects/library-system_edit/apps/api/src/reservations/reservations.service.ts#L342)
-* Reservation lifecycle timing is still not modeled cleanly. Expiry reconciliation is driven by `expiresAt`, while approval sets `pickupDeadline`, so the pickup-window behavior is not fully aligned in the data model. References: [borrow-scheduler.service.ts](/C:/Projects/library-system_edit/apps/api/src/borrows/borrow-scheduler.service.ts#L57), [reservations.service.ts](/C:/Projects/library-system_edit/apps/api/src/reservations/reservations.service.ts#L339)
 * Frontend route protection decodes the JWT payload in middleware without signature verification. Backend authorization still protects APIs, so this is not the main security boundary, but frontend role gating can be spoofed at the UI layer. References: [middleware.ts](/C:/Projects/library-system_edit/apps/web/middleware.ts#L37), [middleware.ts](/C:/Projects/library-system_edit/apps/web/middleware.ts#L67)
 
 ## Low Priority Improvements
@@ -71,12 +70,12 @@ Reason:
 
 ### Reservation System
 
-* Status: Fair
+* Status: Good
 * Issues:
 * Duplicate active reservation per user-book pair is prevented at the DB level by partial unique index.
 * Copy claim in `create()` is atomic. Borrow-limit check in `collect()` is inside the advisory-locked transaction.
-* The scheduler expires stale reservations and frees reserved copies.
-* Reservation lifecycle has timing and model gaps: `expiresAt` and `pickupDeadline` are not consistently reconciled, and no separate `APPROVED` state exists.
+* The scheduler expires PENDING/APPROVED reservations by `expiresAt` and READY_FOR_PICKUP reservations by `pickupDeadline`.
+* Full APPROVED lifecycle is implemented: PENDING → APPROVED → READY_FOR_PICKUP → COLLECTED, with reject allowed from any active state.
 
 ### Error Handling
 
@@ -116,7 +115,7 @@ Reason:
 
 ## Next Best Actions (Ordered)
 
-1. Add the `APPROVED` reservation state and align `expiresAt` / `pickupDeadline` with the intended approval and pickup lifecycle.
-2. Add integration tests (Supertest) for the reservation and borrow HTTP paths to give the test suite real HTTP wiring coverage.
+1. Add integration tests (Supertest) for the reservation and borrow HTTP paths to give the test suite real HTTP wiring coverage.
+2. Address frontend JWT decode in middleware (medium priority) or accept it as a known non-security-critical gap.
 
 ---
