@@ -6,6 +6,7 @@ import {
   Max,
   IsArray,
   IsBoolean,
+  ValidateNested,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
@@ -150,6 +151,8 @@ export class CreateBookDto {
 
   @ApiProperty({ type: [BranchCopiesDto] })
   @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BranchCopiesDto)
   branches: BranchCopiesDto[];
 }
 
