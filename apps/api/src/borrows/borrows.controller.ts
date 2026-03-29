@@ -13,6 +13,12 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Role } from "@prisma/client";
+import {
+  BorrowQueryDto,
+  BorrowHistoryQueryDto,
+  MostBorrowedQueryDto,
+  TrendsQueryDto,
+} from "./dto/borrows.dto";
 
 @ApiTags("borrows")
 @Controller("borrows")
@@ -37,12 +43,11 @@ export class BorrowsController {
   @ApiOperation({ summary: "Get my borrow history" })
   async getMyHistory(
     @CurrentUser("id") userId: string,
-    @Query("page") page?: string,
-    @Query("pageSize") pageSize?: string
+    @Query() dto: BorrowHistoryQueryDto,
   ) {
     return this.borrowsService.findMyHistory(userId, {
-      page: page ? parseInt(page, 10) : undefined,
-      pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
+      page: dto.page,
+      pageSize: dto.pageSize,
     });
   }
 
@@ -58,25 +63,16 @@ export class BorrowsController {
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Get all borrow history (admin)" })
-  async getAllHistory(
-    @Query("page") page?: string,
-    @Query("pageSize") pageSize?: string,
-    @Query("userId") userId?: string,
-    @Query("bookId") bookId?: string,
-    @Query("role") role?: string,
-    @Query("status") status?: string,
-    @Query("startDate") startDate?: string,
-    @Query("endDate") endDate?: string
-  ) {
+  async getAllHistory(@Query() dto: BorrowHistoryQueryDto) {
     return this.borrowsService.findAllHistory({
-      page: page ? parseInt(page) : undefined,
-      pageSize: pageSize ? parseInt(pageSize) : undefined,
-      userId,
-      bookId,
-      role,
-      status,
-      startDate,
-      endDate,
+      page: dto.page,
+      pageSize: dto.pageSize,
+      userId: dto.userId,
+      bookId: dto.bookId,
+      role: dto.role,
+      status: dto.status,
+      startDate: dto.startDate,
+      endDate: dto.endDate,
     });
   }
 
@@ -84,20 +80,16 @@ export class BorrowsController {
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Get most borrowed books" })
-  async getMostBorrowed(@Query("limit") limit?: string) {
-    return this.borrowsService.getMostBorrowedBooks(
-      limit ? parseInt(limit, 10) : 10
-    );
+  async getMostBorrowed(@Query() dto: MostBorrowedQueryDto) {
+    return this.borrowsService.getMostBorrowedBooks(dto.limit ?? 10);
   }
 
   @Get("admin/trends")
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Get borrow trends" })
-  async getTrends(@Query("months") months?: string) {
-    return this.borrowsService.getBorrowTrends(
-      months ? parseInt(months, 10) : 6
-    );
+  async getTrends(@Query() dto: TrendsQueryDto) {
+    return this.borrowsService.getBorrowTrends(dto.months ?? 6);
   }
 
   @Get("admin/statistics")
@@ -120,17 +112,12 @@ export class BorrowsController {
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Get all borrows (admin only)" })
-  async getAllBorrows(
-    @Query("status") status?: string,
-    @Query("userId") userId?: string,
-    @Query("page") page?: string,
-    @Query("pageSize") pageSize?: string,
-  ) {
+  async getAllBorrows(@Query() dto: BorrowQueryDto) {
     return this.borrowsService.findAllBorrows({
-      status,
-      userId,
-      page: page ? parseInt(page, 10) : undefined,
-      pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
+      status: dto.status,
+      userId: dto.userId,
+      page: dto.page,
+      pageSize: dto.pageSize,
     });
   }
 
