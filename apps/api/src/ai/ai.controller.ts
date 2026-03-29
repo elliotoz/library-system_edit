@@ -25,7 +25,10 @@ export class AiController {
   // ── Agentic endpoints (Path A) ──────────────────────────────────
 
   @Get('status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get Ollama availability and model list' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getStatus() {
     return this.agentService.getStatus();
   }
