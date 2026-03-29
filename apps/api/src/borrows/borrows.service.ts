@@ -369,7 +369,7 @@ export class BorrowsService {
     query: { page?: number; pageSize?: number }
   ) {
     const page = Number(query.page) || 1;
-    const pageSize = Number(query.pageSize) || 10;
+    const pageSize = Math.min(Number(query.pageSize) || 10, 100);
 
     const where = {
       userId,
@@ -433,7 +433,7 @@ export class BorrowsService {
     endDate?: string;
   }) {
     const page = Number(query.page) || 1;
-    const pageSize = Number(query.pageSize) || 20;
+    const pageSize = Math.min(Number(query.pageSize) || 20, 100);
 
     const where: any = {};
 
