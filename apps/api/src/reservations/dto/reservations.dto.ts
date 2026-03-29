@@ -26,7 +26,7 @@ export class ReservationQueryDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  status?: 'PENDING' | 'READY_FOR_PICKUP' | 'COLLECTED' | 'CANCELLED' | 'EXPIRED';
+  status?: 'PENDING' | 'APPROVED' | 'READY_FOR_PICKUP' | 'COLLECTED' | 'CANCELLED' | 'EXPIRED';
 
   @ApiPropertyOptional()
   @IsOptional()

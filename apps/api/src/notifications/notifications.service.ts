@@ -96,6 +96,23 @@ export class NotificationsService {
     userId: string,
     bookTitle: string,
     branchName: string,
+    bookId?: string,
+    branchId?: string
+  ) {
+    return this.create({
+      userId,
+      type: NotificationType.RESERVATION_APPROVED,
+      title: "Reservation Approved!",
+      message: `Your reservation for "${bookTitle}" at ${branchName} has been approved. We'll notify you when it's ready for pickup.`,
+      bookId,
+      branchId,
+    });
+  }
+
+  async notifyReservationReady(
+    userId: string,
+    bookTitle: string,
+    branchName: string,
     pickupDeadline: Date,
     bookId?: string,
     branchId?: string
@@ -110,9 +127,9 @@ export class NotificationsService {
 
     return this.create({
       userId,
-      type: NotificationType.RESERVATION_APPROVED,
-      title: "Reservation Approved! 🎉",
-      message: `Great news! Your reservation for "${bookTitle}" has been approved. Please pick it up at ${branchName} by ${deadlineStr}.`,
+      type: NotificationType.RESERVATION_READY,
+      title: "Book Ready for Pickup!",
+      message: `"${bookTitle}" is ready for pickup at ${branchName}. Please collect it by ${deadlineStr}.`,
       bookId,
       branchId,
     });

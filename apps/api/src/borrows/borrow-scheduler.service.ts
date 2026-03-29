@@ -59,9 +59,10 @@ export class BorrowSchedulerService implements OnModuleInit, OnModuleDestroy {
   private async expireReservations() {
     const now = new Date();
 
-    const stale = await this.prisma.reservation.findMany({
+    // Expire PENDING and APPROVED reservations by expiresAt
+    const staleByExpiry = await this.prisma.reservation.findMany({
       where: {
-        status: { in: [ReservationStatus.PENDING, ReservationStatus.READY_FOR_PICKUP] },
+        status: { in: [ReservationStatus.PENDING, ReservationStatus.APPROVED] },
         expiresAt: { lt: now },
       },
       include: {
@@ -69,12 +70,24 @@ export class BorrowSchedulerService implements OnModuleInit, OnModuleDestroy {
       },
     });
 
+    // Expire READY_FOR_PICKUP reservations by pickupDeadline
+    const staleByDeadline = await this.prisma.reservation.findMany({
+      where: {
+        status: ReservationStatus.READY_FOR_PICKUP,
+        pickupDeadline: { lt: now },
+      },
+      include: {
+        bookCopy: { include: { book: { select: { id: true, title: true } } } },
+      },
+    });
+
+    const stale = [...staleByExpiry, ...staleByDeadline];
     let expired = 0;
 
     for (const reservation of stale) {
       await this.prisma.$transaction([
         this.prisma.reservation.updateMany({
-          where: { id: reservation.id, status: { in: [ReservationStatus.PENDING, ReservationStatus.READY_FOR_PICKUP] } },
+          where: { id: reservation.id, status: { in: [ReservationStatus.PENDING, ReservationStatus.APPROVED, ReservationStatus.READY_FOR_PICKUP] } },
           data: { status: ReservationStatus.EXPIRED },
         }),
         this.prisma.bookCopy.updateMany({

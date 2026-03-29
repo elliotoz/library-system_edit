@@ -172,7 +172,7 @@ export class ReservationsService {
           where: {
             userId,
             status: {
-              in: [ReservationStatus.PENDING, ReservationStatus.READY_FOR_PICKUP],
+              in: [ReservationStatus.PENDING, ReservationStatus.APPROVED, ReservationStatus.READY_FOR_PICKUP],
             },
           },
         });
@@ -337,6 +337,50 @@ export class ReservationsService {
       throw new BadRequestException("Can only approve pending reservations");
     }
 
+    const updatedReservation = await this.prisma.reservation.update({
+      where: { id: reservationId },
+      data: {
+        status: ReservationStatus.APPROVED,
+      },
+      include: {
+        bookCopy: { include: { book: true } },
+        branch: true,
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    await this.notificationsService.notifyReservationApproved(
+      updatedReservation.user.id,
+      updatedReservation.bookCopy.book.title,
+      updatedReservation.branch.name,
+      updatedReservation.bookCopy.book.id,
+      updatedReservation.branch.id
+    );
+
+    return {
+      id: updatedReservation.id,
+      status: updatedReservation.status,
+      pickupDeadline: updatedReservation.pickupDeadline,
+      book: updatedReservation.bookCopy.book,
+      branch: updatedReservation.branch,
+      user: updatedReservation.user,
+    };
+  }
+
+  async markReady(reservationId: string) {
+    const reservation = await this.prisma.reservation.findUnique({
+      where: { id: reservationId },
+      include: { bookCopy: true },
+    });
+
+    if (!reservation) {
+      throw new NotFoundException("Reservation not found");
+    }
+
+    if (reservation.status !== ReservationStatus.APPROVED) {
+      throw new BadRequestException("Can only mark approved reservations as ready");
+    }
+
     const pickupDeadline = new Date();
     pickupDeadline.setDate(pickupDeadline.getDate() + 2);
 
@@ -353,7 +397,7 @@ export class ReservationsService {
       },
     });
 
-    await this.notificationsService.notifyReservationApproved(
+    await this.notificationsService.notifyReservationReady(
       updatedReservation.user.id,
       updatedReservation.bookCopy.book.title,
       updatedReservation.branch.name,
@@ -388,10 +432,11 @@ export class ReservationsService {
 
     if (
       reservation.status !== ReservationStatus.PENDING &&
+      reservation.status !== ReservationStatus.APPROVED &&
       reservation.status !== ReservationStatus.READY_FOR_PICKUP
     ) {
       throw new BadRequestException(
-        "Only pending or ready-for-pickup reservations can be rejected"
+        "Only pending, approved, or ready-for-pickup reservations can be rejected"
       );
     }
 
@@ -429,9 +474,12 @@ export class ReservationsService {
   }
 
   async getStats() {
-    const [pending, ready, collected, cancelled, expired] = await Promise.all([
+    const [pending, approved, ready, collected, cancelled, expired] = await Promise.all([
       this.prisma.reservation.count({
         where: { status: ReservationStatus.PENDING },
+      }),
+      this.prisma.reservation.count({
+        where: { status: ReservationStatus.APPROVED },
       }),
       this.prisma.reservation.count({
         where: { status: ReservationStatus.READY_FOR_PICKUP },
@@ -449,12 +497,47 @@ export class ReservationsService {
 
     return {
       pending,
+      approved,
       ready,
       collected,
       cancelled,
       expired,
-      total: pending + ready + collected + cancelled + expired,
+      total: pending + approved + ready + collected + cancelled + expired,
     };
+  }
+
+  async findApprovedReservations() {
+    const reservations = await this.prisma.reservation.findMany({
+      where: { status: ReservationStatus.APPROVED },
+      include: {
+        user: { select: { id: true, name: true, email: true, role: true } },
+        bookCopy: {
+          include: {
+            book: {
+              select: {
+                id: true,
+                title: true,
+                authors: true,
+                coverImageUrl: true,
+              },
+            },
+          },
+        },
+        branch: { select: { id: true, name: true, code: true } },
+      },
+      orderBy: { createdAt: "asc" },
+      take: 100,
+    });
+
+    return reservations.map((r) => ({
+      id: r.id,
+      status: r.status,
+      createdAt: r.createdAt,
+      expiresAt: r.expiresAt,
+      user: r.user,
+      book: r.bookCopy.book,
+      branch: r.branch,
+    }));
   }
 
   async getUserReservationInfo(userId: string) {
@@ -471,7 +554,7 @@ export class ReservationsService {
       where: {
         userId,
         status: {
-          in: [ReservationStatus.PENDING, ReservationStatus.READY_FOR_PICKUP],
+          in: [ReservationStatus.PENDING, ReservationStatus.APPROVED, ReservationStatus.READY_FOR_PICKUP],
         },
       },
     });

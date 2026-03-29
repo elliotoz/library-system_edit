@@ -93,6 +93,14 @@ export class ReservationsController {
     return this.reservationsService.approve(id);
   }
 
+  @Patch(":id/mark-ready")
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: "Mark an approved reservation as ready for pickup" })
+  async markReady(@Param("id") id: string) {
+    return this.reservationsService.markReady(id);
+  }
+
   @Patch(":id/reject")
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
@@ -100,6 +108,15 @@ export class ReservationsController {
   async reject(@Param("id") id: string, @Body() dto: RejectReservationDto) {
     return this.reservationsService.reject(id, dto.reason);
   }
+
+  @Get("approved")
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: "Get approved reservations" })
+  async getApprovedReservations() {
+    return this.reservationsService.findApprovedReservations();
+  }
+
   @Get("ready")
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
