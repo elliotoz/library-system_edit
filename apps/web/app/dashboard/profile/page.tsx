@@ -93,7 +93,7 @@ export default function ProfilePage() {
         setIsEditing(false);
         setProfile((prev) => prev ? { ...prev, interests } : null);
       } else {
-        toast.error('Failed to update interests');
+        toast.error(await extractApiError(response, 'Failed to update interests'));
       }
     } catch (error) {
       toast.error('Failed to update interests');

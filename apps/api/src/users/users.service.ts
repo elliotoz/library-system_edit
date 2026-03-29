@@ -123,19 +123,10 @@ export class UsersService {
    * Find user by email
    */
   async findByEmail(email: string) {
-    const user = await this.prisma.user.findUnique({
+    return this.prisma.user.findUnique({
       where: { email: email.toLowerCase() },
-      include: {
-        faculty: true,
-      },
+      select: { ...SAFE_USER_SELECT, faculty: true },
     });
-
-    if (!user) {
-      return null;
-    }
-
-    const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
   }
 
   /**
