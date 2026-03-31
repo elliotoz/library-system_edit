@@ -8,6 +8,28 @@ Format for each entry:
 
 ## YYYY-MM-DD HH:MM - <short title>
 
+## 2026-03-31 - Query DTO Hardening + TEST_CHECKLIST Audit
+
+### What changed
+- `apps/api/src/reservations/dto/reservations.dto.ts` — added `page` and `pageSize` to `ReservationQueryDto` with `@Type(() => Number)`, `@IsInt`, `@Min(1)`, `@Max(100)`
+- `apps/api/src/reservations/reservations.controller.ts` — `GET /reservations` now uses `@Query() dto: ReservationQueryDto`; raw `parseInt()` removed
+- `apps/api/src/notifications/dto/notifications.dto.ts` — created `NotificationsQueryDto` with `limit` (`@Type(() => Number)`, `@IsInt`, `@Min(1)`, `@Max(100)`)
+- `apps/api/src/notifications/notifications.controller.ts` — `GET /notifications` now uses `@Query() dto: NotificationsQueryDto`
+- `apps/api/src/notifications/notifications.service.ts` — `findUserNotifications` uses `Math.min(limit ?? 20, 100)` defence-in-depth clamp
+- `apps/api/src/fine-payments/dto/fine-payments.dto.ts` — added `FinePaymentsQueryDto` with `@IsEnum(FineStatus)`, typed `page`/`pageSize`
+- `apps/api/src/fine-payments/fine-payments.controller.ts` — `GET /fine-payments` now uses `@Query() dto: FinePaymentsQueryDto`; raw `parseInt()` removed; unused `FineStatus` import cleaned
+- `apps/api/test/security.e2e-spec.ts` — 9 new e2e tests for query validation across all three endpoints
+- `TEST_CHECKLIST.md` — full rewrite: added [AUTO]/[MANUAL] markers, full reservation lifecycle, fines admin flow, notifications page, AI conversations, scheduler, query validation section, role-boundary findings, automated test coverage table. Removed stale items (incomplete API list, missing new flows).
+
+### Role-boundary audit findings
+- Frontend middleware: `/dashboard/admin/*` correctly ADMIN-only. `/dashboard/instructor/*` sub-routes correctly inherit INSTRUCTOR+ADMIN via longest-prefix match. Three pages (`/dashboard/fines`, `/dashboard/history`, `/dashboard/materials`) have no ROUTE_PERMISSIONS entry — middleware falls through to allow for any authenticated user. Backend data-scoping prevents cross-user exposure; low-priority UX gap only.
+- Backend: `@Roles()` empty pattern on `GET /fine-payments/my` is intentional (any auth role can view own fines). All admin actions use `@Roles(Role.ADMIN)`. No bypass paths found.
+
+### Verification
+- `npm run typecheck:api` — PASS
+- `npm run test:api:critical` — PASS (24 tests)
+- `npm run test:api:e2e` — PASS (46 tests: 28 prior + 9 new query validation + 9 prior security)
+
 ## 2026-03-29 - Security Hardening (Password Strength, Branch Copy Validation, Auth Rate Limiting, AI Status Guard)
 
 ### What changed
