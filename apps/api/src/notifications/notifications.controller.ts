@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { NotificationsService } from "./notifications.service";
+import { NotificationsQueryDto } from "./dto/notifications.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 
@@ -23,11 +24,11 @@ export class NotificationsController {
   @ApiOperation({ summary: "Get my notifications" })
   async getMyNotifications(
     @CurrentUser("id") userId: string,
-    @Query("limit") limit?: string
+    @Query() dto: NotificationsQueryDto
   ) {
     const notifications = await this.notificationsService.findUserNotifications(
       userId,
-      limit ? parseInt(limit) : 20
+      dto.limit
     );
     const unreadCount = await this.notificationsService.findUnreadCount(userId);
 
