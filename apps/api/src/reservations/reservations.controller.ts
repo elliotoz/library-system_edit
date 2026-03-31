@@ -10,7 +10,7 @@ import {
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { ReservationsService } from "./reservations.service";
-import { CreateReservationDto, RejectReservationDto } from "./dto/reservations.dto";
+import { CreateReservationDto, RejectReservationDto, ReservationQueryDto } from "./dto/reservations.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -56,18 +56,8 @@ export class ReservationsController {
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Get all reservations" })
-  async getAllReservations(
-    @Query("status") status?: string,
-    @Query("userId") userId?: string,
-    @Query("page") page?: string,
-    @Query("pageSize") pageSize?: string
-  ) {
-    return this.reservationsService.findAllReservations({
-      status,
-      userId,
-      page: page ? parseInt(page) : undefined,
-      pageSize: pageSize ? parseInt(pageSize) : undefined,
-    });
+  async getAllReservations(@Query() dto: ReservationQueryDto) {
+    return this.reservationsService.findAllReservations(dto);
   }
 
   @Post()
