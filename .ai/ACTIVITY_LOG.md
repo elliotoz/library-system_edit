@@ -8,6 +8,18 @@ Format for each entry:
 
 ## YYYY-MM-DD HH:MM - <short title>
 
+## 2026-03-31 - AI Catalog Search Fix (Concept Search + Link Semantics)
+
+### What changed
+- `apps/api/src/ai/catalog-search.service.ts` — added `searchForAgent(query, pageSize)`: routes through `parseIntent()` + `semanticSearch.searchBooks()` + `rankBooks()` instead of raw `/books?search=`. Returns structured JSON with `id, title, authors, category, subjects, available, copies, reasons, catalogLink`. Added two-pass subtitle-stripping fallback: if full query returns nothing, strips text after `:` and punctuation ("Clean Code: A Handbook..." → "clean code") and retries; sets `fallbackUsed`/`fallbackQuery` in result. Added `normalizeQueryForSearch()` private helper.
+- `apps/api/src/ai/agent.service.ts` — `search_catalog` tool case now calls `catalogSearch.searchForAgent()` instead of raw fetch. `get_book_details` tool case renamed `link` → `catalogLink`; `ebookUrl` kept as separate optional field. System prompt: removed title-only-bot guidance ("treat [name] as a book title"); added topic/concept search guidance; clarified link rule (always `catalogLink`, only surface `ebookUrl` when user explicitly asks to open/read/download/access e-book content); added subtitle-retry guidance.
+- `apps/api/src/ai/catalog-search.service.spec.ts` — 12 new unit tests: catalogLink present / ebookUrl absent, subtitle fallback ("Clean Code: A Handbook..." resolves same book as "clean code"), concept queries (coding, engineering, natural sciences, software engineering, "related to coding"), pageSize cap.
+
+### Verification
+- `cd apps/api && npx tsc --noEmit` — PASS
+- `cd apps/api && npm run test:critical` — PASS (24 tests)
+- `cd apps/api && npx jest src/ai/catalog-search.service.spec.ts` — PASS (12 tests)
+
 ## 2026-03-31 - Query DTO Hardening + TEST_CHECKLIST Audit
 
 ### What changed
