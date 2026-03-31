@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Ollama, Message as OllamaMessage, Tool } from 'ollama';
 import { PrismaService } from '../prisma/prisma.service';
+import { CatalogSearchService } from './catalog-search.service';
 import { BorrowStatus } from '@prisma/client';
 
 @Injectable()
@@ -8,7 +9,10 @@ export class AgentService {
   private readonly logger = new Logger(AgentService.name);
   private readonly ollama: Ollama;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly catalogSearch: CatalogSearchService,
+  ) {
     this.ollama = new Ollama({ host: process.env.OLLAMA_BASE_URL || 'http://localhost:11434' });
   }
 
@@ -101,9 +105,11 @@ You have direct, real-time access to the library database through these tools.
 ## Behaviour Rules
 - ALWAYS use a tool to answer library data questions. NEVER guess or invent numbers.
 - To count books: call get_catalog_stats — it returns exact totals from the database.
-- To find a book by name: call search_catalog with the book title as the query.
-- When the user says "find/get/fetch [name]", treat [name] as a book title and call search_catalog.
-- When books are returned by any tool, always render the title as a markdown link: [Title](link)
+- To search by title, author, topic, or subject: call search_catalog.
+- For specific book-title requests ("find X", "get X", "fetch X"): call search_catalog with the title as the query. Do NOT report "not found" until the tool has returned zero results. The search layer handles subtitle stripping and normalization automatically.
+- For topic/concept requests ("books about X", "related to X", "X books", subject names): call search_catalog — it expands concepts to matching categories automatically.
+- When books are returned by any tool, always render the title as a markdown link using catalogLink: [Title](catalogLink)
+- Never use ebookUrl as the main link. Only mention ebookUrl when the user explicitly asks to open, read, download, or access e-book content.
 - To see active borrows or the most-borrowed book: call get_active_borrows.
 - To see active reservations: call get_active_reservations.
 - NEVER write Python, SQL, shell, or any code to answer a library question — call the tool.
@@ -230,25 +236,9 @@ You have direct, real-time access to the library database through these tools.
       switch (name) {
         case 'search_catalog': {
           const pageSize = Math.min((args.pageSize as number) || 5, 10);
-          const res = await fetch(
-            `${API_BASE}/books?page=1&pageSize=${pageSize}&search=${encodeURIComponent(args.query as string)}`,
-            { headers },
-          );
-          if (!res.ok) return 'Catalog search failed.';
-          const data = await res.json() as { data?: Record<string, unknown>[]; total?: number };
-          if (!data.data?.length) return 'No books found for that search.';
-          const mapped = data.data.map((b: Record<string, unknown>) => ({
-            id: b.id,
-            title: b.title,
-            authors: b.authors,
-            isEbook: b.isEbookAvailable,
-            available: b.isAvailable,
-            copies: `${b.availableCopies}/${b.totalCopies}`,
-            subjects: b.subjectTags,
-            link: `/dashboard/catalog/${b.id}`,
-            description: typeof b.description === 'string' ? b.description.substring(0, 200) : undefined,
-          }));
-          return JSON.stringify({ total: data.total ?? data.data.length, results: mapped });
+          const result = await this.catalogSearch.searchForAgent(args.query as string, pageSize);
+          if (result.total === 0) return 'No books found for that search.';
+          return JSON.stringify(result);
         }
 
         case 'get_book_details': {
@@ -260,10 +250,11 @@ You have direct, real-time access to the library database through these tools.
             description: book.description, publisher: book.publisher,
             year: book.publicationYear, pages: book.pageCount,
             isbn: book.isbn, language: book.language,
-            isEbook: book.isEbookAvailable, ebookUrl: book.ebookUrl,
+            isEbook: book.isEbookAvailable,
+            ebookUrl: book.ebookUrl ?? null,
             availableCopies: book.availableCopies, totalCopies: book.totalCopies,
             isAvailable: book.isAvailable, subjects: book.subjectTags,
-            link: `/dashboard/catalog/${book.id}`,
+            catalogLink: `/dashboard/catalog/${book.id}`,
           });
         }
 
