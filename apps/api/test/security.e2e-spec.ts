@@ -108,6 +108,90 @@ describe("Security E2E", () => {
     });
   });
 
+  // ── Query DTO validation — GET /reservations ─────────────────────────────
+
+  describe("GET /reservations — query DTO validation", () => {
+    it("rejects page=0 with 400", async () => {
+      const { cookie } = await loginAs(app, "admin");
+      await request(server)
+        .get("/reservations?page=0")
+        .set("Cookie", cookie)
+        .expect(400);
+    });
+
+    it("rejects pageSize=200 with 400", async () => {
+      const { cookie } = await loginAs(app, "admin");
+      await request(server)
+        .get("/reservations?pageSize=200")
+        .set("Cookie", cookie)
+        .expect(400);
+    });
+
+    it("rejects pageSize=abc with 400", async () => {
+      const { cookie } = await loginAs(app, "admin");
+      await request(server)
+        .get("/reservations?pageSize=abc")
+        .set("Cookie", cookie)
+        .expect(400);
+    });
+  });
+
+  // ── Query DTO validation — GET /notifications ─────────────────────────────
+
+  describe("GET /notifications — query DTO validation", () => {
+    it("rejects limit=0 with 400", async () => {
+      const { cookie } = await loginAs(app, "student");
+      await request(server)
+        .get("/notifications?limit=0")
+        .set("Cookie", cookie)
+        .expect(400);
+    });
+
+    it("rejects limit=200 with 400", async () => {
+      const { cookie } = await loginAs(app, "student");
+      await request(server)
+        .get("/notifications?limit=200")
+        .set("Cookie", cookie)
+        .expect(400);
+    });
+
+    it("rejects limit=abc with 400", async () => {
+      const { cookie } = await loginAs(app, "student");
+      await request(server)
+        .get("/notifications?limit=abc")
+        .set("Cookie", cookie)
+        .expect(400);
+    });
+  });
+
+  // ── Query DTO validation — GET /fine-payments ─────────────────────────────
+
+  describe("GET /fine-payments — query DTO validation", () => {
+    it("rejects page=0 with 400", async () => {
+      const { cookie } = await loginAs(app, "admin");
+      await request(server)
+        .get("/fine-payments?page=0")
+        .set("Cookie", cookie)
+        .expect(400);
+    });
+
+    it("rejects pageSize=999 with 400", async () => {
+      const { cookie } = await loginAs(app, "admin");
+      await request(server)
+        .get("/fine-payments?pageSize=999")
+        .set("Cookie", cookie)
+        .expect(400);
+    });
+
+    it("rejects status=INVALID with 400", async () => {
+      const { cookie } = await loginAs(app, "admin");
+      await request(server)
+        .get("/fine-payments?status=INVALID")
+        .set("Cookie", cookie)
+        .expect(400);
+    });
+  });
+
   // ── reset-password rate limiting ──────────────────────────────────────────
 
   describe("POST /auth/reset-password — rate limiting", () => {
