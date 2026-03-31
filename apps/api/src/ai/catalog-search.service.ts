@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ChatResponse } from './ai.service';
 import { Role } from '@prisma/client';
 import { SemanticSearchService, RankedBookResult } from './semantic-search.service';
-import { SearchIntent, ReadingListResult } from './types/search.types';
+import { SearchIntent, SearchContext, ReadingListResult } from './types/search.types';
 
 // Re-export for backward compatibility
 export { SearchIntent } from './types/search.types';
@@ -246,5 +246,93 @@ export class CatalogSearchService {
 
   private has(text: string, keywords: string[]): boolean {
     return keywords.some((kw) => text.includes(kw));
+  }
+
+  // ── Agent-oriented search (structured JSON, no markdown) ──────
+
+  /**
+   * Search the catalog for the agent tool layer.
+   * Returns structured results the LLM can present directly.
+   * Runs a second pass with a normalized short title if the first pass
+   * returns nothing (handles subtitle + punctuation stripping).
+   */
+  async searchForAgent(
+    query: string,
+    pageSize = 5,
+  ): Promise<{
+    matchedQuery: string;
+    total: number;
+    fallbackUsed: boolean;
+    fallbackQuery?: string;
+    results: {
+      id: string;
+      title: string;
+      authors: string[];
+      category: string | null;
+      subjects: string[];
+      available: boolean;
+      copies: string;
+      reasons: string[];
+      catalogLink: string;
+    }[];
+  }> {
+    const limit = Math.min(pageSize, 10);
+    const context: SearchContext = { facultyName: null };
+
+    // First pass: full query through intent parser
+    const intent = this.parseIntent(query);
+    const candidates = await this.semanticSearch.searchBooks(intent, context);
+    let books = this.semanticSearch.rankBooks(candidates, intent, context).slice(0, limit);
+
+    // Second pass: strip subtitle after ':' and punctuation if first pass empty
+    let fallbackUsed = false;
+    let fallbackQuery: string | undefined;
+    if (books.length === 0) {
+      const normalized = this.normalizeQueryForSearch(query);
+      if (normalized && normalized !== query.trim().toLowerCase()) {
+        const fallbackIntent = this.parseIntent(normalized);
+        const fallbackCandidates = await this.semanticSearch.searchBooks(fallbackIntent, context);
+        const fallbackBooks = this.semanticSearch
+          .rankBooks(fallbackCandidates, fallbackIntent, context)
+          .slice(0, limit);
+        if (fallbackBooks.length > 0) {
+          books = fallbackBooks;
+          fallbackUsed = true;
+          fallbackQuery = normalized;
+        }
+      }
+    }
+
+    return {
+      matchedQuery: query,
+      total: books.length,
+      fallbackUsed,
+      ...(fallbackQuery ? { fallbackQuery } : {}),
+      results: books.map((b) => ({
+        id: b.id,
+        title: b.title,
+        authors: b.authors,
+        category: b.category ?? null,
+        subjects: b.subjectTags,
+        available: b.availableCopies > 0,
+        copies: `${b.availableCopies}/${b.totalCopies}`,
+        reasons: b.reasons,
+        catalogLink: `/dashboard/catalog/${b.id}`,
+      })),
+    };
+  }
+
+  /**
+   * Normalise a full book title for a fallback search pass.
+   * Strips subtitle text after ':', punctuation, and extra whitespace.
+   * "Clean Code: A Handbook of Agile..." → "clean code"
+   */
+  private normalizeQueryForSearch(query: string): string {
+    return query
+      .split(':')[0]
+      .replace(/[^\w\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
   }
 }
