@@ -265,7 +265,6 @@ export class CatalogSearchService {
     fallbackUsed: boolean;
     fallbackQuery?: string;
     results: {
-      id: string;
       title: string;
       authors: string[];
       category: string | null;
@@ -309,7 +308,7 @@ export class CatalogSearchService {
       fallbackUsed,
       ...(fallbackQuery ? { fallbackQuery } : {}),
       results: books.map((b) => ({
-        id: b.id,
+        // id is intentionally omitted — catalogLink is the only navigation field
         title: b.title,
         authors: b.authors,
         category: b.category ?? null,
@@ -320,6 +319,30 @@ export class CatalogSearchService {
         catalogLink: `/dashboard/catalog/${b.id}`,
       })),
     };
+  }
+
+  /**
+   * Formats a searchForAgent result as preformatted tool output lines.
+   * Each line embeds the exact catalogLink so the model can reproduce it
+   * verbatim without reconstructing or guessing the URL.
+   *
+   * Example line:
+   *   - [Clean Code](/dashboard/catalog/abc123) — Robert C. Martin · Computer Science · ✅ 1/2 copies
+   */
+  formatSearchResults(result: Awaited<ReturnType<typeof this.searchForAgent>>): string {
+    const { total, matchedQuery, fallbackUsed, fallbackQuery, results } = result;
+    const header = fallbackUsed
+      ? `Found ${total} book${total !== 1 ? 's' : ''} for "${matchedQuery}" (searched as: "${fallbackQuery}"):`
+      : `Found ${total} book${total !== 1 ? 's' : ''} for "${matchedQuery}":`;
+
+    const lines = results.map((b) => {
+      const authors = b.authors.slice(0, 2).join(', ');
+      const cat = b.category ? ` · ${b.category}` : '';
+      const avail = b.available ? `✅ ${b.copies} copies` : `❌ All copies borrowed`;
+      return `- [${b.title}](${b.catalogLink}) — ${authors}${cat} · ${avail}`;
+    });
+
+    return `${header}\n\n${lines.join('\n')}`;
   }
 
   /**

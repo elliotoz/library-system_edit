@@ -74,7 +74,7 @@ describe('CatalogSearchService', () => {
       expect(result.results[0].catalogLink).toBe('/dashboard/catalog/abc123');
     });
 
-    it('does not expose ebookUrl — only catalogLink', async () => {
+    it('does not expose id, ebookUrl, or generic link — only catalogLink', async () => {
       const book = makeBook({ id: 'abc123' });
       const service = await buildService(makeMockSemantic([book]));
 
@@ -82,6 +82,7 @@ describe('CatalogSearchService', () => {
 
       const resultKeys = Object.keys(result.results[0]);
       expect(resultKeys).toContain('catalogLink');
+      expect(resultKeys).not.toContain('id');
       expect(resultKeys).not.toContain('ebookUrl');
       expect(resultKeys).not.toContain('link');
     });
@@ -221,6 +222,71 @@ describe('CatalogSearchService', () => {
       const result = await service.searchForAgent('programming', 20);
 
       expect(result.results.length).toBeLessThanOrEqual(10);
+    });
+  });
+
+  // ── formatSearchResults — link integrity ─────────────────────────
+
+  describe('formatSearchResults — link integrity', () => {
+    it('embeds exact catalogLink verbatim in the formatted output', async () => {
+      const book = makeBook({ id: 'abc123' });
+      const service = await buildService(makeMockSemantic([book]));
+      const result = await service.searchForAgent('clean code');
+
+      const formatted = service.formatSearchResults(result);
+
+      // The formatted string must contain the exact path — no truncation or rewriting
+      expect(formatted).toContain('/dashboard/catalog/abc123');
+    });
+
+    it('uses markdown link syntax [Title](catalogLink)', async () => {
+      const book = makeBook({ id: 'abc123', title: 'Clean Code' });
+      const service = await buildService(makeMockSemantic([book]));
+      const result = await service.searchForAgent('clean code');
+
+      const formatted = service.formatSearchResults(result);
+
+      expect(formatted).toMatch(/\[Clean Code\]\(\/dashboard\/catalog\/abc123\)/);
+    });
+
+    it('shows fallback header when fallbackUsed is true', async () => {
+      const book = makeBook({ id: 'xyz' });
+      const semantic = makeMockSemantic([], [book]);
+      const service = await buildService(semantic);
+      const result = await service.searchForAgent(
+        'Clean Code: A Handbook of Agile Software Craftsmanship',
+      );
+
+      const formatted = service.formatSearchResults(result);
+
+      expect(formatted).toContain('searched as:');
+      expect(formatted).toContain('clean code');
+    });
+
+    it('shows ✅ for available books and ❌ for unavailable', async () => {
+      const available = makeBook({ id: 'a1', availableCopies: 2, totalCopies: 3 });
+      const unavailable = makeBook({ id: 'a2', title: 'No Copies', availableCopies: 0, totalCopies: 1 });
+      const service = await buildService(makeMockSemantic([available, unavailable]));
+      const result = await service.searchForAgent('programming');
+
+      const formatted = service.formatSearchResults(result);
+
+      expect(formatted).toContain('✅');
+      expect(formatted).toContain('❌');
+    });
+
+    it('does not include raw id or ebookUrl in the formatted string', async () => {
+      const book = makeBook({ id: 'secret-id-123' });
+      const service = await buildService(makeMockSemantic([book]));
+      const result = await service.searchForAgent('clean code');
+
+      const formatted = service.formatSearchResults(result);
+
+      // The id should only appear as part of the catalogLink path, not as a bare value
+      expect(formatted).not.toMatch(/"id"/);
+      expect(formatted).not.toMatch(/ebookUrl/);
+      // But it MUST appear inside the markdown link
+      expect(formatted).toContain('/dashboard/catalog/secret-id-123');
     });
   });
 });

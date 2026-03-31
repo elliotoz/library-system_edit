@@ -108,7 +108,9 @@ You have direct, real-time access to the library database through these tools.
 - To search by title, author, topic, or subject: call search_catalog.
 - For specific book-title requests ("find X", "get X", "fetch X"): call search_catalog with the title as the query. Do NOT report "not found" until the tool has returned zero results. The search layer handles subtitle stripping and normalization automatically.
 - For topic/concept requests ("books about X", "related to X", "X books", subject names): call search_catalog — it expands concepts to matching categories automatically.
-- When books are returned by any tool, always render the title as a markdown link using catalogLink: [Title](catalogLink)
+- When search_catalog returns formatted result lines, reproduce them verbatim in your reply — do not rewrite or rephrase the links.
+- When get_book_details returns a catalogLink field, use that exact value as the link: [Title](catalogLink). Never construct /dashboard/catalog/... manually.
+- Do not derive links from the title, authors, ISBN, id, or any other field. Copy catalogLink exactly as given.
 - Never use ebookUrl as the main link. Only mention ebookUrl when the user explicitly asks to open, read, download, or access e-book content.
 - To see active borrows or the most-borrowed book: call get_active_borrows.
 - To see active reservations: call get_active_reservations.
@@ -238,7 +240,8 @@ You have direct, real-time access to the library database through these tools.
           const pageSize = Math.min((args.pageSize as number) || 5, 10);
           const result = await this.catalogSearch.searchForAgent(args.query as string, pageSize);
           if (result.total === 0) return 'No books found for that search.';
-          return JSON.stringify(result);
+          // Return preformatted lines — links are already correct; reproduce verbatim
+          return this.catalogSearch.formatSearchResults(result);
         }
 
         case 'get_book_details': {
