@@ -5,7 +5,7 @@ import { ChatResponse } from './ai.service';
 import { SemanticSearchService, RankedBookResult } from './semantic-search.service';
 import { SearchIntent, ReadingListResult } from './types/search.types';
 import { CatalogSearchService } from './catalog-search.service';
-import { OllamaService } from './ollama.service';
+import { GroqService } from './groq.service';
 
 const MAX_TOPIC_LENGTH = 120;
 
@@ -29,7 +29,7 @@ export class ResearchAssistantService {
   constructor(
     private readonly semanticSearch: SemanticSearchService,
     private readonly catalogSearch: CatalogSearchService,
-    private readonly ollama: OllamaService,
+    private readonly groq: GroqService,
   ) {}
 
   isResearchQuery(message: string): boolean {
@@ -239,8 +239,8 @@ export class ResearchAssistantService {
       `- Do not recommend external websites, databases, or resources outside the library system.\n` +
       `- Be concise and practical.\n`;
 
-    const model = this.ollama.getModel(ctx.user.role);
-    const result = await this.ollama.generate(model, prompt);
+    const model = this.groq.getModel(ctx.user.role);
+    const result = await this.groq.generate(model, prompt);
 
     const sources: string[] = [];
     let reply = `## 🔬 Research Guide: ${topic}\n\n`;
@@ -271,6 +271,6 @@ export class ResearchAssistantService {
     reply += '### Suggested Next Steps\n';
     reply += this.nextSteps(ctx);
 
-    return { reply, modelUsed: result.model, sources };
+    return { reply, modelUsed: this.groq.defaultModel, sources };
   }
 }

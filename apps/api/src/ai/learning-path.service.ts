@@ -4,7 +4,7 @@ import { AiContext } from './context-builder.service';
 import { ChatResponse } from './ai.service';
 import { SemanticSearchService, RankedBookResult } from './semantic-search.service';
 import { SearchIntent } from './types/search.types';
-import { OllamaService } from './ollama.service';
+import { GroqService } from './groq.service';
 
 const MAX_TOPIC_LENGTH = 120;
 
@@ -36,7 +36,7 @@ export class LearningPathService {
 
   constructor(
     private readonly semanticSearch: SemanticSearchService,
-    private readonly ollama: OllamaService,
+    private readonly groq: GroqService,
   ) {}
 
   isLearningPathQuery(message: string): boolean {
@@ -317,8 +317,8 @@ export class LearningPathService {
       `- Use markdown formatting. Be concise.\n` +
       `- Do not recommend external websites, databases, or resources outside the library system.\n`;
 
-    const model = this.ollama.getModel(ctx.user.role);
-    const result = await this.ollama.generate(model, prompt);
+    const model = this.groq.getModel(ctx.user.role);
+    const result = await this.groq.generate(model, prompt);
 
     let reply = `## 📚 Learning Path: ${topic}\n\n`;
     reply += this.roleIntro(ctx);
@@ -332,7 +332,7 @@ export class LearningPathService {
 
     return {
       reply,
-      modelUsed: result.model,
+      modelUsed: this.groq.defaultModel,
       sources: [`/dashboard/catalog?search=${encodeURIComponent(topic)}`],
     };
   }

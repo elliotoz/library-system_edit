@@ -7,7 +7,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AiService } from './ai.service';
 import { AgentService, ChatChunk } from './agent.service';
-import { OllamaService } from './ollama.service';
+import { GroqService } from './groq.service';
 import { UpdateInterestsDto } from './dto/update-interests.dto';
 import { ScanCoverDto } from './dto/scan-cover.dto';
 import { Role } from '@prisma/client';
@@ -19,7 +19,7 @@ export class AiController {
   constructor(
     private readonly aiService: AiService,
     private readonly agentService: AgentService,
-    private readonly ollama: OllamaService,
+    private readonly groq: GroqService,
   ) {}
 
   // ── Agentic endpoints (Path A) ──────────────────────────────────
@@ -159,6 +159,6 @@ export class AiController {
   @ApiResponse({ status: 200, description: 'Extracted book metadata' })
   @ApiResponse({ status: 403, description: 'Admin only' })
   scanCover(@Body() dto: ScanCoverDto) {
-    return this.ollama.scanBookCover(dto.image);
+    return this.groq.scanBookCover(dto.image);
   }
 }

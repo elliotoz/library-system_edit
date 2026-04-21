@@ -8,7 +8,7 @@ import { CatalogSearchService } from './catalog-search.service';
 import { SemanticSearchService } from './semantic-search.service';
 import { LearningPathService } from './learning-path.service';
 import { ResearchAssistantService } from './research-assistant.service';
-import { OllamaService } from './ollama.service';
+import { GroqService } from './groq.service';
 import { UsersModule } from '../users/users.module';
 import { PrismaModule } from '../prisma/prisma.module';
 
@@ -24,8 +24,8 @@ import { PrismaModule } from '../prisma/prisma.module';
     SemanticSearchService,
     LearningPathService,
     ResearchAssistantService,
-    OllamaService,
+    GroqService,
   ],
-  exports: [OllamaService, AgentService],
+  exports: [GroqService, AgentService],
 })
 export class AiModule {}

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Ollama, Message as OllamaMessage, Tool } from 'ollama';
+import Groq from 'groq-sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogSearchService } from './catalog-search.service';
 import { BorrowStatus } from '@prisma/client';
@@ -18,26 +18,22 @@ export type ChatChunk =
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger(AgentService.name);
-  private readonly ollama: Ollama;
+  private readonly groq: Groq;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly catalogSearch: CatalogSearchService,
   ) {
-    this.ollama = new Ollama({ host: process.env.OLLAMA_BASE_URL || 'http://localhost:11434' });
+    this.groq = new Groq({ apiKey: process.env.GROQ_API_KEY || '' });
   }
 
   // ── Status ─────────────────────────────────────────────────────
 
-  async getStatus(): Promise<{ available: boolean; models: string[] }> {
-    try {
-      const res = await fetch(`${process.env.OLLAMA_BASE_URL || 'http://localhost:11434'}/api/tags`);
-      if (!res.ok) return { available: false, models: [] };
-      const data = await res.json() as { models: { name: string }[] };
-      return { available: true, models: data.models.map((m) => m.name) };
-    } catch {
-      return { available: false, models: [] };
-    }
+  async getStatus(): Promise<{ available: boolean; model: string }> {
+    return {
+      available: !!process.env.GROQ_API_KEY,
+      model: 'llama-3.3-70b-versatile',
+    };
   }
 
   // ── Conversations ──────────────────────────────────────────────
@@ -117,27 +113,24 @@ You have direct, real-time access to the library database through these tools.
 - ALWAYS use a tool to answer library data questions. NEVER guess or invent numbers.
 - To count books: call get_catalog_stats — it returns exact totals from the database.
 - To search by title, author, topic, or subject: call search_catalog.
-- For specific book-title requests ("find X", "get X", "fetch X"): call search_catalog with the title as the query. Do NOT report "not found" until the tool has returned zero results. The search layer handles subtitle stripping and normalization automatically.
-- For topic/concept requests ("books about X", "related to X", "X books", subject names): call search_catalog — it expands concepts to matching categories automatically.
-- When search_catalog returns formatted result lines, reproduce them verbatim in your reply — do not rewrite or rephrase the links.
+- For specific book-title requests ("find X", "get X", "fetch X"): call search_catalog with the title as the query. Do NOT report "not found" until the tool has returned zero results.
+- For topic/concept requests ("books about X", "related to X", "X books"): call search_catalog.
+- When search_catalog returns formatted result lines, reproduce them verbatim in your reply.
 - When get_book_details returns a catalogLink field, use that exact value as the link: [Title](catalogLink). Never construct /dashboard/catalog/... manually.
-- Do not derive links from the title, authors, ISBN, id, or any other field. Copy catalogLink exactly as given.
-- Never use ebookUrl as the main link. Only mention ebookUrl when the user explicitly asks to open, read, download, or access e-book content.
+- Never use ebookUrl as the main link. Only mention it when the user explicitly asks to open/read/download e-book content.
 - To see active borrows or the most-borrowed book: call get_active_borrows.
 - To see active reservations: call get_active_reservations.
 - NEVER write Python, SQL, shell, or any code to answer a library question — call the tool.
-- NEVER use placeholder text like {{variable}} or <result> — always call the tool and use real data.
 - For code questions (user explicitly asking to write code), reply with a code block only.
 - When summarising a book, call read_ebook first — never invent summaries.
-- When the user sends an image, describe what you see in detail, then answer their question.
 - Use markdown: bullet points for lists, headings for long answers, fenced code blocks for code.
 - Be concise. Today is ${today}.`;
   }
 
   // ── Tools ──────────────────────────────────────────────────────
 
-  private getTools(): Tool[] {
-    const tools: Tool[] = [
+  private getTools(): Groq.Chat.ChatCompletionTool[] {
+    return [
       {
         type: 'function',
         function: {
@@ -169,7 +162,7 @@ You have direct, real-time access to the library database through these tools.
         type: 'function',
         function: {
           name: 'read_ebook',
-          description: 'Fetch and read an e-book from its URL. Use to summarise or answer questions about book content.',
+          description: 'Fetch and read an e-book from its URL.',
           parameters: {
             type: 'object',
             properties: {
@@ -184,7 +177,7 @@ You have direct, real-time access to the library database through these tools.
         type: 'function',
         function: {
           name: 'fetch_webpage',
-          description: 'Fetch any public URL to look up information. Use for Wikipedia, academic papers, or URLs the user provides.',
+          description: 'Fetch any public URL to look up information.',
           parameters: {
             type: 'object',
             properties: {
@@ -207,7 +200,7 @@ You have direct, real-time access to the library database through these tools.
         type: 'function',
         function: {
           name: 'get_catalog_stats',
-          description: 'Get total book count, copy counts, and e-book count from the library catalog. Use this to answer "how many books" questions.',
+          description: 'Get total book count, copy counts, and e-book count from the library catalog.',
           parameters: { type: 'object', properties: {} },
         },
       },
@@ -215,7 +208,7 @@ You have direct, real-time access to the library database through these tools.
         type: 'function',
         function: {
           name: 'get_active_borrows',
-          description: 'Get all currently active borrows across the library, including which books are borrowed, by whom, and due dates. Also returns the top 5 most-borrowed books of all time.',
+          description: 'Get all currently active borrows across the library and the top 5 most-borrowed books.',
           parameters: { type: 'object', properties: {} },
         },
       },
@@ -228,7 +221,6 @@ You have direct, real-time access to the library database through these tools.
         },
       },
     ];
-    return tools;
   }
 
   // ── Tool execution ─────────────────────────────────────────────
@@ -275,8 +267,7 @@ You have direct, real-time access to the library database through these tools.
               description: book.description, publisher: book.publisher,
               year: book.publicationYear, pages: book.pageCount,
               isbn: book.isbn, language: book.language,
-              isEbook: book.isEbookAvailable,
-              ebookUrl: book.ebookUrl ?? null,
+              isEbook: book.isEbookAvailable, ebookUrl: book.ebookUrl ?? null,
               availableCopies: book.availableCopies, totalCopies: book.totalCopies,
               isAvailable: book.isAvailable, subjects: book.subjectTags,
               catalogLink: `/dashboard/catalog/${book.id}`,
@@ -322,20 +313,13 @@ You have direct, real-time access to the library database through these tools.
         case 'get_my_borrows': {
           const borrows = await this.prisma.borrow.findMany({
             where: { userId, status: BorrowStatus.ACTIVE },
-            include: {
-              bookCopy: { include: { book: { select: { title: true } } } },
-            },
+            include: { bookCopy: { include: { book: { select: { title: true } } } } },
           });
           if (!borrows.length) return { result: 'No active borrows.', citations: [] };
           const now = new Date();
           const mapped = borrows.map((b) => {
             const daysLeft = Math.ceil((new Date(b.dueAt).getTime() - now.getTime()) / 86400000);
-            return {
-              title: b.bookCopy.book.title,
-              dueDate: b.dueAt,
-              daysLeft,
-              isOverdue: daysLeft < 0,
-            };
+            return { title: b.bookCopy.book.title, dueDate: b.dueAt, daysLeft, isOverdue: daysLeft < 0 };
           });
           return { result: JSON.stringify(mapped), citations: [] };
         }
@@ -351,10 +335,7 @@ You have direct, real-time access to the library database through these tools.
               this.prisma.borrow.count({ where: { status: 'ACTIVE' } }),
             ]);
           return {
-            result: JSON.stringify({
-              totalBooks, totalCopies, availableCopies, borrowedCopies, ebookCount,
-              activeBorrows: activeborrows,
-            }),
+            result: JSON.stringify({ totalBooks, totalCopies, availableCopies, borrowedCopies, ebookCount, activeBorrows: activeborrows }),
             citations: [],
           };
         }
@@ -385,16 +366,10 @@ You have direct, real-time access to the library database through these tools.
             result: JSON.stringify({
               activeBorrowCount: activeBorrows.length,
               activeBorrows: activeBorrows.map((b) => ({
-                book: b.bookCopy.book.title,
-                borrower: b.user.name,
-                role: b.user.role,
-                dueAt: b.dueAt,
-                daysLeft: Math.ceil((new Date(b.dueAt).getTime() - now.getTime()) / 86400000),
+                book: b.bookCopy.book.title, borrower: b.user.name, role: b.user.role,
+                dueAt: b.dueAt, daysLeft: Math.ceil((new Date(b.dueAt).getTime() - now.getTime()) / 86400000),
               })),
-              mostBorrowedBooks: mostBorrowed.map((r) => ({
-                title: r.title,
-                borrowCount: Number(r.borrow_count),
-              })),
+              mostBorrowedBooks: mostBorrowed.map((r) => ({ title: r.title, borrowCount: Number(r.borrow_count) })),
             }),
             citations: [],
           };
@@ -416,12 +391,8 @@ You have direct, real-time access to the library database through these tools.
             result: JSON.stringify({
               count: reservations.length,
               reservations: reservations.map((r) => ({
-                book: r.bookCopy.book.title,
-                user: r.user.name,
-                status: r.status,
-                branch: r.branch.name,
-                createdAt: r.createdAt,
-                pickupDeadline: r.pickupDeadline,
+                book: r.bookCopy.book.title, user: r.user.name, status: r.status,
+                branch: r.branch.name, createdAt: r.createdAt, pickupDeadline: r.pickupDeadline,
               })),
             }),
             citations: [],
@@ -449,7 +420,6 @@ You have direct, real-time access to the library database through these tools.
     cookieHeader: string,
     conversationId?: string,
   ): AsyncGenerator<ChatChunk> {
-    // Load user context
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -469,83 +439,86 @@ You have direct, real-time access to the library database through these tools.
     }
 
     const policy = await this.prisma.borrowPolicy.findUnique({ where: { role: user.role } });
-
-    const borrowsForPrompt = user.borrows.map((b) => ({
-      book: { title: b.bookCopy.book.title },
-    }));
-
+    const borrowsForPrompt = user.borrows.map((b) => ({ book: { title: b.bookCopy.book.title } }));
     const systemPrompt = this.buildSystemPrompt({
-      name: user.name,
-      role: user.role,
-      faculty: user.faculty,
-      interests: user.interests,
-      activeBorrowsCount: user.borrows.length,
-      borrowPolicy: policy,
-      borrows: borrowsForPrompt,
+      name: user.name, role: user.role, faculty: user.faculty,
+      interests: user.interests, activeBorrowsCount: user.borrows.length,
+      borrowPolicy: policy, borrows: borrowsForPrompt,
     });
 
-    // Auto-title conversation on first message
+    // Auto-title conversation
     if (conversationId) {
       const msgCount = await this.prisma.aiMessage.count({ where: { conversationId } });
       if (msgCount === 0) {
         const title = message.trim().substring(0, 60) || 'New Chat';
-        await this.prisma.aiConversation.update({
-          where: { id: conversationId },
-          data: { title },
-        });
+        await this.prisma.aiConversation.update({ where: { id: conversationId }, data: { title } });
       }
-      await this.prisma.aiConversation.update({
-        where: { id: conversationId },
-        data: { updatedAt: new Date() },
-      });
+      await this.prisma.aiConversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
     }
 
-    // Select model
-    const codeKeywords = ['code', 'python', 'c++', 'javascript', 'typescript', 'function', 'class', 'implement', 'write a', 'syntax', 'algorithm'];
-    const isCode = codeKeywords.some((kw) => message.toLowerCase().includes(kw));
-    const model = hasImage ? 'llava:13b' : (isCode ? 'qwen2.5-coder:7b' : 'qwen2.5:14b');
+    // Build messages — Groq uses OpenAI message format
+    type GroqMessage = Groq.Chat.ChatCompletionMessageParam;
 
-    const userMsg: OllamaMessage = hasImage && imageBase64
-      ? { role: 'user', content: message, images: [imageBase64] }
-      : { role: 'user', content: message };
+    let userContent: GroqMessage['content'];
+    if (hasImage && imageBase64) {
+      userContent = [
+        { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
+        { type: 'text', text: message },
+      ];
+    } else {
+      userContent = message;
+    }
 
-    const messages: OllamaMessage[] = [
+    const messages: GroqMessage[] = [
       { role: 'system', content: systemPrompt },
-      ...history.slice(-10).map((m): OllamaMessage => ({ role: m.role, content: m.content })),
-      userMsg,
+      ...history.slice(-10).map((m): GroqMessage => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      })),
+      { role: 'user', content: userContent },
     ];
+
+    const model = hasImage ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile';
 
     // Agent loop — max 3 rounds
     const allCitations: BookCitation[] = [];
     let round = 0;
+
     while (round < 3) {
       round++;
 
-      const response = await this.ollama.chat({
+      const response = await this.groq.chat.completions.create({
         model,
         messages,
         tools: hasImage ? undefined : this.getTools(),
+        tool_choice: hasImage ? undefined : 'auto',
         stream: false,
       });
 
-      const msg = response.message;
+      const choice = response.choices[0];
+      const msg = choice?.message;
 
-      if (msg.tool_calls && msg.tool_calls.length > 0) {
-        messages.push({ role: 'assistant', content: msg.content });
+      if (msg?.tool_calls && msg.tool_calls.length > 0) {
+        messages.push({ role: 'assistant', content: msg.content ?? '', tool_calls: msg.tool_calls });
 
         for (const toolCall of msg.tool_calls) {
-          const args = (toolCall.function?.arguments ?? {}) as Record<string, unknown>;
+          // IMPORTANT: Groq returns arguments as a JSON string — must parse
+          const args = JSON.parse(toolCall.function.arguments || '{}') as Record<string, unknown>;
           const { result, citations } = await this.executeTool(
             toolCall.function.name, args, userId, cookieHeader,
           );
-          messages.push({ role: 'tool', content: result });
+          messages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: result,
+          });
           allCitations.push(...citations);
         }
         continue;
       }
 
       // Final answer — stream it
-      const finalStream = await this.ollama.chat({
+      const finalStream = await this.groq.chat.completions.create({
         model,
         messages,
         stream: true,
@@ -553,21 +526,20 @@ You have direct, real-time access to the library database through these tools.
 
       let fullResponse = '';
       for await (const chunk of finalStream) {
-        const text = chunk.message?.content ?? '';
+        const text = chunk.choices[0]?.delta?.content ?? '';
         if (text) {
           fullResponse += text;
           yield { type: 'text', text };
         }
       }
 
-      // Fallback for empty image response
       if (!fullResponse && hasImage) {
-        const fallback = 'I received your image but could not analyse it. Make sure the llava model is running: `ollama pull llava:13b`.';
+        const fallback = 'I received your image but could not analyse it.';
         yield { type: 'text', text: fallback };
         fullResponse = fallback;
       }
 
-      // Emit deduplicated book citations before saving
+      // Emit deduplicated book citations
       const uniqueCitations = Array.from(
         new Map(allCitations.map((c) => [c.catalogLink, c])).values(),
       );
@@ -580,7 +552,6 @@ You have direct, real-time access to the library database through these tools.
       return;
     }
 
-    // Fallback if loop exhausted without final answer
     const fallback = 'I was unable to complete the request after multiple attempts. Please try again.';
     yield { type: 'text', text: fallback };
     await this.saveMessage(userId, 'user', message, conversationId);

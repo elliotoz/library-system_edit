@@ -5,7 +5,7 @@ import { RoleResponseService } from './role-response.service';
 import { CatalogSearchService } from './catalog-search.service';
 import { LearningPathService } from './learning-path.service';
 import { ResearchAssistantService } from './research-assistant.service';
-import { OllamaService, OllamaMessage } from './ollama.service';
+import { GroqService } from './groq.service';
 import { UsersService } from '../users/users.service';
 
 export interface ChatResponse {
@@ -17,7 +17,7 @@ export interface ChatResponse {
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
-  private readonly sessions = new Map<string, OllamaMessage[]>();
+  private readonly sessions = new Map<string, { role: string; content: string }[]>();
   private readonly MAX_HISTORY = 20; // 10 exchanges (user + assistant per turn)
 
   constructor(
@@ -26,14 +26,13 @@ export class AiService {
     private readonly catalogSearch: CatalogSearchService,
     private readonly learningPath: LearningPathService,
     private readonly researchAssistant: ResearchAssistantService,
-    private readonly ollama: OllamaService,
+    private readonly groq: GroqService,
     private readonly usersService: UsersService,
   ) {}
 
   async chat(userId: string, userRole: Role, message: string, image?: string): Promise<ChatResponse> {
     const ctx = await this.contextBuilder.build(userId, userRole);
 
-    // If an image is attached, route directly to Ollama (multimodal)
     if (image) {
       return this.ollamaChat(userId, ctx, message, image);
     }
@@ -72,7 +71,6 @@ export class AiService {
       return this.researchAssistant.assist(ctx, message);
     }
 
-    // Try Ollama-powered response, fallback to rule-based on failure
     return this.ollamaChat(userId, ctx, message);
   }
 
@@ -87,26 +85,23 @@ export class AiService {
 
   private async ollamaChat(userId: string, ctx: AiContext, message: string, image?: string): Promise<ChatResponse> {
     const queryType = image ? undefined : this.classifyQuery(message);
-    // Use gemma3:4b for multimodal (image) messages; otherwise role-based model
-    const model = image ? 'gemma3:4b' : this.ollama.getModel(ctx.user.role, queryType);
+    const model = this.groq.getModel(ctx.user.role, queryType);
     const system = this.buildSystemPrompt(ctx);
 
     // Build per-user message history
     const history = this.sessions.get(userId) ?? [];
-    const userMessage: OllamaMessage = image
-      ? { role: 'user', content: message, images: [image] }
-      : { role: 'user', content: message };
-    const messages: OllamaMessage[] = [
+    const userMessage = { role: 'user' as const, content: message };
+    const messages: { role: 'user' | 'assistant' | 'system'; content: string }[] = [
       { role: 'system', content: system },
-      ...history,
+      ...(history as { role: 'user' | 'assistant' | 'system'; content: string }[]),
       userMessage,
     ];
 
     try {
-      const result = await this.ollama.chat(model, messages);
+      const result = await this.groq.chat(model, messages);
       const reply = result.message.content;
 
-      // Update session history (user turn + assistant turn) — strip images to keep history lean
+      // Update session history (user turn + assistant turn)
       const updated = [...history, { role: 'user' as const, content: message }, { role: 'assistant' as const, content: reply }];
       this.sessions.set(userId, updated.slice(-this.MAX_HISTORY));
 
@@ -115,11 +110,11 @@ export class AiService {
       const sources = this.dedupeArray([...staticSources, ...linkedSources]);
       return {
         reply,
-        modelUsed: result.model,
+        modelUsed: this.groq.defaultModel,
         sources,
       };
     } catch (err) {
-      this.logger.warn(`Ollama chat failed, falling back to rules: ${err}`);
+      this.logger.warn(`Groq chat failed, falling back to rules: ${err}`);
       return this.roleResponse.respond(ctx, message);
     }
   }
