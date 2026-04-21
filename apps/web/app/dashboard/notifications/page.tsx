@@ -1,9 +1,22 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Bell, BookOpen, Clock, CheckCircle, AlertTriangle, Trash2, Check, Filter } from 'lucide-react';
+import { Bell, CheckCircle, AlertTriangle, Trash2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { extractApiError } from '@/lib/api-error';
+
+interface ApiNotification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  bookId: string | null;
+  branchId: string | null;
+  createdAt: string;
+  readAt: string | null;
+}
 
 interface Notification {
   id: string;
@@ -13,6 +26,45 @@ interface Notification {
   read: boolean;
   createdAt: string;
   link?: string;
+}
+
+function getDisplayType(type: string): 'info' | 'warning' | 'success' | 'error' {
+  switch (type) {
+    case 'BORROW_DUE_SOON':
+    case 'RESERVATION_EXPIRED':
+      return 'warning';
+    case 'RESERVATION_APPROVED':
+    case 'RESERVATION_READY':
+    case 'BORROW_CREATED':
+    case 'BOOK_AVAILABLE':
+    case 'READING_LIST_PUBLISHED':
+    case 'READING_LIST_UPDATED':
+      return 'success';
+    case 'BORROW_OVERDUE':
+    case 'RESERVATION_REJECTED':
+      return 'error';
+    default:
+      return 'info';
+  }
+}
+
+function getNotificationLink(type: string): string | undefined {
+  switch (type) {
+    case 'RESERVATION_CREATED':
+    case 'RESERVATION_APPROVED':
+    case 'RESERVATION_READY':
+    case 'RESERVATION_REJECTED':
+    case 'RESERVATION_EXPIRED':
+      return '/dashboard/reservations';
+    case 'BORROW_CREATED':
+    case 'BORROW_DUE_SOON':
+    case 'BORROW_OVERDUE':
+      return '/dashboard/borrowed';
+    case 'BOOK_AVAILABLE':
+      return '/dashboard/catalog';
+    default:
+      return undefined;
+  }
 }
 
 export default function NotificationsPage() {
@@ -26,85 +78,98 @@ export default function NotificationsPage() {
 
   const fetchNotifications = async () => {
     try {
-      // Mock notifications - will be replaced with API call
-      setNotifications([
-        {
-          id: '1',
-          title: 'Book Due Soon',
-          message: 'Your borrowed book "Clean Code" is due in 3 days. Please return or extend it.',
-          type: 'warning',
-          read: false,
-          createdAt: new Date().toISOString(),
-          link: '/dashboard/borrowed',
-        },
-        {
-          id: '2',
-          title: 'Reservation Ready',
-          message: 'Your reserved book "Design Patterns" is ready for pickup at Main Library.',
-          type: 'success',
-          read: false,
-          createdAt: new Date(Date.now() - 86400000).toISOString(),
-          link: '/dashboard/reservations',
-        },
-        {
-          id: '3',
-          title: 'Borrow Extended',
-          message: 'Your borrow for "Introduction to Algorithms" has been extended by 7 days.',
-          type: 'info',
-          read: true,
-          createdAt: new Date(Date.now() - 172800000).toISOString(),
-          link: '/dashboard/borrowed',
-        },
-        {
-          id: '4',
-          title: 'Reservation Expired',
-          message: 'Your reservation for "Database Systems" has expired.',
-          type: 'error',
-          read: true,
-          createdAt: new Date(Date.now() - 259200000).toISOString(),
-        },
-        {
-          id: '5',
-          title: 'Welcome to Library System',
-          message: 'Your account has been created successfully. Start exploring our book collection!',
-          type: 'info',
-          read: true,
-          createdAt: new Date(Date.now() - 604800000).toISOString(),
-          link: '/dashboard/catalog',
-        },
-      ]);
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
+      const response = await fetch('/api/notifications', { credentials: 'include' });
+      if (!response.ok) {
+        toast.error(await extractApiError(response, 'Failed to load notifications'));
+        return;
+      }
+      const data = await response.json();
+      const mapped: Notification[] = (data.notifications as ApiNotification[]).map((n) => ({
+        id: n.id,
+        title: n.title,
+        message: n.message,
+        type: getDisplayType(n.type),
+        read: n.read,
+        createdAt: n.createdAt,
+        link: getNotificationLink(n.type),
+      }));
+      setNotifications(mapped);
+    } catch {
+      toast.error('Failed to load notifications');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const markAsRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+  const markAsRead = async (id: string) => {
+    try {
+      const response = await fetch(`/api/notifications/${id}/read`, {
+        method: 'PATCH',
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        toast.error(await extractApiError(response, 'Failed to mark as read'));
+        return;
+      }
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    } catch {
+      toast.error('Failed to mark as read');
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    toast.success('All notifications marked as read');
+  const markAllAsRead = async () => {
+    try {
+      const response = await fetch('/api/notifications/read-all', {
+        method: 'PATCH',
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        toast.error(await extractApiError(response, 'Failed to mark all as read'));
+        return;
+      }
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      toast.success('All notifications marked as read');
+    } catch {
+      toast.error('Failed to mark all as read');
+    }
   };
 
-  const deleteNotification = (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-    toast.success('Notification deleted');
+  const deleteNotification = async (id: string) => {
+    try {
+      const response = await fetch(`/api/notifications/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        toast.error(await extractApiError(response, 'Failed to delete notification'));
+        return;
+      }
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      toast.success('Notification deleted');
+    } catch {
+      toast.error('Failed to delete notification');
+    }
   };
 
-  const clearAll = () => {
-    setNotifications([]);
-    toast.success('All notifications cleared');
+  const clearRead = async () => {
+    try {
+      const response = await fetch('/api/notifications/clear-read', {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        toast.error(await extractApiError(response, 'Failed to clear notifications'));
+        return;
+      }
+      setNotifications((prev) => prev.filter((n) => !n.read));
+      toast.success('Read notifications cleared');
+    } catch {
+      toast.error('Failed to clear notifications');
+    }
   };
 
   const filteredNotifications =
-    filter === 'unread'
-      ? notifications.filter((n) => !n.read)
-      : notifications;
+    filter === 'unread' ? notifications.filter((n) => !n.read) : notifications;
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -118,20 +183,6 @@ export default function NotificationsPage() {
         return <AlertTriangle className="w-5 h-5 text-red-500" />;
       default:
         return <Bell className="w-5 h-5 text-blue-500" />;
-    }
-  };
-
-  const getBgColor = (type: string, read: boolean) => {
-    if (read) return 'bg-white dark:bg-gray-800';
-    switch (type) {
-      case 'warning':
-        return 'bg-amber-50 dark:bg-amber-900/20';
-      case 'success':
-        return 'bg-green-50 dark:bg-green-900/20';
-      case 'error':
-        return 'bg-red-50 dark:bg-red-900/20';
-      default:
-        return 'bg-blue-50 dark:bg-blue-900/20';
     }
   };
 
@@ -154,7 +205,7 @@ export default function NotificationsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Notifications</h1>
           <p className="text-gray-500 dark:text-gray-400">
-            {unreadCount > 0 ? `You have ${unreadCount} unread notifications` : 'You\'re all caught up!'}
+            {unreadCount > 0 ? `You have ${unreadCount} unread notifications` : "You're all caught up!"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -166,18 +217,17 @@ export default function NotificationsPage() {
               Mark all as read
             </button>
           )}
-          {notifications.length > 0 && (
+          {notifications.some((n) => n.read) && (
             <button
-              onClick={clearAll}
+              onClick={clearRead}
               className="px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
             >
-              Clear all
+              Clear read
             </button>
           )}
         </div>
       </div>
 
-      {/* Filter */}
       <div className="flex gap-2">
         <button
           onClick={() => setFilter('all')}
@@ -203,7 +253,6 @@ export default function NotificationsPage() {
         </button>
       </div>
 
-      {/* Notifications List */}
       {filteredNotifications.length === 0 ? (
         <div className="glass-card p-12 text-center">
           <Bell className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
@@ -212,8 +261,8 @@ export default function NotificationsPage() {
           </h3>
           <p className="text-gray-500 dark:text-gray-400">
             {filter === 'unread'
-              ? 'You\'ve read all your notifications'
-              : 'You don\'t have any notifications yet'}
+              ? "You've read all your notifications"
+              : "You don't have any notifications yet"}
           </p>
         </div>
       ) : (

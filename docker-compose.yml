@@ -1,3 +1,5 @@
+name: library-system
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -81,6 +83,8 @@ services:
 
 volumes:
   postgres_data:
+    name: library-system_edit_postgres_data
+    external: true
 
 networks:
   library_network:
