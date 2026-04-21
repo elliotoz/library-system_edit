@@ -1,6 +1,7 @@
-import { Controller, Post, Patch, Get, Delete, Body, Req, Res, Param, Query, UseGuards, HttpCode } from '@nestjs/common';
+import { Controller, Post, Patch, Get, Delete, Body, Req, Res, Param, Query, UseGuards, HttpCode, UseInterceptors, UploadedFile, BadRequestException, PayloadTooLargeException } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -8,10 +9,12 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AiService } from './ai.service';
 import { AgentService, ChatChunk } from './agent.service';
 import { GroqService } from './groq.service';
+import { FileExtractService } from './file-extract.service';
 import { UpdateInterestsDto } from './dto/update-interests.dto';
 import { ScanCoverDto } from './dto/scan-cover.dto';
 import { Role } from '@prisma/client';
 import { Request, Response } from 'express';
+import { memoryStorage } from 'multer';
 
 @ApiTags('ai')
 @Controller('ai')
@@ -20,6 +23,7 @@ export class AiController {
     private readonly aiService: AiService,
     private readonly agentService: AgentService,
     private readonly groq: GroqService,
+    private readonly fileExtract: FileExtractService,
   ) {}
 
   // ── Agentic endpoints (Path A) ──────────────────────────────────
@@ -149,6 +153,41 @@ export class AiController {
     @CurrentUser('role') userRole: Role,
   ) {
     return this.aiService.getContext(userId, userRole);
+  }
+
+  @Post('upload-file')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @UseInterceptors(FileInterceptor('file', {
+    storage: memoryStorage(),
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+    fileFilter: (_req, file, cb) => {
+      const allowed = ['application/pdf', 'text/plain',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+      const extOk = /\.(pdf|txt|docx)$/i.test(file.originalname);
+      if (allowed.includes(file.mimetype) || extOk) {
+        cb(null, true);
+      } else {
+        cb(new BadRequestException('Only PDF, DOCX, and TXT files are allowed'), false);
+      }
+    },
+  }))
+  @ApiOperation({ summary: 'Extract text from a PDF, DOCX, or TXT file for AI context' })
+  async uploadFile(@UploadedFile() file: Express.Multer.File & { size?: number }) {
+    if (!file) throw new BadRequestException('No file uploaded. Please select a PDF, DOCX, or TXT file.');
+    if ((file.size ?? 0) > 50 * 1024 * 1024) {
+      throw new PayloadTooLargeException(
+        'File is too large. Maximum allowed size is 50 MB. Please reduce the file size and try again.',
+      );
+    }
+    const result = await this.fileExtract.extractText(file.buffer, file.mimetype, file.originalname);
+    return {
+      text: result.text,
+      wordCount: result.wordCount,
+      totalWordCount: result.totalWordCount,
+      truncated: result.truncated,
+      filename: file.originalname,
+    };
   }
 
   @Post('scan-cover')

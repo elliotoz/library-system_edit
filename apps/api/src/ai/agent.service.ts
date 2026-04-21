@@ -220,6 +220,14 @@ You have direct, real-time access to the library database through these tools.
           parameters: { type: 'object', properties: {} },
         },
       },
+      {
+        type: 'function',
+        function: {
+          name: 'get_user_stats',
+          description: 'Get total registered user counts broken down by role (STUDENT, FACULTY, ADMIN).',
+          parameters: { type: 'object', properties: {} },
+        },
+      },
     ];
   }
 
@@ -399,6 +407,18 @@ You have direct, real-time access to the library database through these tools.
           };
         }
 
+        case 'get_user_stats': {
+          const [total, students, admins] = await Promise.all([
+            this.prisma.user.count(),
+            this.prisma.user.count({ where: { role: 'STUDENT' } }),
+            this.prisma.user.count({ where: { role: 'ADMIN' } }),
+          ]);
+          return {
+            result: JSON.stringify({ totalUsers: total, students, admins }),
+            citations: [],
+          };
+        }
+
         default:
           return { result: 'Unknown tool.', citations: [] };
       }
@@ -478,6 +498,8 @@ You have direct, real-time access to the library database through these tools.
       { role: 'user', content: userContent },
     ];
 
+    // llama-3.3-70b-versatile: supports external tool calling (catalog search, DB queries etc).
+    // llama-4-scout: vision model for image input only.
     const model = hasImage ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile';
 
     // Agent loop — max 3 rounds
@@ -517,26 +539,17 @@ You have direct, real-time access to the library database through these tools.
         continue;
       }
 
-      // Final answer — stream it
-      const finalStream = await this.groq.chat.completions.create({
-        model,
-        messages,
-        stream: true,
-      });
-
-      let fullResponse = '';
-      for await (const chunk of finalStream) {
-        const text = chunk.choices[0]?.delta?.content ?? '';
-        if (text) {
-          fullResponse += text;
-          yield { type: 'text', text };
-        }
-      }
+      // Final answer — yield the content from the non-streaming response directly.
+      // Do NOT make a second streaming call: Groq rejects tool calls in a
+      // streaming request that was sent without tools, causing 400 errors.
+      let fullResponse = msg?.content ?? '';
 
       if (!fullResponse && hasImage) {
-        const fallback = 'I received your image but could not analyse it.';
-        yield { type: 'text', text: fallback };
-        fullResponse = fallback;
+        fullResponse = 'I received your image but could not analyse it.';
+      }
+
+      if (fullResponse) {
+        yield { type: 'text', text: fullResponse };
       }
 
       // Emit deduplicated book citations
