@@ -134,3 +134,4 @@ cookie.txt
 !apps/web/.env.example
 
 # AI collaboration docs/logs are intentionally tracked
+.worktrees/
