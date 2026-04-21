@@ -33,7 +33,11 @@ export class GeminiProvider implements LlmProvider {
       throw new Error('GeminiProvider: GEMINI_API_KEY not set');
     }
 
-    const modelName = options.model || 'gemini-1.5-flash';
+    if (options.tools && options.tools.length > 0) {
+      this.logger.warn('GeminiProvider: tool calling is not supported — tools will be ignored');
+    }
+
+    const modelName = options.model ?? 'gemini-1.5-flash';
 
     const genModel = this.client.getGenerativeModel({
       model: modelName,
@@ -41,7 +45,10 @@ export class GeminiProvider implements LlmProvider {
     });
 
     // Build history (all but the last message) and extract the last user message
-    const allMessages = options.messages;
+    const allMessages = options.messages.filter((m) => m.role !== 'system');
+    if (allMessages.length === 0) {
+      return { text: '', toolCalls: undefined, usage: { inputTokens: 0, outputTokens: 0 } };
+    }
     const lastMessage = allMessages[allMessages.length - 1];
     const history = allMessages.slice(0, -1).map((m) => ({
       role: m.role === 'assistant' ? 'model' : 'user',
@@ -56,15 +63,16 @@ export class GeminiProvider implements LlmProvider {
       },
     });
 
-    const result = await chat.sendMessage(lastMessage?.content ?? '');
+    const result = await chat.sendMessage(lastMessage.content);
     const text = result.response.text();
+    const meta = result.response.usageMetadata;
 
     return {
       text,
-      toolCalls: undefined, // Gemini tool support not implemented in free tier
+      toolCalls: undefined,
       usage: {
-        inputTokens: 0,
-        outputTokens: 0,
+        inputTokens: meta?.promptTokenCount ?? 0,
+        outputTokens: meta?.candidatesTokenCount ?? 0,
       },
     };
   }
@@ -78,14 +86,15 @@ export class GeminiProvider implements LlmProvider {
       throw new Error('GeminiProvider: GEMINI_API_KEY not set');
     }
 
-    const modelName = options.model || 'gemini-1.5-flash';
+    const modelName = options.model ?? 'gemini-1.5-flash';
 
     const genModel = this.client.getGenerativeModel({
       model: modelName,
       systemInstruction: options.system,
     });
 
-    const allMessages = options.messages;
+    const allMessages = options.messages.filter((m) => m.role !== 'system');
+    if (allMessages.length === 0) return;
     const lastMessage = allMessages[allMessages.length - 1];
     const history = allMessages.slice(0, -1).map((m) => ({
       role: m.role === 'assistant' ? 'model' : 'user',
@@ -93,7 +102,7 @@ export class GeminiProvider implements LlmProvider {
     }));
 
     const chat = genModel.startChat({ history });
-    const result = await chat.sendMessageStream(lastMessage?.content ?? '');
+    const result = await chat.sendMessageStream(lastMessage.content);
 
     for await (const chunk of result.stream) {
       const text = chunk.text();

@@ -33,7 +33,7 @@ export class GroqProvider implements LlmProvider {
       throw new Error('GroqProvider: GROQ_API_KEY not set');
     }
 
-    const model = options.model || 'llama-3.3-70b-versatile';
+    const model = options.model ?? 'llama-3.3-70b-versatile';
 
     const groqMessages: Groq.Chat.ChatCompletionMessageParam[] = [
       { role: 'system', content: options.system },
@@ -65,10 +65,15 @@ export class GroqProvider implements LlmProvider {
     const choice = response.choices[0];
     const msg = choice?.message;
 
-    const toolCalls = msg?.tool_calls?.map((tc) => ({
-      name: tc.function.name,
-      arguments: JSON.parse(tc.function.arguments || '{}') as Record<string, unknown>,
-    }));
+    const toolCalls = msg?.tool_calls?.map((tc) => {
+      let args: Record<string, unknown> = {};
+      try {
+        args = JSON.parse(tc.function.arguments || '{}') as Record<string, unknown>;
+      } catch {
+        this.logger.warn(`Failed to parse tool call arguments for ${tc.function.name}: ${tc.function.arguments}`);
+      }
+      return { name: tc.function.name, arguments: args };
+    });
 
     return {
       text: msg?.content ?? '',
@@ -89,7 +94,7 @@ export class GroqProvider implements LlmProvider {
       throw new Error('GroqProvider: GROQ_API_KEY not set');
     }
 
-    const model = options.model || 'llama-3.3-70b-versatile';
+    const model = options.model ?? 'llama-3.3-70b-versatile';
 
     const groqMessages: Groq.Chat.ChatCompletionMessageParam[] = [
       { role: 'system', content: options.system },

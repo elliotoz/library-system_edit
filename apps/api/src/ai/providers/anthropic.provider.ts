@@ -33,7 +33,7 @@ export class AnthropicProvider implements LlmProvider {
       throw new Error('AnthropicProvider: ANTHROPIC_API_KEY not set');
     }
 
-    const model = options.model || 'claude-haiku-4-5-20251001';
+    const model = options.model ?? 'claude-haiku-4-5-20251001';
 
     const anthropicMessages: Anthropic.MessageParam[] = options.messages
       .filter((m) => m.role !== 'system')
@@ -93,7 +93,7 @@ export class AnthropicProvider implements LlmProvider {
       throw new Error('AnthropicProvider: ANTHROPIC_API_KEY not set');
     }
 
-    const model = options.model || 'claude-haiku-4-5-20251001';
+    const model = options.model ?? 'claude-haiku-4-5-20251001';
 
     const anthropicMessages: Anthropic.MessageParam[] = options.messages
       .filter((m) => m.role !== 'system')
