@@ -4,12 +4,16 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { StorageService } from "../storage/storage.service";
 import { BookQueryDto, CreateBookDto, UpdateBookDto } from "./dto/books.dto";
 import { BookCopyStatus } from "@prisma/client";
 
 @Injectable()
 export class BooksService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private storage: StorageService,
+  ) {}
 
   async findAll(query: BookQueryDto) {
     const {
@@ -409,5 +413,22 @@ export class BooksService {
       select: { id: true, name: true, code: true, address: true },
       orderBy: { name: "asc" },
     });
+  }
+
+  async uploadPdf(
+    bookId: string,
+    file: Express.Multer.File,
+  ): Promise<{ pdfUrl: string }> {
+    const book = await this.prisma.book.findUnique({ where: { id: bookId } });
+    if (!book) throw new NotFoundException(`Book ${bookId} not found`);
+
+    const pdfUrl = await this.storage.uploadFile(file, "pdfs");
+
+    await this.prisma.book.update({
+      where: { id: bookId },
+      data: { pdfUrl },
+    });
+
+    return { pdfUrl };
   }
 }

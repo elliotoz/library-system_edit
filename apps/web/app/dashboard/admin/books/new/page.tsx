@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, BookOpen, Plus, Trash2, Save, Loader2, ScanLine } from 'lucide-react';
+import { ArrowLeft, BookOpen, Plus, Trash2, Save, Loader2, ScanLine, FileText, Upload, CheckCircle2, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { aiApi } from '@/lib/api';
@@ -64,6 +64,12 @@ export default function AddBookPage() {
   const [faculties, setFaculties] = useState<Faculty[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const coverInputRef = useRef<HTMLInputElement>(null);
+
+  // PDF upload step (shown after book is saved)
+  const [savedBookId, setSavedBookId] = useState<string | null>(null);
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+  const [uploadedPdfUrl, setUploadedPdfUrl] = useState<string | null>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -188,6 +194,37 @@ export default function AddBookPage() {
     }
   };
 
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !savedBookId) return;
+    if (file.type !== 'application/pdf') {
+      toast.error('Only PDF files are allowed');
+      return;
+    }
+    setIsUploadingPdf(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch(`/api/books/${savedBookId}/pdf`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUploadedPdfUrl(data.pdfUrl);
+        toast.success('PDF uploaded successfully');
+      } else {
+        toast.error(await extractApiError(response, 'Failed to upload PDF'));
+      }
+    } catch {
+      toast.error('Failed to upload PDF');
+    } finally {
+      setIsUploadingPdf(false);
+      if (pdfInputRef.current) pdfInputRef.current.value = '';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -264,8 +301,8 @@ export default function AddBookPage() {
 
       if (response.ok) {
         const book = await response.json();
-        toast.success('Book added successfully!');
-        router.push('/dashboard/admin/books');
+        toast.success('Book added! You can now attach a PDF.');
+        setSavedBookId(book.id);
       } else {
         toast.error(await extractApiError(response, 'Failed to add book'));
       }
@@ -280,6 +317,77 @@ export default function AddBookPage() {
     (sum, bc) => sum + (bc.numberOfCopies || 0),
     0
   );
+
+  // PDF upload step shown after book is saved
+  if (savedBookId) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Attach PDF</h1>
+            <p className="mt-1 text-gray-500 dark:text-gray-400">
+              Optionally upload a PDF for AI search and RAG ingestion
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-8 dark:border-gray-700 dark:bg-gray-800">
+          <input
+            ref={pdfInputRef}
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            onChange={handlePdfUpload}
+          />
+          {uploadedPdfUrl ? (
+            <div className="flex flex-col items-center gap-4 text-center">
+              <CheckCircle2 className="h-12 w-12 text-green-500" />
+              <p className="text-lg font-medium text-gray-900 dark:text-white">PDF attached successfully</p>
+              <a
+                href={uploadedPdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-primary-600 underline dark:text-primary-400"
+              >
+                View uploaded PDF
+              </a>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-4 text-center">
+              <FileText className="h-12 w-12 text-gray-400" />
+              <div>
+                <p className="text-base font-medium text-gray-700 dark:text-gray-300">Upload a PDF for this book</p>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Used for AI-powered search and RAG — max 50 MB</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => pdfInputRef.current?.click()}
+                disabled={isUploadingPdf}
+                className="flex items-center gap-2 rounded-lg bg-primary-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-primary-600 disabled:opacity-50"
+              >
+                {isUploadingPdf ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" />Uploading...</>
+                ) : (
+                  <><Upload className="h-4 w-4" />Choose PDF</>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end">
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard/admin/books')}
+            className="flex items-center gap-2 rounded-lg bg-primary-500 px-6 py-2.5 text-sm font-medium text-white hover:bg-primary-600"
+          >
+            {uploadedPdfUrl ? 'Done' : 'Skip'}
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

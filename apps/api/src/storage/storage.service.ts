@@ -4,7 +4,7 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { extname } from "path";
 import { randomUUID } from "crypto";
 
-type Folder = "avatars" | "materials";
+type Folder = "avatars" | "materials" | "pdfs";
 
 @Injectable()
 export class StorageService {
@@ -59,12 +59,12 @@ export class StorageService {
   }
 
   /**
-   * Upload a document/media file (materials).
+   * Upload a document/media file (materials, pdfs).
    * Returns the public URL.
    */
   async uploadFile(
     file: Express.Multer.File,
-    folder: "materials",
+    folder: "materials" | "pdfs",
   ): Promise<string> {
     return this.upload(file, folder);
   }

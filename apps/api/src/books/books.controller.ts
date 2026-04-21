@@ -8,14 +8,37 @@ import {
   Body,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from "@nestjs/common";
-import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
+import { FileInterceptor } from "@nestjs/platform-express";
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiConsumes,
+} from "@nestjs/swagger";
+import { diskStorage } from "multer";
+import { extname } from "path";
+import { randomUUID } from "crypto";
 import { BooksService } from "./books.service";
 import { BookQueryDto, CreateBookDto, UpdateBookDto } from "./dto/books.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { Role } from "@prisma/client";
+
+const pdfDiskStorage = diskStorage({
+  destination: "./uploads/pdfs",
+  filename: (
+    _req: Express.Request,
+    file: Express.Multer.File,
+    callback: (error: Error | null, filename: string) => void
+  ) => {
+    callback(null, `${randomUUID()}${extname(file.originalname)}`);
+  },
+});
 
 @ApiTags("books")
 @Controller("books")
@@ -87,5 +110,35 @@ export class BooksController {
     @Body() body: { branchId: string; numberOfCopies: number }
   ) {
     return this.booksService.addCopies(id, body.branchId, body.numberOfCopies);
+  }
+
+  @Post(":id/pdf")
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: "Upload PDF for a book (admin only)" })
+  @ApiConsumes("multipart/form-data")
+  @UseInterceptors(
+    FileInterceptor("file", {
+      storage: pdfDiskStorage,
+      limits: { fileSize: 50 * 1024 * 1024 },
+      fileFilter: (
+        _req: Express.Request,
+        file: Express.Multer.File,
+        callback: (error: Error | null, acceptFile: boolean) => void
+      ) => {
+        if (file.mimetype === "application/pdf") {
+          callback(null, true);
+        } else {
+          callback(new Error("Only PDF files are allowed"), false);
+        }
+      },
+    })
+  )
+  async uploadPdf(
+    @Param("id") id: string,
+    @UploadedFile() file: Express.Multer.File
+  ) {
+    if (!file) throw new BadRequestException("No PDF file provided");
+    return this.booksService.uploadPdf(id, file);
   }
 }

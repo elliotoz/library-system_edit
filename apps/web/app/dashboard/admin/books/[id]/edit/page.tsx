@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -11,6 +11,9 @@ import {
   Save,
   Loader2,
   Package,
+  FileText,
+  Upload,
+  CheckCircle2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -46,6 +49,7 @@ interface BookDetail {
   coverImageUrl: string | null;
   isEbookAvailable: boolean;
   ebookUrl: string | null;
+  pdfUrl: string | null;
   mainFacultyId: string | null;
   totalCopies: number;
   availableCopies: number;
@@ -96,6 +100,11 @@ export default function EditBookPage() {
   const [addCopiesCount, setAddCopiesCount] = useState(1);
   const [isAddingCopies, setIsAddingCopies] = useState(false);
 
+  // PDF upload state
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+  const [currentPdfUrl, setCurrentPdfUrl] = useState<string | null>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -111,6 +120,7 @@ export default function EditBookPage() {
         if (bookRes.ok) {
           const bookData = await bookRes.json();
           setBook(bookData);
+          setCurrentPdfUrl(bookData.pdfUrl ?? null);
           setFormData({
             title: bookData.title || '',
             authors: bookData.authors?.join(', ') || '',
@@ -220,6 +230,37 @@ export default function EditBookPage() {
       toast.error('Failed to update book');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+      toast.error('Only PDF files are allowed');
+      return;
+    }
+    setIsUploadingPdf(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch(`/api/books/${params.id}/pdf`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentPdfUrl(data.pdfUrl);
+        toast.success('PDF uploaded successfully');
+      } else {
+        toast.error(await extractApiError(response, 'Failed to upload PDF'));
+      }
+    } catch {
+      toast.error('Failed to upload PDF');
+    } finally {
+      setIsUploadingPdf(false);
+      if (pdfInputRef.current) pdfInputRef.current.value = '';
     }
   };
 
@@ -547,6 +588,65 @@ export default function EditBookPage() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Book PDF */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+          <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
+            Book PDF
+          </h2>
+          <input
+            ref={pdfInputRef}
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            onChange={handlePdfUpload}
+          />
+          {currentPdfUrl ? (
+            <div className="flex items-center justify-between rounded-lg bg-green-50 p-4 dark:bg-green-900/20">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                <div>
+                  <p className="text-sm font-medium text-green-800 dark:text-green-300">PDF uploaded</p>
+                  <a
+                    href={currentPdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-green-600 underline dark:text-green-400"
+                  >
+                    View PDF
+                  </a>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => pdfInputRef.current?.click()}
+                disabled={isUploadingPdf}
+                className="flex items-center gap-2 rounded-lg border border-green-300 px-3 py-1.5 text-sm font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-900/40"
+              >
+                {isUploadingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                Replace
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 p-8 text-center dark:border-gray-600">
+              <FileText className="mb-2 h-10 w-10 text-gray-400" />
+              <p className="mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">No PDF attached</p>
+              <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">Upload a PDF for AI-powered search and RAG (max 50 MB)</p>
+              <button
+                type="button"
+                onClick={() => pdfInputRef.current?.click()}
+                disabled={isUploadingPdf}
+                className="flex items-center gap-2 rounded-lg bg-primary-500 px-4 py-2 text-sm font-medium text-white hover:bg-primary-600 disabled:opacity-50"
+              >
+                {isUploadingPdf ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" />Uploading...</>
+                ) : (
+                  <><Upload className="h-4 w-4" />Upload PDF</>
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Current Copies */}

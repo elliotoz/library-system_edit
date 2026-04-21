@@ -253,6 +253,9 @@ model Book {
   // Cover image
   coverImageUrl String?
 
+  // PDF (for RAG ingestion)
+  pdfUrl String?
+
   // Source tracking
   source String @default("Manual") // Gutendex, OpenLibrary, Manual, etc.
 

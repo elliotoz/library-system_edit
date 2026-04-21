@@ -91,7 +91,7 @@ export class BorrowsService {
   async findAllActiveBorrowsForAdmin() {
     const borrows = await this.prisma.borrow.findMany({
       where: {
-        status: BorrowStatus.ACTIVE,
+        status: { in: [BorrowStatus.ACTIVE, BorrowStatus.OVERDUE] },
       },
       include: {
         user: {

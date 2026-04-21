@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { extractApiError } from '@/lib/api-error';
 
 interface Book {
   id: string;
@@ -63,8 +64,8 @@ export default function ManageBooksPage() {
     return () => clearTimeout(debounce);
   }, [search]);
 
-  const handleDelete = async (bookId: string) => {
-    if (!confirm('Are you sure you want to delete this book?')) return;
+  const handleDelete = async (bookId: string, title: string) => {
+    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
     try {
       const response = await fetch(`/api/books/${bookId}`, {
         method: 'DELETE',
@@ -74,9 +75,9 @@ export default function ManageBooksPage() {
         toast.success('Book deleted');
         fetchBooks();
       } else {
-        toast.error('Failed to delete book');
+        toast.error(await extractApiError(response, 'Failed to delete book'));
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to delete book');
     }
   };
@@ -188,8 +189,14 @@ export default function ManageBooksPage() {
                           <Edit className="h-4 w-4" />
                         </Link>
                         <button
-                          onClick={() => handleDelete(book.id)}
-                          className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                          onClick={() => handleDelete(book.id, book.title)}
+                          disabled={book.totalCopies > book.availableCopies}
+                          title={
+                            book.totalCopies > book.availableCopies
+                              ? 'Cannot delete — some copies are currently borrowed or reserved'
+                              : 'Delete book'
+                          }
+                          className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-400"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
