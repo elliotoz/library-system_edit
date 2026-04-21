@@ -9,6 +9,11 @@ import { SemanticSearchService } from './semantic-search.service';
 import { LearningPathService } from './learning-path.service';
 import { ResearchAssistantService } from './research-assistant.service';
 import { GroqService } from './groq.service';
+import { FileExtractService } from './file-extract.service';
+import { GroqProvider } from './providers/groq.provider';
+import { GeminiProvider } from './providers/gemini.provider';
+import { AnthropicProvider } from './providers/anthropic.provider';
+import { ProviderFactory } from './providers/provider-factory';
 import { UsersModule } from '../users/users.module';
 import { PrismaModule } from '../prisma/prisma.module';
 
@@ -25,7 +30,12 @@ import { PrismaModule } from '../prisma/prisma.module';
     LearningPathService,
     ResearchAssistantService,
     GroqService,
+    FileExtractService,
+    GroqProvider,
+    GeminiProvider,
+    AnthropicProvider,
+    ProviderFactory,
   ],
-  exports: [GroqService, AgentService],
+  exports: [GroqService, AgentService, ProviderFactory],
 })
 export class AiModule {}
