@@ -253,13 +253,22 @@ export default function BookDetailPage() {
         <p className="mb-6 text-gray-500 dark:text-gray-400">
           This book may have been removed or the link is incorrect.
         </p>
-        <button
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary-500 px-5 py-2.5 font-medium text-white transition-colors hover:bg-primary-600"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Go Back
-        </button>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <button
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-5 py-2.5 font-medium text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Go Back
+          </button>
+          <Link
+            href="/dashboard/catalog"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary-500 px-5 py-2.5 font-medium text-white transition-colors hover:bg-primary-600"
+          >
+            <BookOpen className="h-4 w-4" />
+            Search Catalog
+          </Link>
+        </div>
       </div>
     );
   }

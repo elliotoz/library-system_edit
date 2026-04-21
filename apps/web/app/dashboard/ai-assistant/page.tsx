@@ -7,14 +7,23 @@ import { Send, ImageIcon, X, BookOpen, History, Plus, Trash2, MessageSquare } fr
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { renderMessage } from '@/lib/renderMessage';
+import { BookCitationCards } from '@/components/BookCitationCards';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
+
+interface BookCitation {
+  title: string;
+  catalogLink: string;
+  available: boolean;
+  copies: string;
+}
 
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   imagePreview?: string;
+  citations?: BookCitation[];
 }
 
 interface Conversation {
@@ -317,11 +326,18 @@ export default function AIAssistantPage() {
           const raw = line.slice(6).trim();
           if (raw === '[DONE]') break;
           try {
-            const parsed = JSON.parse(raw) as { text?: string; error?: string };
+            const parsed = JSON.parse(raw) as { text?: string; books?: BookCitation[]; error?: string };
             if (parsed.text) {
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === assistantMsgId ? { ...m, content: m.content + parsed.text } : m,
+                ),
+              );
+            }
+            if (parsed.books) {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMsgId ? { ...m, citations: parsed.books } : m,
                 ),
               );
             }
@@ -604,6 +620,9 @@ export default function AIAssistantPage() {
                   {msg.role === 'assistant' ? (
                     <div className="leading-relaxed">
                       {renderMessage(msg.content)}
+                      {msg.citations && msg.citations.length > 0 && (
+                        <BookCitationCards citations={msg.citations} />
+                      )}
                       {isStreaming && isLast && (
                         <span className="inline-block w-2 h-4 bg-[#2A9D9D] rounded-sm animate-pulse ml-0.5 align-middle" />
                       )}

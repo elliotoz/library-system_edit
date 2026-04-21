@@ -6,7 +6,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AiService } from './ai.service';
-import { AgentService } from './agent.service';
+import { AgentService, ChatChunk } from './agent.service';
 import { OllamaService } from './ollama.service';
 import { UpdateInterestsDto } from './dto/update-interests.dto';
 import { ScanCoverDto } from './dto/scan-cover.dto';
@@ -110,7 +110,11 @@ export class AiController {
       );
 
       for await (const chunk of stream) {
-        res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+        if (chunk.type === 'text') {
+          res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+        } else {
+          res.write(`data: ${JSON.stringify({ books: chunk.books })}\n\n`);
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';

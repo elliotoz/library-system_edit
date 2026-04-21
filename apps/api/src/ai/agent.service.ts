@@ -4,6 +4,17 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CatalogSearchService } from './catalog-search.service';
 import { BorrowStatus } from '@prisma/client';
 
+export interface BookCitation {
+  title: string;
+  catalogLink: string;
+  available: boolean;
+  copies: string;
+}
+
+export type ChatChunk =
+  | { type: 'text'; text: string }
+  | { type: 'books'; books: BookCitation[] };
+
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger(AgentService.name);
@@ -227,7 +238,7 @@ You have direct, real-time access to the library database through these tools.
     args: Record<string, unknown>,
     userId: string,
     cookieHeader: string,
-  ): Promise<string> {
+  ): Promise<{ result: string; citations: BookCitation[] }> {
     const API_BASE = 'http://localhost:3001';
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -238,27 +249,40 @@ You have direct, real-time access to the library database through these tools.
       switch (name) {
         case 'search_catalog': {
           const pageSize = Math.min((args.pageSize as number) || 5, 10);
-          const result = await this.catalogSearch.searchForAgent(args.query as string, pageSize);
-          if (result.total === 0) return 'No books found for that search.';
-          // Return preformatted lines — links are already correct; reproduce verbatim
-          return this.catalogSearch.formatSearchResults(result);
+          const searchResult = await this.catalogSearch.searchForAgent(args.query as string, pageSize);
+          if (searchResult.total === 0) {
+            return { result: 'No books found for that search.', citations: [] };
+          }
+          const citations: BookCitation[] = searchResult.results.map((b) => ({
+            title: b.title,
+            catalogLink: b.catalogLink,
+            available: b.available,
+            copies: b.copies,
+          }));
+          return {
+            result: this.catalogSearch.formatSearchResults(searchResult),
+            citations,
+          };
         }
 
         case 'get_book_details': {
           const res = await fetch(`${API_BASE}/books/${args.bookId as string}`, { headers });
-          if (!res.ok) return 'Book not found.';
+          if (!res.ok) return { result: 'Book not found.', citations: [] };
           const book = await res.json() as Record<string, unknown>;
-          return JSON.stringify({
-            id: book.id, title: book.title, authors: book.authors,
-            description: book.description, publisher: book.publisher,
-            year: book.publicationYear, pages: book.pageCount,
-            isbn: book.isbn, language: book.language,
-            isEbook: book.isEbookAvailable,
-            ebookUrl: book.ebookUrl ?? null,
-            availableCopies: book.availableCopies, totalCopies: book.totalCopies,
-            isAvailable: book.isAvailable, subjects: book.subjectTags,
-            catalogLink: `/dashboard/catalog/${book.id}`,
-          });
+          return {
+            result: JSON.stringify({
+              id: book.id, title: book.title, authors: book.authors,
+              description: book.description, publisher: book.publisher,
+              year: book.publicationYear, pages: book.pageCount,
+              isbn: book.isbn, language: book.language,
+              isEbook: book.isEbookAvailable,
+              ebookUrl: book.ebookUrl ?? null,
+              availableCopies: book.availableCopies, totalCopies: book.totalCopies,
+              isAvailable: book.isAvailable, subjects: book.subjectTags,
+              catalogLink: `/dashboard/catalog/${book.id}`,
+            }),
+            citations: [],
+          };
         }
 
         case 'read_ebook': {
@@ -276,7 +300,7 @@ You have direct, real-time access to the library database through these tools.
           const excerpt = text.length > 4000
             ? text.substring(0, 4000) + '\n\n[Excerpt — full book available at original URL]'
             : text;
-          return `E-BOOK CONTENT (for: ${args.question as string}):\n\n${excerpt}`;
+          return { result: `E-BOOK CONTENT (for: ${args.question as string}):\n\n${excerpt}`, citations: [] };
         }
 
         case 'fetch_webpage': {
@@ -292,7 +316,7 @@ You have direct, real-time access to the library database through these tools.
             .replace(/\s+/g, ' ')
             .trim()
             .substring(0, 3000);
-          return `WEB PAGE (${args.url as string}):\n\n${text}`;
+          return { result: `WEB PAGE (${args.url as string}):\n\n${text}`, citations: [] };
         }
 
         case 'get_my_borrows': {
@@ -302,7 +326,7 @@ You have direct, real-time access to the library database through these tools.
               bookCopy: { include: { book: { select: { title: true } } } },
             },
           });
-          if (!borrows.length) return 'No active borrows.';
+          if (!borrows.length) return { result: 'No active borrows.', citations: [] };
           const now = new Date();
           const mapped = borrows.map((b) => {
             const daysLeft = Math.ceil((new Date(b.dueAt).getTime() - now.getTime()) / 86400000);
@@ -313,7 +337,7 @@ You have direct, real-time access to the library database through these tools.
               isOverdue: daysLeft < 0,
             };
           });
-          return JSON.stringify(mapped);
+          return { result: JSON.stringify(mapped), citations: [] };
         }
 
         case 'get_catalog_stats': {
@@ -326,14 +350,13 @@ You have direct, real-time access to the library database through these tools.
               this.prisma.book.count({ where: { isEbookAvailable: true } }),
               this.prisma.borrow.count({ where: { status: 'ACTIVE' } }),
             ]);
-          return JSON.stringify({
-            totalBooks,
-            totalCopies,
-            availableCopies,
-            borrowedCopies,
-            ebookCount,
-            activeBorrows: activeborrows,
-          });
+          return {
+            result: JSON.stringify({
+              totalBooks, totalCopies, availableCopies, borrowedCopies, ebookCount,
+              activeBorrows: activeborrows,
+            }),
+            citations: [],
+          };
         }
 
         case 'get_active_borrows': {
@@ -358,20 +381,23 @@ You have direct, real-time access to the library database through these tools.
             `,
           ]);
           const now = new Date();
-          return JSON.stringify({
-            activeBorrowCount: activeBorrows.length,
-            activeBorrows: activeBorrows.map((b) => ({
-              book: b.bookCopy.book.title,
-              borrower: b.user.name,
-              role: b.user.role,
-              dueAt: b.dueAt,
-              daysLeft: Math.ceil((new Date(b.dueAt).getTime() - now.getTime()) / 86400000),
-            })),
-            mostBorrowedBooks: mostBorrowed.map((r) => ({
-              title: r.title,
-              borrowCount: Number(r.borrow_count),
-            })),
-          });
+          return {
+            result: JSON.stringify({
+              activeBorrowCount: activeBorrows.length,
+              activeBorrows: activeBorrows.map((b) => ({
+                book: b.bookCopy.book.title,
+                borrower: b.user.name,
+                role: b.user.role,
+                dueAt: b.dueAt,
+                daysLeft: Math.ceil((new Date(b.dueAt).getTime() - now.getTime()) / 86400000),
+              })),
+              mostBorrowedBooks: mostBorrowed.map((r) => ({
+                title: r.title,
+                borrowCount: Number(r.borrow_count),
+              })),
+            }),
+            citations: [],
+          };
         }
 
         case 'get_active_reservations': {
@@ -385,27 +411,30 @@ You have direct, real-time access to the library database through these tools.
             orderBy: { createdAt: 'desc' },
             take: 20,
           });
-          if (!reservations.length) return 'No active reservations.';
-          return JSON.stringify({
-            count: reservations.length,
-            reservations: reservations.map((r) => ({
-              book: r.bookCopy.book.title,
-              user: r.user.name,
-              status: r.status,
-              branch: r.branch.name,
-              createdAt: r.createdAt,
-              pickupDeadline: r.pickupDeadline,
-            })),
-          });
+          if (!reservations.length) return { result: 'No active reservations.', citations: [] };
+          return {
+            result: JSON.stringify({
+              count: reservations.length,
+              reservations: reservations.map((r) => ({
+                book: r.bookCopy.book.title,
+                user: r.user.name,
+                status: r.status,
+                branch: r.branch.name,
+                createdAt: r.createdAt,
+                pickupDeadline: r.pickupDeadline,
+              })),
+            }),
+            citations: [],
+          };
         }
 
         default:
-          return 'Unknown tool.';
+          return { result: 'Unknown tool.', citations: [] };
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.warn(`Tool ${name} failed: ${msg}`);
-      return `Tool error: ${msg}`;
+      return { result: `Tool error: ${msg}`, citations: [] };
     }
   }
 
@@ -419,7 +448,7 @@ You have direct, real-time access to the library database through these tools.
     imageBase64: string | null,
     cookieHeader: string,
     conversationId?: string,
-  ): AsyncGenerator<string> {
+  ): AsyncGenerator<ChatChunk> {
     // Load user context
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -435,7 +464,7 @@ You have direct, real-time access to the library database through these tools.
     });
 
     if (!user) {
-      yield 'User not found.';
+      yield { type: 'text', text: 'User not found.' };
       return;
     }
 
@@ -487,6 +516,7 @@ You have direct, real-time access to the library database through these tools.
     ];
 
     // Agent loop — max 3 rounds
+    const allCitations: BookCitation[] = [];
     let round = 0;
     while (round < 3) {
       round++;
@@ -505,8 +535,11 @@ You have direct, real-time access to the library database through these tools.
 
         for (const toolCall of msg.tool_calls) {
           const args = (toolCall.function?.arguments ?? {}) as Record<string, unknown>;
-          const result = await this.executeTool(toolCall.function.name, args, userId, cookieHeader);
+          const { result, citations } = await this.executeTool(
+            toolCall.function.name, args, userId, cookieHeader,
+          );
           messages.push({ role: 'tool', content: result });
+          allCitations.push(...citations);
         }
         continue;
       }
@@ -523,15 +556,23 @@ You have direct, real-time access to the library database through these tools.
         const text = chunk.message?.content ?? '';
         if (text) {
           fullResponse += text;
-          yield text;
+          yield { type: 'text', text };
         }
       }
 
       // Fallback for empty image response
       if (!fullResponse && hasImage) {
         const fallback = 'I received your image but could not analyse it. Make sure the llava model is running: `ollama pull llava:13b`.';
-        yield fallback;
+        yield { type: 'text', text: fallback };
         fullResponse = fallback;
+      }
+
+      // Emit deduplicated book citations before saving
+      const uniqueCitations = Array.from(
+        new Map(allCitations.map((c) => [c.catalogLink, c])).values(),
+      );
+      if (uniqueCitations.length > 0) {
+        yield { type: 'books', books: uniqueCitations };
       }
 
       await this.saveMessage(userId, 'user', message, conversationId);
@@ -541,7 +582,7 @@ You have direct, real-time access to the library database through these tools.
 
     // Fallback if loop exhausted without final answer
     const fallback = 'I was unable to complete the request after multiple attempts. Please try again.';
-    yield fallback;
+    yield { type: 'text', text: fallback };
     await this.saveMessage(userId, 'user', message, conversationId);
     await this.saveMessage(userId, 'assistant', fallback, conversationId);
   }
