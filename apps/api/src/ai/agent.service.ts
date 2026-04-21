@@ -2,7 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import Groq from 'groq-sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogSearchService } from './catalog-search.service';
-import { BorrowStatus } from '@prisma/client';
+import { BorrowStatus, Role } from '@prisma/client';
+import { buildSystemPrompt as buildSystemPromptFromModule, PromptContext } from './prompts/system-prompt-builder';
 
 export interface BookCitation {
   title: string;
@@ -72,59 +73,6 @@ export class AgentService {
     return this.prisma.aiMessage.create({
       data: { userId, role, content, ...(conversationId ? { conversationId } : {}) },
     });
-  }
-
-  // ── System prompt ──────────────────────────────────────────────
-
-  private buildSystemPrompt(user: {
-    name: string;
-    role: string;
-    faculty?: { name: string } | null;
-    interests: string[];
-    activeBorrowsCount?: number;
-    borrowPolicy?: { maxActiveBorrows: number; maxBorrowDays: number; maxExtensions: number } | null;
-    borrows?: { book: { title: string } }[];
-  }): string {
-    const borrowTitles = user.borrows?.map((b) => b.book.title).join(', ') || 'nothing';
-    const today = new Date().toLocaleDateString('en-GB', {
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-    });
-
-    return `You are OZ AI — the AI assistant for AI Integrated Library System.
-You are smart, academic, friendly, and precise.
-Respond in English by default. Only switch to Turkish if the user's message is written in Turkish.
-
-## Current User
-Name: ${user.name}
-Role: ${user.role}
-Faculty: ${user.faculty?.name || 'Unknown'}
-Interests: ${user.interests.join(', ') || 'not set yet'}
-Currently Borrowed: ${borrowTitles}
-Active Borrows: ${user.activeBorrowsCount ?? 0} / ${user.borrowPolicy?.maxActiveBorrows ?? 5} max
-Borrow Policy: ${user.borrowPolicy?.maxBorrowDays ?? 14} days, ${user.borrowPolicy?.maxExtensions ?? 2} extensions
-
-## Your Capabilities
-You have tools to search the library catalog, count catalog stats, get book details,
-read and summarise e-books, fetch web pages, check your own borrows, and — for staff/admin —
-view all active borrows and reservations across the library.
-You have direct, real-time access to the library database through these tools.
-
-## Behaviour Rules
-- ALWAYS use a tool to answer library data questions. NEVER guess or invent numbers.
-- To count books: call get_catalog_stats — it returns exact totals from the database.
-- To search by title, author, topic, or subject: call search_catalog.
-- For specific book-title requests ("find X", "get X", "fetch X"): call search_catalog with the title as the query. Do NOT report "not found" until the tool has returned zero results.
-- For topic/concept requests ("books about X", "related to X", "X books"): call search_catalog.
-- When search_catalog returns formatted result lines, reproduce them verbatim in your reply.
-- When get_book_details returns a catalogLink field, use that exact value as the link: [Title](catalogLink). Never construct /dashboard/catalog/... manually.
-- Never use ebookUrl as the main link. Only mention it when the user explicitly asks to open/read/download e-book content.
-- To see active borrows or the most-borrowed book: call get_active_borrows.
-- To see active reservations: call get_active_reservations.
-- NEVER write Python, SQL, shell, or any code to answer a library question — call the tool.
-- For code questions (user explicitly asking to write code), reply with a code block only.
-- When summarising a book, call read_ebook first — never invent summaries.
-- Use markdown: bullet points for lists, headings for long answers, fenced code blocks for code.
-- Be concise. Today is ${today}.`;
   }
 
   // ── Tools ──────────────────────────────────────────────────────
@@ -459,12 +407,32 @@ You have direct, real-time access to the library database through these tools.
     }
 
     const policy = await this.prisma.borrowPolicy.findUnique({ where: { role: user.role } });
-    const borrowsForPrompt = user.borrows.map((b) => ({ book: { title: b.bookCopy.book.title } }));
-    const systemPrompt = this.buildSystemPrompt({
-      name: user.name, role: user.role, faculty: user.faculty,
-      interests: user.interests, activeBorrowsCount: user.borrows.length,
-      borrowPolicy: policy, borrows: borrowsForPrompt,
-    });
+
+    const [catalogTotalBooks, catalogAvailableCopies, publishedReadingLists] = await Promise.all([
+      this.prisma.book.count({ where: { isActive: true } }),
+      this.prisma.bookCopy.count({ where: { status: 'AVAILABLE' } }),
+      this.prisma.readingList.count({ where: { status: 'PUBLISHED' } }),
+    ]);
+
+    const promptContext: PromptContext = {
+      userName: user.name,
+      userRole: user.role as Role,
+      userFaculty: user.faculty?.name,
+      userInterests: user.interests,
+      activeBorrowsCount: user.borrows.length,
+      currentlyBorrowed: user.borrows.map((b) => b.bookCopy.book.title),
+      maxActiveBorrows: policy?.maxActiveBorrows ?? 5,
+      maxBorrowDays: policy?.maxBorrowDays ?? 14,
+      maxExtensions: policy?.maxExtensions ?? 2,
+      catalogTotalBooks,
+      catalogAvailableCopies,
+      publishedReadingLists,
+      topCategories: [],
+      currentDate: new Date().toLocaleDateString('en-GB', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+      }),
+    };
+    const systemPrompt = buildSystemPromptFromModule(promptContext);
 
     // Auto-title conversation
     if (conversationId) {
