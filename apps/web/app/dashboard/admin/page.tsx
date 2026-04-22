@@ -210,11 +210,7 @@ export default function AdminDashboard() {
       <motion.section {...CONTAINER_MOTION}>
         <GlassCard
           liquid
-          className="relative overflow-hidden rounded-[30px] border border-white/10 p-6 sm:p-7"
-          style={{
-            background:
-              'linear-gradient(135deg, rgba(4,14,27,0.88) 0%, rgba(10,30,46,0.82) 56%, rgba(7,24,39,0.9) 100%)',
-          }}
+          className="relative overflow-hidden rounded-[30px] border border-white/10 p-6 sm:p-7 bg-gradient-to-br from-slate-950/90 via-slate-900/85 to-slate-950/90"
         >
           <div className="pointer-events-none absolute inset-0">
             <Spotlight className="left-[45%] top-[-38%] opacity-100" fill="#5eead4" />
@@ -461,11 +457,7 @@ export default function AdminDashboard() {
 
           <GlassCard
             liquid
-            className="relative overflow-hidden rounded-[30px] border border-cyan-300/15 p-5 sm:p-6"
-            style={{
-              background:
-                'linear-gradient(180deg, rgba(17,58,74,0.18) 0%, rgba(8,19,31,0.06) 100%)',
-            }}
+            className="relative overflow-hidden rounded-[30px] border border-cyan-300/15 p-5 sm:p-6 bg-gradient-to-b from-teal-900/20 to-slate-950/10"
           >
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(45,212,191,0.18),transparent_25%),radial-gradient(circle_at_left,rgba(125,211,252,0.14),transparent_20%)]" />
             <div className="relative">
