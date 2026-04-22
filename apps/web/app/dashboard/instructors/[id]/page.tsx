@@ -106,7 +106,7 @@ export default function InstructorProfilePage() {
             {profile.readingLists.length} reading list{profile.readingLists.length !== 1 ? 's' : ''}
           </p>
         </div>
-        {!isSelf && (
+        {!isSelf && user?.role !== 'ADMIN' && (
           <button
             onClick={handleToggleFollow}
             disabled={isToggling}
