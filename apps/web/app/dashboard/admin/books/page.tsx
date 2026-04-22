@@ -14,6 +14,7 @@ import {
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { extractApiError } from '@/lib/api-error';
+import { AdminPageLayout } from '@/components/dashboard/AdminPageLayout';
 
 interface Book {
   id: string;
@@ -83,14 +84,10 @@ export default function ManageBooksPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Manage Books</h1>
-          <p className="mt-1 text-gray-500 dark:text-gray-400">
-            Add, edit, and manage library books
-          </p>
-        </div>
+    <AdminPageLayout
+      title="Manage Books"
+      description="Add, edit, and manage library books"
+      action={
         <Link
           href="/dashboard/admin/books/new"
           className="flex items-center gap-2 rounded-lg bg-primary-500 px-4 py-2 text-white hover:bg-primary-600"
@@ -98,8 +95,8 @@ export default function ManageBooksPage() {
           <Plus className="h-4 w-4" />
           Add Book
         </Link>
-      </div>
-
+      }
+    >
       <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-gray-400" />
@@ -232,6 +229,6 @@ export default function ManageBooksPage() {
           </div>
         )}
       </div>
-    </div>
+    </AdminPageLayout>
   );
 }
