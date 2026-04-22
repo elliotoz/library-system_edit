@@ -86,8 +86,8 @@ export default function ManageBooksPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Manage Books</h1>
-          <p className="mt-1 text-gray-500">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Manage Books</h1>
+          <p className="mt-1 text-gray-500 dark:text-gray-400">
             Add, edit, and manage library books
           </p>
         </div>
@@ -100,7 +100,7 @@ export default function ManageBooksPage() {
         </Link>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-4">
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-gray-400" />
           <input
@@ -111,12 +111,12 @@ export default function ManageBooksPage() {
               setSearch(e.target.value);
               setPage(1);
             }}
-            className="w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-primary-400"
+            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-primary-400"
           />
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         {isLoading ? (
           <div className="p-8 text-center">
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
@@ -124,48 +124,48 @@ export default function ManageBooksPage() {
         ) : books.length === 0 ? (
           <div className="p-8 text-center">
             <BookOpen className="mx-auto mb-4 h-12 w-12 text-gray-300" />
-            <p className="text-gray-500">No books found</p>
+            <p className="text-gray-500 dark:text-gray-400">No books found</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="border-b border-gray-200 bg-gray-50">
+              <thead className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
                     Book
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
                     ISBN
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
                     Category
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
                     Copies
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
+                  <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {books.map((book) => (
-                  <tr key={book.id} className="hover:bg-gray-50">
+                  <tr key={book.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                     <td className="px-6 py-4">
                       <Link
                         href={`/dashboard/catalog/${book.id}`}
-                        className="font-medium text-gray-900 hover:text-primary-600"
+                        className="font-medium text-gray-900 dark:text-white hover:text-primary-600"
                       >
                         {book.title}
                       </Link>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
                         {book.authors.join(', ')}
                       </p>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
+                    <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                       {book.isbn || '-'}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
+                    <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                       {book.category || '-'}
                     </td>
                     <td className="px-6 py-4">
@@ -184,7 +184,7 @@ export default function ManageBooksPage() {
                       <div className="flex items-center justify-end gap-2">
                         <Link
                           href={`/dashboard/admin/books/${book.id}/edit`}
-                          className="rounded-lg p-2 text-gray-400 hover:bg-primary-50 hover:text-primary-600"
+                          className="rounded-lg p-2 text-gray-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary-600"
                         >
                           <Edit className="h-4 w-4" />
                         </Link>
@@ -196,7 +196,7 @@ export default function ManageBooksPage() {
                               ? 'Cannot delete — some copies are currently borrowed or reserved'
                               : 'Delete book'
                           }
-                          className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-400"
+                          className="rounded-lg p-2 text-gray-400 dark:text-gray-500 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-400"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -209,22 +209,22 @@ export default function ManageBooksPage() {
           </div>
         )}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-gray-200 px-6 py-3">
-            <p className="text-sm text-gray-500">
+          <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-6 py-3">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               Page {page} of {totalPages}
             </p>
             <div className="flex gap-2">
               <button
                 onClick={() => setPage(page - 1)}
                 disabled={page === 1}
-                className="rounded-lg border border-gray-200 p-2 hover:bg-gray-50 disabled:opacity-50"
+                className="rounded-lg border border-gray-200 dark:border-gray-700 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setPage(page + 1)}
                 disabled={page === totalPages}
-                className="rounded-lg border border-gray-200 p-2 hover:bg-gray-50 disabled:opacity-50"
+                className="rounded-lg border border-gray-200 dark:border-gray-700 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
