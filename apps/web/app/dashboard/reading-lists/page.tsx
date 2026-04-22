@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
 import { BookOpen, Lock, Users, FileText, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -10,6 +11,8 @@ import { ReadingList } from '@/types';
 export default function ReadingListsFeedPage() {
   const [lists, setLists] = useState<ReadingList[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
 
   useEffect(() => {
     readingListsApi
@@ -38,6 +41,18 @@ export default function ReadingListsFeedPage() {
           Discover reading lists published by instructors
         </p>
       </div>
+
+      {isAdmin && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <p className="text-sm text-blue-900 dark:text-blue-300">
+            As an administrator, you can moderate all reading lists from the{' '}
+            <Link href="/dashboard/admin/reading-lists" className="font-semibold underline">
+              Admin Reading Lists Dashboard
+            </Link>
+            .
+          </p>
+        </div>
+      )}
 
       {lists.length === 0 ? (
         <div className="glass-card p-8 text-center">
