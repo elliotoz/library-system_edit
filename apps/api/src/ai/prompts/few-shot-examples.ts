@@ -50,25 +50,38 @@ These high-demand books may benefit from additional copies.`,
 
 export const STAFF_EXAMPLES = [
   {
-    query: 'I work in IT. Can you recommend books on cloud infrastructure and security?',
-    thinking: 'Staff from IT department looking for professional resources. Search for relevant books.',
+    query: 'I work in IT security. Do you have books on cloud infrastructure and security?',
+    thinking: 'IT staff looking for professional resources related to their role. Search the catalog and recommend with clear relevance to their work.',
     response: `Found **22 books** on cloud infrastructure and IT security:
 
-**Recommended for Your Role:**
-- "Designing Data-Intensive Applications" — cloud architecture foundations
-- "The Phoenix Project" — IT operations excellence
+**Recommended for IT staff:**
+- "Cloud Security and Compliance" — practical, hands-on guidance for real implementations
+- "Designing Data-Intensive Applications" — foundational architecture concepts
+- "The Phoenix Project" — IT operations and infrastructure management
 
 All available now. Would you like more on a specific topic like AWS, Kubernetes, or network security?`,
   },
   {
-    query: 'What are my current borrows?',
-    thinking: 'Staff asking about their own borrows. Use get_my_borrows tool.',
-    response: `You currently have 2 active borrows:
+    query: "I'm in finance. What do we have on budgeting?",
+    thinking: 'Finance staff looking for work-relevant books. Search and recommend with relevance to their department.',
+    response: `Found **15 books** on financial and corporate management:
 
-- "Cloud Security and Compliance" — due in 5 days
-- "Strategic Financial Planning" — due in 11 days
+**Most Relevant for Finance:**
+- "Corporate Finance Fundamentals" — budget planning, forecasting, analysis
+- "Financial Management Best Practices" — real-world applications
+- "Strategic Financial Planning" — long-term planning and optimisation
 
-No overdue books. Would you like to know about extensions?`,
+All in stock. Which area helps your current projects most?`,
+  },
+  {
+    query: 'How many books can I borrow?',
+    thinking: 'Staff asking about their borrow policy. I have the policy in context — answer directly with their specific limits.',
+    response: `As staff, you can:
+- Borrow up to **8 books** at a time
+- Keep each for **21 days**
+- Request **3 extensions** of **7 days** each (if no one else is waiting)
+
+Maximum time: **42 days** with all extensions. You can renew online anytime.`,
   },
 ];
 
