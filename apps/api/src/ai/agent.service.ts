@@ -215,7 +215,7 @@ export class AgentService {
     try { await this.toolHookService.runPreHook(hookContext); } catch { /* hooks must not break execution */ }
 
     try {
-      const toolResult = await this.executeToolInner(name, args, userId, cookieHeader, headers);
+      const toolResult = await this.executeToolInner(name, args, userId, userRole, cookieHeader, headers);
       try {
         await this.toolHookService.runPostHook(hookContext, {
           success: true,
@@ -232,10 +232,29 @@ export class AgentService {
     }
   }
 
+  /** Block localhost, RFC-1918, link-local, and the local API to prevent SSRF. */
+  private assertSafeUrl(url: string): void {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new Error(`Invalid URL: ${url}`);
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error('Only http and https URLs are allowed');
+    }
+    const host = parsed.hostname.toLowerCase();
+    const blocked = /^(localhost|127\.|::1$|0\.0\.0\.0|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.)/.test(host);
+    if (blocked) {
+      throw new Error(`Blocked URL: requests to internal addresses are not allowed`);
+    }
+  }
+
   private async executeToolInner(
     name: string,
     args: Record<string, unknown>,
     userId: string,
+    userRole: string,
     cookieHeader: string,
     headers: Record<string, string>,
   ): Promise<{ result: string; citations: BookCitation[] }> {
@@ -280,6 +299,7 @@ export class AgentService {
         }
 
         case 'read_ebook': {
+          this.assertSafeUrl(args.url as string);
           const res = await fetch(args.url as string, {
             headers: { 'User-Agent': 'LibraryBotAI/1.0' },
             signal: AbortSignal.timeout(15000),
@@ -298,6 +318,7 @@ export class AgentService {
         }
 
         case 'fetch_webpage': {
+          this.assertSafeUrl(args.url as string);
           const res = await fetch(args.url as string, {
             headers: { 'User-Agent': 'LibraryBotAI/1.0' },
             signal: AbortSignal.timeout(10000),
@@ -344,6 +365,9 @@ export class AgentService {
         }
 
         case 'get_active_borrows': {
+          if (userRole !== 'ADMIN' && userRole !== 'STAFF') {
+            return { result: 'Access denied: this tool is only available to staff and administrators.', citations: [] };
+          }
           const [activeBorrows, mostBorrowed] = await Promise.all([
             this.prisma.borrow.findMany({
               where: { status: 'ACTIVE' },
@@ -379,6 +403,9 @@ export class AgentService {
         }
 
         case 'get_active_reservations': {
+          if (userRole !== 'ADMIN' && userRole !== 'STAFF') {
+            return { result: 'Access denied: this tool is only available to staff and administrators.', citations: [] };
+          }
           const reservations = await this.prisma.reservation.findMany({
             where: { status: { in: ['PENDING', 'READY_FOR_PICKUP'] } },
             include: {
@@ -403,6 +430,9 @@ export class AgentService {
         }
 
         case 'get_user_stats': {
+          if (userRole !== 'ADMIN') {
+            return { result: 'Access denied: this tool is only available to administrators.', citations: [] };
+          }
           const [total, students, admins] = await Promise.all([
             this.prisma.user.count(),
             this.prisma.user.count({ where: { role: 'STUDENT' } }),
