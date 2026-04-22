@@ -14,6 +14,7 @@ import { GroqProvider } from './providers/groq.provider';
 import { GeminiProvider } from './providers/gemini.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
 import { ProviderFactory } from './providers/provider-factory';
+import { ToolHookService } from './tools/tool-hook.service';
 import { UsersModule } from '../users/users.module';
 import { PrismaModule } from '../prisma/prisma.module';
 
@@ -35,6 +36,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     GeminiProvider,
     AnthropicProvider,
     ProviderFactory,
+    ToolHookService,
   ],
   exports: [GroqService, AgentService, ProviderFactory],
 })

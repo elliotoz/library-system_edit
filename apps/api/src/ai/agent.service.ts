@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CatalogSearchService } from './catalog-search.service';
 import { BorrowStatus, BookCopyStatus } from '@prisma/client';
 import { buildSystemPrompt as buildSystemPromptFromModule, PromptContext } from './prompts/system-prompt-builder';
+import { ToolHookService } from './tools/tool-hook.service';
+import { ToolExecutionContext } from './tools/tool-hooks';
 
 export interface BookCitation {
   title: string;
@@ -24,6 +26,7 @@ export class AgentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly catalogSearch: CatalogSearchService,
+    private readonly toolHookService: ToolHookService,
   ) {
     this.groq = new Groq({ apiKey: process.env.GROQ_API_KEY || '' });
   }
@@ -185,13 +188,49 @@ export class AgentService {
     name: string,
     args: Record<string, unknown>,
     userId: string,
+    userRole: string,
     cookieHeader: string,
   ): Promise<{ result: string; citations: BookCitation[] }> {
-    const API_BASE = 'http://localhost:3001';
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Cookie: cookieHeader,
     };
+
+    const hookContext: ToolExecutionContext = {
+      toolName: name,
+      arguments: args,
+      userId,
+      userRole,
+      timestamp: new Date(),
+    };
+
+    const startTime = Date.now();
+    await this.toolHookService.runPreHook(hookContext);
+
+    try {
+      const toolResult = await this.executeToolInner(name, args, userId, cookieHeader, headers);
+      await this.toolHookService.runPostHook(hookContext, {
+        success: true,
+        data: toolResult.result,
+        executionTimeMs: Date.now() - startTime,
+      });
+      return toolResult;
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      await this.toolHookService.runErrorHook(hookContext, error);
+      this.logger.warn(`Tool ${name} failed: ${error.message}`);
+      return { result: `Tool error: ${error.message}`, citations: [] };
+    }
+  }
+
+  private async executeToolInner(
+    name: string,
+    args: Record<string, unknown>,
+    userId: string,
+    cookieHeader: string,
+    headers: Record<string, string>,
+  ): Promise<{ result: string; citations: BookCitation[] }> {
+    const API_BASE = 'http://localhost:3001';
 
     try {
       switch (name) {
@@ -371,9 +410,7 @@ export class AgentService {
           return { result: 'Unknown tool.', citations: [] };
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Tool ${name} failed: ${msg}`);
-      return { result: `Tool error: ${msg}`, citations: [] };
+      throw err;
     }
   }
 
@@ -494,7 +531,7 @@ export class AgentService {
           // IMPORTANT: Groq returns arguments as a JSON string — must parse
           const args = JSON.parse(toolCall.function.arguments || '{}') as Record<string, unknown>;
           const { result, citations } = await this.executeTool(
-            toolCall.function.name, args, userId, cookieHeader,
+            toolCall.function.name, args, userId, user.role, cookieHeader,
           );
           messages.push({
             role: 'tool',
