@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import Groq from 'groq-sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogSearchService } from './catalog-search.service';
-import { BorrowStatus, Role } from '@prisma/client';
+import { BorrowStatus, BookCopyStatus } from '@prisma/client';
 import { buildSystemPrompt as buildSystemPromptFromModule, PromptContext } from './prompts/system-prompt-builder';
 
 export interface BookCitation {
@@ -410,13 +410,13 @@ export class AgentService {
 
     const [catalogTotalBooks, catalogAvailableCopies, publishedReadingLists] = await Promise.all([
       this.prisma.book.count({ where: { isActive: true } }),
-      this.prisma.bookCopy.count({ where: { status: 'AVAILABLE' } }),
-      this.prisma.readingList.count({ where: { status: 'PUBLISHED' } }),
+      this.prisma.bookCopy.count({ where: { status: BookCopyStatus.AVAILABLE } }),
+      this.prisma.readingList.count({ where: { status: 'PUBLISHED', isActive: true } }),
     ]);
 
     const promptContext: PromptContext = {
       userName: user.name,
-      userRole: user.role as Role,
+      userRole: user.role,
       userFaculty: user.faculty?.name,
       userInterests: user.interests,
       activeBorrowsCount: user.borrows.length,
@@ -427,7 +427,6 @@ export class AgentService {
       catalogTotalBooks,
       catalogAvailableCopies,
       publishedReadingLists,
-      topCategories: [],
       currentDate: new Date().toLocaleDateString('en-GB', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
       }),

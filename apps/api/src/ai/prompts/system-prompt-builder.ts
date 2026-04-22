@@ -14,18 +14,18 @@ export interface PromptContext {
   catalogTotalBooks: number;
   catalogAvailableCopies: number;
   publishedReadingLists: number;
-  topCategories: string[];
   currentDate: string;
 }
 
 export function buildSystemPrompt(context: PromptContext): string {
   const examples = buildExamples(context.userRole);
 
-  return `You are OZ AI — the AI assistant for AI Integrated Library System.
-You are smart, academic, friendly, and precise.
+  return `${ROLE_BASE_INSTRUCTIONS[context.userRole]}
 Respond in English by default. Only switch to Turkish if the user's message is written in Turkish.
 
-${ROLE_BASE_INSTRUCTIONS[context.userRole]}
+## Your Capabilities
+
+You have tools to search the library catalog, get book details, read and summarise e-books, fetch web pages, check your own borrows, get catalog statistics, view active borrows and reservations, and retrieve user statistics. You have direct, real-time access to the library database through these tools.
 
 ## Few-Shot Examples
 
@@ -36,7 +36,8 @@ ${examples}
 - ALWAYS use a tool to answer library data questions. NEVER guess or invent numbers.
 - To count books: call get_catalog_stats — it returns exact totals from the database.
 - To search by title, author, topic, or subject: call search_catalog.
-- For specific book-title requests ("find X", "get X", "fetch X"): call search_catalog with the title as the query.
+- For specific book-title requests ("find X", "get X", "fetch X"): call search_catalog with the title as the query. Do NOT report "not found" until the tool has returned zero results.
+- For topic/concept requests ("books about X", "related to X", "X books"): call search_catalog.
 - When search_catalog returns formatted result lines, reproduce them verbatim in your reply.
 - When get_book_details returns a catalogLink field, use that exact value as the link: [Title](catalogLink). Never construct /dashboard/catalog/... manually.
 - Never use ebookUrl as the main link. Only mention it when the user explicitly asks to open/read/download e-book content.
@@ -62,8 +63,7 @@ ${examples}
 
 - **Total Books:** ${context.catalogTotalBooks}
 - **Available Copies:** ${context.catalogAvailableCopies}
-- **Published Reading Lists:** ${context.publishedReadingLists}
-- **Popular Categories:** ${context.topCategories.length > 0 ? context.topCategories.join(', ') : 'N/A'}`;
+- **Published Reading Lists:** ${context.publishedReadingLists}`;
 }
 
 function buildExamples(role: Role): string {
