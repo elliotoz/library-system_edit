@@ -4,6 +4,33 @@ Purpose: Track every change, why it was done, and how it was verified.
 
 ---
 
+## 2026-04-22 — AI Layer Enhancement Plan (Tasks 1–4)
+
+**Goal**: Execute the full AI_LAYER_ENHANCEMENT_PLAN — provider abstraction, role-based prompts, tool hooks, token tracking.
+
+**Branch**: `v2-ai-upgrade`
+
+### Task 1 — Provider Abstraction Layer
+Created `apps/api/src/ai/providers/` with `provider.interface.ts`, `groq.provider.ts`, `gemini.provider.ts`, `anthropic.provider.ts`, `provider-factory.ts`. Factory routes by model prefix; `getDefaultProvider()` prefers Anthropic → Groq → Gemini. All providers check `isAvailable()` before routing; JSON.parse is guarded; Gemini warns on tool calls; real `usageMetadata` token counts. Registered in `ai.module.ts`.
+
+### Task 2 — Enhanced Role-Based System Prompts
+Created `apps/api/src/ai/prompts/` with `few-shot-examples.ts` (2 examples per role), `role-prompts.ts` (ROLE_BASE_INSTRUCTIONS + ROLE_BEHAVIORAL_EXAMPLES for all 4 roles), `system-prompt-builder.ts` (buildSystemPrompt with PromptContext). Replaced inline 50-line system prompt in `agent.service.ts` with the new builder. Added live catalog stat queries (totalBooks, availableCopies, publishedReadingLists) before each prompt build. Fixed: duplicate identity, missing search-safety rules, topCategories stub removed, BookCopyStatus enum used.
+
+### Task 3 — Tool Lifecycle Hooks
+Created `apps/api/src/ai/tools/tool-hooks.ts` (ToolExecutionContext, ToolResult, hook types) and `tool-hook.service.ts` (@Injectable with runPreHook/runPostHook/runErrorHook via NestJS Logger). Split `executeTool()` into coordinator + `executeToolInner()`. All hook calls wrapped in isolated try/catch so hook failures never break tool execution. Safe JSON.stringify with [unserializable] fallback.
+
+### Task 4 — Token Usage Tracking
+Created `apps/api/src/ai/session/token-tracker.service.ts` — in-memory Map capped at 500 keys / 1000 records per key (FIFO eviction both levels). Records `prompt_tokens` + `completion_tokens` from every Groq response in the agent loop. Added `GET /ai/metrics?conversationId=` endpoint in `ai.controller.ts` gated by JwtAuthGuard; validates conversationId ownership via `conversationBelongsToUser()` before returning summary.
+
+### Security fixes (post-review)
+- `assertSafeUrl()`: blocks localhost, 127.x, ::1, RFC-1918 (10.x, 172.16-31.x, 192.168.x), link-local (169.254.x), non-http(s) protocols — applied to `read_ebook` and `fetch_webpage`
+- Role guards on admin-only tools: `get_active_borrows` / `get_active_reservations` (ADMIN+STAFF only), `get_user_stats` (ADMIN only)
+- `userRole` threaded from `chatStream` → `executeTool` → `executeToolInner` for per-tool enforcement
+
+**Verified**: `tsc --noEmit` clean. Final review: READY TO MERGE.
+
+---
+
 ## 2026-03-29 — Security: token exposure fix, verify-email rate limit, error contract
 
 **Goal**: Close critical token exposure in user profile endpoint, add rate limiting to verification endpoints, standardize API error shape.
