@@ -205,19 +205,21 @@ export class AgentService {
     };
 
     const startTime = Date.now();
-    await this.toolHookService.runPreHook(hookContext);
+    try { await this.toolHookService.runPreHook(hookContext); } catch { /* hooks must not break execution */ }
 
     try {
       const toolResult = await this.executeToolInner(name, args, userId, cookieHeader, headers);
-      await this.toolHookService.runPostHook(hookContext, {
-        success: true,
-        data: toolResult.result,
-        executionTimeMs: Date.now() - startTime,
-      });
+      try {
+        await this.toolHookService.runPostHook(hookContext, {
+          success: true,
+          data: toolResult.result,
+          executionTimeMs: Date.now() - startTime,
+        });
+      } catch { /* hooks must not break execution */ }
       return toolResult;
     } catch (err: unknown) {
       const error = err instanceof Error ? err : new Error(String(err));
-      await this.toolHookService.runErrorHook(hookContext, error);
+      try { await this.toolHookService.runErrorHook(hookContext, error); } catch { /* hooks must not break execution */ }
       this.logger.warn(`Tool ${name} failed: ${error.message}`);
       return { result: `Tool error: ${error.message}`, citations: [] };
     }
@@ -232,8 +234,7 @@ export class AgentService {
   ): Promise<{ result: string; citations: BookCitation[] }> {
     const API_BASE = 'http://localhost:3001';
 
-    try {
-      switch (name) {
+    switch (name) {
         case 'search_catalog': {
           const pageSize = Math.min((args.pageSize as number) || 5, 10);
           const searchResult = await this.catalogSearch.searchForAgent(args.query as string, pageSize);
@@ -409,9 +410,6 @@ export class AgentService {
         default:
           return { result: 'Unknown tool.', citations: [] };
       }
-    } catch (err: unknown) {
-      throw err;
-    }
   }
 
   // ── Agent streaming loop ───────────────────────────────────────

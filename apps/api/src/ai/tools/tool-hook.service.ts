@@ -6,8 +6,10 @@ export class ToolHookService {
   private readonly logger = new Logger(ToolHookService.name);
 
   async runPreHook(context: ToolExecutionContext): Promise<void> {
+    let safeArgs: string;
+    try { safeArgs = JSON.stringify(context.arguments); } catch { safeArgs = '[unserializable]'; }
     this.logger.debug(
-      `[TOOL:PRE] ${context.toolName} — user=${context.userId} role=${context.userRole} args=${JSON.stringify(context.arguments)}`,
+      `[TOOL:PRE] ${context.toolName} — user=${context.userId} role=${context.userRole} args=${safeArgs}`,
     );
   }
 
