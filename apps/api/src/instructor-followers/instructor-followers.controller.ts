@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Delete, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { InstructorFollowersService } from './instructor-followers.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Role } from '@prisma/client';
 
 @ApiTags('instructor-followers')
 @ApiBearerAuth()
@@ -30,8 +31,12 @@ export class InstructorFollowersController {
   @ApiResponse({ status: 201, description: 'Followed successfully' })
   async follow(
     @CurrentUser('id') userId: string,
+    @CurrentUser('role') userRole: Role,
     @Param('instructorId') instructorId: string,
   ) {
+    if (userRole === Role.ADMIN) {
+      throw new ForbiddenException('Administrators cannot follow instructors');
+    }
     return this.service.follow(userId, instructorId);
   }
 
