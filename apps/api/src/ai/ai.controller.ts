@@ -87,6 +87,12 @@ export class AiController {
     @CurrentUser('id') userId: string,
     @Query('conversationId') conversationId?: string,
   ): Promise<TokenUsageSummary> {
+    if (conversationId) {
+      const owned = await this.agentService.conversationBelongsToUser(conversationId, userId);
+      if (!owned) {
+        return { totalMessages: 0, totalInputTokens: 0, totalOutputTokens: 0, totalCacheReadTokens: 0, totalCacheCreationTokens: 0, cacheHitRate: 0 };
+      }
+    }
     return this.tokenTrackerService.getSummary(userId, conversationId);
   }
 

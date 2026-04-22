@@ -63,6 +63,11 @@ export class AgentService {
     await this.prisma.aiConversation.deleteMany({ where: { id, userId } });
   }
 
+  async conversationBelongsToUser(conversationId: string, userId: string): Promise<boolean> {
+    const conv = await this.prisma.aiConversation.findFirst({ where: { id: conversationId, userId } });
+    return conv !== null;
+  }
+
   // ── History ────────────────────────────────────────────────────
 
   async getHistory(userId: string, conversationId?: string) {

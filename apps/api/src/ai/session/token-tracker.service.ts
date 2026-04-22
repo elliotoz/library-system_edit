@@ -25,6 +25,7 @@ export class TokenTrackerService {
   // Key: `${userId}:${conversationId}` or `${userId}:global`
   private readonly records = new Map<string, TokenUsageRecord[]>();
   private readonly MAX_KEYS = 500;
+  private readonly MAX_RECORDS_PER_KEY = 1000;
 
   record(
     userId: string,
@@ -49,7 +50,11 @@ export class TokenTrackerService {
     if (!this.records.has(key)) {
       this.records.set(key, []);
     }
-    this.records.get(key)!.push({
+    const arr = this.records.get(key)!;
+    if (arr.length >= this.MAX_RECORDS_PER_KEY) {
+      arr.shift(); // evict oldest record for this key
+    }
+    arr.push({
       provider: usage.provider,
       model: usage.model,
       inputTokens: usage.inputTokens,
