@@ -6,6 +6,7 @@ import { BorrowStatus, BookCopyStatus } from '@prisma/client';
 import { buildSystemPrompt as buildSystemPromptFromModule, PromptContext } from './prompts/system-prompt-builder';
 import { ToolHookService } from './tools/tool-hook.service';
 import { ToolExecutionContext } from './tools/tool-hooks';
+import { TokenTrackerService } from './session/token-tracker.service';
 
 export interface BookCitation {
   title: string;
@@ -27,6 +28,7 @@ export class AgentService {
     private readonly prisma: PrismaService,
     private readonly catalogSearch: CatalogSearchService,
     private readonly toolHookService: ToolHookService,
+    private readonly tokenTrackerService: TokenTrackerService,
   ) {
     this.groq = new Groq({ apiKey: process.env.GROQ_API_KEY || '' });
   }
@@ -520,6 +522,12 @@ export class AgentService {
       });
 
       const choice = response.choices[0];
+      this.tokenTrackerService.record(userId, conversationId, {
+        provider: 'groq',
+        model,
+        inputTokens: response.usage?.prompt_tokens ?? 0,
+        outputTokens: response.usage?.completion_tokens ?? 0,
+      });
       const msg = choice?.message;
 
       if (msg?.tool_calls && msg.tool_calls.length > 0) {

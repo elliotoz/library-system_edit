@@ -15,6 +15,7 @@ import { GeminiProvider } from './providers/gemini.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
 import { ProviderFactory } from './providers/provider-factory';
 import { ToolHookService } from './tools/tool-hook.service';
+import { TokenTrackerService } from './session/token-tracker.service';
 import { UsersModule } from '../users/users.module';
 import { PrismaModule } from '../prisma/prisma.module';
 
@@ -37,6 +38,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     AnthropicProvider,
     ProviderFactory,
     ToolHookService,
+    TokenTrackerService,
   ],
   exports: [GroqService, AgentService, ProviderFactory],
 })

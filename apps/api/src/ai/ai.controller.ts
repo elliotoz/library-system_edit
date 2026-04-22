@@ -10,6 +10,7 @@ import { AiService } from './ai.service';
 import { AgentService, ChatChunk } from './agent.service';
 import { GroqService } from './groq.service';
 import { FileExtractService } from './file-extract.service';
+import { TokenTrackerService, TokenUsageSummary } from './session/token-tracker.service';
 import { UpdateInterestsDto } from './dto/update-interests.dto';
 import { ScanCoverDto } from './dto/scan-cover.dto';
 import { Role } from '@prisma/client';
@@ -24,6 +25,7 @@ export class AiController {
     private readonly agentService: AgentService,
     private readonly groq: GroqService,
     private readonly fileExtract: FileExtractService,
+    private readonly tokenTrackerService: TokenTrackerService,
   ) {}
 
   // ── Agentic endpoints (Path A) ──────────────────────────────────
@@ -75,6 +77,17 @@ export class AiController {
     @Query('conversationId') conversationId?: string,
   ) {
     return this.agentService.getHistory(userId, conversationId);
+  }
+
+  @Get('metrics')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get token usage metrics for the current user' })
+  async getMetrics(
+    @CurrentUser('id') userId: string,
+    @Query('conversationId') conversationId?: string,
+  ): Promise<TokenUsageSummary> {
+    return this.tokenTrackerService.getSummary(userId, conversationId);
   }
 
   @Post('chat')
