@@ -107,7 +107,7 @@ export default function ManageUsersPage() {
         {isLoading ? (
           <div className="p-8 text-center"><div className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full mx-auto" /></div>
         ) : users.length === 0 ? (
-          <div className="p-8 text-center"><Users className="w-12 h-12 text-gray-300 mx-auto mb-4" /><p className="text-gray-500">No users found</p></div>
+          <div className="p-8 text-center"><Users className="w-12 h-12 text-gray-300 mx-auto mb-4" /><p className="text-gray-500 dark:text-gray-400">No users found</p></div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -137,10 +137,10 @@ export default function ManageUsersPage() {
                     </td>
                     <td className="px-6 py-4"><span className={cn('px-2 py-1 rounded-full text-xs font-medium', roleColors[user.role])}>{user.role}</span></td>
                     <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{user.faculty?.code || '-'}</td>
-                    <td className="px-6 py-4"><span className={cn('px-2 py-1 rounded-full text-xs font-medium', user.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300')}>{user.isActive ? 'Active' : 'Inactive'}</span></td>
+                    <td className="px-6 py-4"><span className={cn('px-2 py-1 rounded-full text-xs font-medium', user.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-800/30 dark:text-gray-300')}>{user.isActive ? 'Active' : 'Inactive'}</span></td>
                     <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{new Date(user.createdAt).toLocaleDateString()}</td>
                     <td className="px-6 py-4 text-right">
-                      <button onClick={() => handleToggleStatus(user.id, user.isActive)} className={cn('inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors', user.isActive ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50')}>
+                      <button onClick={() => handleToggleStatus(user.id, user.isActive)} className={cn('inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors', user.isActive ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30' : 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30')}>
                         {user.isActive ? <><UserX className="w-4 h-4" /> Deactivate</> : <><UserCheck className="w-4 h-4" /> Activate</>}
                       </button>
                     </td>
