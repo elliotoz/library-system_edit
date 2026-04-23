@@ -14,17 +14,30 @@ export const AdminPageLayout: React.FC<AdminPageLayoutProps> = ({
   action,
 }) => {
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>
-          {description && (
-            <p className="text-gray-500 dark:text-gray-400 mt-1">{description}</p>
-          )}
+    <div className="min-h-screen bg-white dark:bg-gray-950">
+      {/* Header */}
+      <div className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex justify-between items-start gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                {title}
+              </h1>
+              {description && (
+                <p className="text-gray-600 dark:text-gray-400 mt-2">
+                  {description}
+                </p>
+              )}
+            </div>
+            {action && <div className="flex-shrink-0">{action}</div>}
+          </div>
         </div>
-        {action && <div className="flex-shrink-0">{action}</div>}
       </div>
-      {children}
+
+      {/* Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {children}
+      </div>
     </div>
   );
 };
