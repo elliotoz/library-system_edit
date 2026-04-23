@@ -6,11 +6,13 @@ import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { AdminPageLayout } from '@/components/dashboard/AdminPageLayout';
 
+type Role = 'STUDENT' | 'INSTRUCTOR' | 'STAFF' | 'ADMIN';
+
 interface User {
   id: string;
   email: string;
   name: string;
-  role: 'STUDENT' | 'INSTRUCTOR' | 'STAFF' | 'ADMIN';
+  role: Role;
   studentId?: string;
   staffId?: string;
   isActive: boolean;
@@ -18,11 +20,11 @@ interface User {
   faculty?: { id: string; name: string; code: string };
 }
 
-const roleColors = {
-  STUDENT: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  INSTRUCTOR: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-  STAFF: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
-  ADMIN: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+const roleColors: Record<Role, string> = {
+  STUDENT: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
+  INSTRUCTOR: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300',
+  STAFF: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300',
+  ADMIN: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
 };
 
 export default function ManageUsersPage() {
