@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Role } from '@prisma/client';
 
@@ -24,7 +24,11 @@ export class InstructorFollowersService {
     });
   }
 
-  async follow(followerId: string, instructorId: string) {
+  async follow(followerId: string, instructorId: string, followerRole: Role) {
+    if (followerRole === Role.ADMIN) {
+      throw new ForbiddenException('Administrators cannot follow instructors');
+    }
+
     if (followerId === instructorId) {
       throw new BadRequestException('You cannot follow yourself');
     }

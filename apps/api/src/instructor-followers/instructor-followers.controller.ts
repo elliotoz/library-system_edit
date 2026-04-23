@@ -37,7 +37,7 @@ export class InstructorFollowersController {
     if (userRole === Role.ADMIN) {
       throw new ForbiddenException('Administrators cannot follow instructors');
     }
-    return this.service.follow(userId, instructorId);
+    return this.service.follow(userId, instructorId, userRole);
   }
 
   @Delete(':instructorId/unfollow')
