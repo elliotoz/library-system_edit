@@ -1,5 +1,11 @@
-import type { ReactNode } from 'react';
+'use client';
 
-export default function AdminLayout({ children }: { children: ReactNode }) {
-  return <>{children}</>;
+import { AuthGuard } from '@/components/AuthGuard';
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AuthGuard allowedRoles={['ADMIN']}>
+      {children}
+    </AuthGuard>
+  );
 }
