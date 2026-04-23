@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { GroqProvider } from './groq.provider';
 import { GeminiProvider } from './gemini.provider';
-import { AnthropicProvider } from './anthropic.provider';
+import { OpenRouterProvider } from './openrouter.provider';
 import { LlmProvider } from './provider.interface';
 
 @Injectable()
@@ -9,15 +9,15 @@ export class ProviderFactory {
   constructor(
     private readonly groqProvider: GroqProvider,
     private readonly geminiProvider: GeminiProvider,
-    private readonly anthropicProvider: AnthropicProvider,
+    private readonly openRouterProvider: OpenRouterProvider,
   ) {}
 
   getProvider(model: string): LlmProvider {
     if (model.startsWith('claude-') || model.startsWith('anthropic/')) {
-      if (!this.anthropicProvider.isAvailable()) {
-        throw new Error('ANTHROPIC_API_KEY not set — cannot use Anthropic models');
+      if (!this.openRouterProvider.isAvailable()) {
+        throw new Error('OPENROUTER_API_KEY not set — cannot use Claude models via OpenRouter');
       }
-      return this.anthropicProvider;
+      return this.openRouterProvider;
     }
     if (model.startsWith('gemini-') || model.startsWith('google/')) {
       if (!this.geminiProvider.isAvailable()) {
@@ -32,15 +32,15 @@ export class ProviderFactory {
   }
 
   getDefaultProvider(): LlmProvider {
-    if (this.anthropicProvider.isAvailable()) {
-      return this.anthropicProvider;
-    }
     if (this.groqProvider.isAvailable()) {
       return this.groqProvider;
+    }
+    if (this.openRouterProvider.isAvailable()) {
+      return this.openRouterProvider;
     }
     if (this.geminiProvider.isAvailable()) {
       return this.geminiProvider;
     }
-    throw new Error('No LLM provider available — set ANTHROPIC_API_KEY, GROQ_API_KEY, or GEMINI_API_KEY');
+    throw new Error('No LLM provider available — set GROQ_API_KEY, OPENROUTER_API_KEY, or GEMINI_API_KEY');
   }
 }

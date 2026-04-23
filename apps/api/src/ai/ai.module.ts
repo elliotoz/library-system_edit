@@ -12,7 +12,7 @@ import { GroqService } from './groq.service';
 import { FileExtractService } from './file-extract.service';
 import { GroqProvider } from './providers/groq.provider';
 import { GeminiProvider } from './providers/gemini.provider';
-import { AnthropicProvider } from './providers/anthropic.provider';
+import { OpenRouterProvider } from './providers/openrouter.provider';
 import { ProviderFactory } from './providers/provider-factory';
 import { ToolHookService } from './tools/tool-hook.service';
 import { TokenTrackerService } from './session/token-tracker.service';
@@ -35,7 +35,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     FileExtractService,
     GroqProvider,
     GeminiProvider,
-    AnthropicProvider,
+    OpenRouterProvider,
     ProviderFactory,
     ToolHookService,
     TokenTrackerService,
