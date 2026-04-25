@@ -27,8 +27,16 @@ export class FileExtractService {
       ext === 'docx'
     ) {
       raw = await this.extractDocx(buffer);
+    } else if (mimetype === 'application/msword' || ext === 'doc') {
+      raw = await this.extractDoc(buffer);
+    } else if (
+      mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      mimetype === 'application/vnd.ms-excel' ||
+      ext === 'xlsx' || ext === 'xls'
+    ) {
+      raw = await this.extractExcel(buffer);
     } else {
-      throw new BadRequestException('Unsupported file type. Please upload a PDF, DOCX, or TXT file.');
+      throw new BadRequestException('Unsupported file type. Please upload a PDF, DOC, DOCX, XLS, XLSX, or TXT file.');
     }
 
     return this.truncate(raw.trim());
@@ -98,6 +106,66 @@ export class FileExtractService {
       const msg = err instanceof Error ? err.message : String(err);
       throw new BadRequestException(
         `Could not read this DOCX file. It may be corrupted or use an unsupported format. (${msg})`,
+      );
+    }
+  }
+
+  private async extractDoc(buffer: Buffer): Promise<string> {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const WordExtractor = require('word-extractor') as new () => {
+        extract: (buf: Buffer) => Promise<{ getBody: () => string }>;
+      };
+      const extractor = new WordExtractor();
+      const doc = await extractor.extract(buffer);
+      const text = doc.getBody();
+      if (!text || text.trim().length === 0) {
+        throw new BadRequestException(
+          'This DOC file appears to be empty or contains no readable text.',
+        );
+      }
+      return text;
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new BadRequestException(
+        `Could not read this DOC file. It may be corrupted or use an unsupported format. (${msg})`,
+      );
+    }
+  }
+
+  private async extractExcel(buffer: Buffer): Promise<string> {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const ExcelJS = require('exceljs') as typeof import('exceljs');
+      const workbook = new ExcelJS.Workbook();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (workbook.xlsx as any).load(buffer);
+
+      const lines: string[] = [];
+      workbook.eachSheet((sheet) => {
+        lines.push(`## Sheet: ${sheet.name}`);
+        sheet.eachRow((row) => {
+          const cells = (row.values as unknown[])
+            .slice(1) // exceljs row.values is 1-indexed (index 0 is empty)
+            .map((v) => (v == null ? '' : String(v)));
+          lines.push(cells.join('\t'));
+        });
+        lines.push('');
+      });
+
+      const text = lines.join('\n');
+      if (!text.trim()) {
+        throw new BadRequestException(
+          'This Excel file appears to be empty or contains no readable data.',
+        );
+      }
+      return text;
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new BadRequestException(
+        `Could not read this Excel file. It may be corrupted or use an unsupported format. (${msg})`,
       );
     }
   }

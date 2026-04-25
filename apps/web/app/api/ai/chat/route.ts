@@ -1,10 +1,11 @@
 import { NextRequest } from 'next/server';
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
   const cookieHeader = request.headers.get('cookie') || '';
-
   const backendUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/ai/chat`;
+
+  // Read raw body to avoid Next.js default 1MB JSON limit
+  const rawBody = await request.text();
 
   const response = await fetch(backendUrl, {
     method: 'POST',
@@ -12,7 +13,7 @@ export async function POST(request: NextRequest) {
       'Content-Type': 'application/json',
       Cookie: cookieHeader,
     },
-    body: JSON.stringify(body),
+    body: rawBody,
   });
 
   return new Response(response.body, {

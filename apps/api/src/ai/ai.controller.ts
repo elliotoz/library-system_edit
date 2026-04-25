@@ -110,6 +110,8 @@ export class AiController {
       hasImage?: boolean;
       imageBase64?: string;
       conversationId?: string;
+      fileContent?: string;
+      fileName?: string;
     },
     @Req() req: Request,
     @Res() res: Response,
@@ -130,6 +132,8 @@ export class AiController {
         body.imageBase64 ?? null,
         cookieHeader,
         body.conversationId,
+        body.fileContent,
+        body.fileName,
       );
 
       for await (const chunk of stream) {
@@ -182,18 +186,21 @@ export class AiController {
     limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
     fileFilter: (_req, file, cb) => {
       const allowed = ['application/pdf', 'text/plain',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-      const extOk = /\.(pdf|txt|docx)$/i.test(file.originalname);
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel'];
+      const extOk = /\.(pdf|txt|docx|doc|xlsx|xls)$/i.test(file.originalname);
       if (allowed.includes(file.mimetype) || extOk) {
         cb(null, true);
       } else {
-        cb(new BadRequestException('Only PDF, DOCX, and TXT files are allowed'), false);
+        cb(new BadRequestException('Only PDF, DOC, DOCX, XLS, XLSX, and TXT files are allowed'), false);
       }
     },
   }))
-  @ApiOperation({ summary: 'Extract text from a PDF, DOCX, or TXT file for AI context' })
+  @ApiOperation({ summary: 'Extract text from a PDF, DOC, DOCX, XLS, XLSX, or TXT file for AI context' })
   async uploadFile(@UploadedFile() file: Express.Multer.File & { size?: number }) {
-    if (!file) throw new BadRequestException('No file uploaded. Please select a PDF, DOCX, or TXT file.');
+    if (!file) throw new BadRequestException('No file uploaded. Please select a PDF, DOC, DOCX, XLS, XLSX, or TXT file.');
     if ((file.size ?? 0) > 50 * 1024 * 1024) {
       throw new PayloadTooLargeException(
         'File is too large. Maximum allowed size is 50 MB. Please reduce the file size and try again.',

@@ -497,6 +497,8 @@ export class AgentService {
     imageBase64: string | null,
     cookieHeader: string,
     conversationId?: string,
+    fileContent?: string,
+    fileName?: string,
   ): AsyncGenerator<ChatChunk> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -572,27 +574,43 @@ export class AgentService {
         role: m.role as 'user' | 'assistant',
         content: m.content,
       })),
-      { role: 'user', content: userContent },
     ];
+
+    // If a file was uploaded, insert it as a dedicated user message before the question.
+    // This keeps the user's question clean and ensures the model sees the file clearly.
+    const hasFile = !!(fileContent && fileContent.trim().length > 0);
+    if (hasFile) {
+      this.logger.log(`📎 File attached: "${fileName}" (${fileContent!.length} chars)`);
+      messages.push({
+        role: 'user',
+        content: `I have uploaded a file named "${fileName}". Here is its content:\n\n---\n${fileContent}\n---`,
+      });
+      messages.push({
+        role: 'assistant',
+        content: `I have read the file "${fileName}". What would you like to know about it?`,
+      });
+    }
+
+    messages.push({ role: 'user', content: userContent });
 
     // Decide whether to use tools based on message complexity
     const simple = this.isSimpleMessage(message);
-    const hasFile = message.includes('[ATTACHED FILE:');
     const deep = this.isDeepQuery(message);
-    // Files: answer from the file content, don't waste rounds on catalog tools
+    // Files: answer from the file content, don't call catalog tools
     const useTools = !hasImage && !simple && !hasFile;
     let model = hasFile
-      ? OPENROUTER_MODELS.CHEAP  // files need decent comprehension
+      ? OPENROUTER_MODELS.CHEAP
       : this.pickModel(message, hasImage);
 
     const tierLabel = hasFile ? 'CHEAP(file)' : deep ? 'SMART' : simple ? 'FREE' : hasImage ? 'CHEAP(vision)' : 'CHEAP(tools)';
     this.logger.log(`🤖 AI Request — model: ${model} | tools: ${useTools} | tier: ${tierLabel}`);
 
-    // Agent loop — max 3 rounds
+    // Agent loop — max 5 rounds of tool calling
+    const MAX_ROUNDS = 5;
     const allCitations: BookCitation[] = [];
     let round = 0;
 
-    while (round < 3) {
+    while (round < MAX_ROUNDS) {
       round++;
 
       const body: Record<string, unknown> = {
@@ -602,9 +620,13 @@ export class AgentService {
         max_tokens: 4096,
       };
 
-      if (useTools) {
+      // On the last round, remove tools to force the model to produce a text answer
+      const isLastRound = round === MAX_ROUNDS;
+      if (useTools && !isLastRound) {
         body.tools = this.getTools();
         body.tool_choice = 'auto';
+      } else if (isLastRound && useTools) {
+        this.logger.warn(`Round ${round}/${MAX_ROUNDS} — forcing text response (no tools)`);
       }
 
       const res = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
@@ -665,13 +687,17 @@ export class AgentService {
 
       let fullResponse = msg?.content ?? '';
 
-      if (!fullResponse && hasImage) {
-        fullResponse = 'I received your image but could not analyse it.';
+      if (!fullResponse) {
+        if (hasImage) {
+          fullResponse = 'I received your image but could not analyse it.';
+        } else if (allCitations.length > 0) {
+          fullResponse = 'Here are the results I found:';
+        } else {
+          fullResponse = 'I\'m sorry, I wasn\'t able to generate a response. Could you rephrase your question?';
+        }
       }
 
-      if (fullResponse) {
-        yield { type: 'text', text: fullResponse };
-      }
+      yield { type: 'text', text: fullResponse };
 
       // Emit deduplicated book citations
       const uniqueCitations = Array.from(
