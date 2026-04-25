@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import Groq from 'groq-sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Role } from '@prisma/client';
+import { OPENROUTER_MODELS } from './providers/openrouter.provider';
 
 export interface BookScanResult {
   title?: string;
@@ -14,22 +14,20 @@ export interface BookScanResult {
 @Injectable()
 export class GroqService implements OnModuleInit {
   private readonly logger = new Logger(GroqService.name);
-  private client: Groq;
   private gemini: GoogleGenerativeAI | null = null;
   private available = false;
+  private readonly openRouterBaseUrl = 'https://openrouter.ai/api/v1';
 
-  readonly defaultModel = 'llama-3.3-70b-versatile';
-  readonly visionModel = 'meta-llama/llama-4-scout-17b-16e-instruct';
+  readonly defaultModel = OPENROUTER_MODELS.FREE;
 
   onModuleInit() {
-    const key = process.env.GROQ_API_KEY;
+    const key = process.env.OPENROUTER_API_KEY;
     if (!key) {
-      this.logger.warn('GROQ_API_KEY not set — AI chat will fall back to rule-based responses');
+      this.logger.warn('OPENROUTER_API_KEY not set — AI chat will fall back to rule-based responses');
       return;
     }
-    this.client = new Groq({ apiKey: key });
     this.available = true;
-    this.logger.log('Groq client initialised');
+    this.logger.log('OpenRouter AI initialised (via GroqService compat layer)');
 
     const geminiKey = process.env.GEMINI_API_KEY;
     if (geminiKey) {
@@ -45,34 +43,73 @@ export class GroqService implements OnModuleInit {
   }
 
   getModel(role: Role, queryType?: 'deep-reasoning' | 'simple'): string {
-    return this.defaultModel;
+    if (queryType === 'deep-reasoning') return OPENROUTER_MODELS.SMART;
+    return OPENROUTER_MODELS.FREE;
+  }
+
+  private get openRouterHeaders(): Record<string, string> {
+    return {
+      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': process.env.FRONTEND_URL ?? 'http://localhost:3000',
+      'X-Title': 'LibrarySystem',
+    };
+  }
+
+  /** Call OpenRouter with automatic 429 fallback from FREE → CHEAP tier. */
+  private async callOpenRouter(
+    model: string,
+    messages: { role: string; content: string }[],
+  ): Promise<{ content: string; modelUsed: string }> {
+    let orModel = model.includes('/') ? model : OPENROUTER_MODELS.FREE;
+    this.logger.log(`🤖 GroqService — model: ${orModel}`);
+
+    const res = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: this.openRouterHeaders,
+      body: JSON.stringify({ model: orModel, messages, max_tokens: 1024 }),
+    });
+
+    if (!res.ok) {
+      // Auto-fallback on free tier rate limit
+      if (res.status === 429 && orModel === OPENROUTER_MODELS.FREE) {
+        this.logger.warn(`Free tier rate-limited, falling back to CHEAP tier`);
+        orModel = OPENROUTER_MODELS.CHEAP;
+        const retry = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: this.openRouterHeaders,
+          body: JSON.stringify({ model: orModel, messages, max_tokens: 1024 }),
+        });
+        if (!retry.ok) {
+          const err = await retry.text();
+          throw new Error(`OpenRouter API error ${retry.status}: ${err}`);
+        }
+        const data = await retry.json() as { choices: Array<{ message: { content: string | null } }> };
+        return { content: data.choices[0]?.message?.content ?? '', modelUsed: orModel };
+      }
+      const err = await res.text();
+      throw new Error(`OpenRouter API error ${res.status}: ${err}`);
+    }
+
+    const data = await res.json() as { choices: Array<{ message: { content: string | null } }> };
+    return { content: data.choices[0]?.message?.content ?? '', modelUsed: orModel };
   }
 
   async generate(model: string, prompt: string, system?: string): Promise<{ response: string }> {
-    const messages: Groq.Chat.ChatCompletionMessageParam[] = [];
+    const messages: { role: string; content: string }[] = [];
     if (system) messages.push({ role: 'system', content: system });
     messages.push({ role: 'user', content: prompt });
 
-    const completion = await this.client.chat.completions.create({
-      model: this.defaultModel,
-      messages,
-      max_tokens: 1024,
-    });
-
-    return { response: completion.choices[0]?.message?.content ?? '' };
+    const { content } = await this.callOpenRouter(model, messages);
+    return { response: content };
   }
 
   async chat(
     model: string,
     messages: { role: 'user' | 'assistant' | 'system'; content: string }[],
   ): Promise<{ message: { content: string } }> {
-    const completion = await this.client.chat.completions.create({
-      model: this.defaultModel,
-      messages,
-      max_tokens: 1024,
-    });
-
-    return { message: { content: completion.choices[0]?.message?.content ?? '' } };
+    const { content } = await this.callOpenRouter(model, messages);
+    return { message: { content } };
   }
 
   async scanBookCover(base64: string): Promise<BookScanResult> {

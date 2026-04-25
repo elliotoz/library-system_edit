@@ -1,6 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { LlmProvider, ProviderMessage, ProviderResponse, ProviderTool } from './provider.interface';
 
+// ── Model tiers ──────────────────────────────────────────────────
+// All AI goes through OpenRouter. Pick the cheapest tier that fits the task.
+export const OPENROUTER_MODELS = {
+  FREE: 'google/gemma-4-31b-it:free',                // $0 — greetings, simple Q&A
+  CHEAP: 'google/gemini-3.1-flash-lite-preview',                   // ~$0.25/M — tool-calling, catalog queries
+  SMART: 'anthropic/claude-3-haiku',                 // $0.50/M — deep reasoning, complex analysis
+} as const;
+
+export type ModelTier = keyof typeof OPENROUTER_MODELS;
+
 interface OpenRouterChatResponse {
   choices: Array<{
     message: {

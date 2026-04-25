@@ -4,7 +4,9 @@ const nextConfig = {
   output: 'standalone',
   transpilePackages: ['three', '@react-three/fiber'],
   images: {
-    domains: ['localhost'],
+    remotePatterns: [
+      { protocol: 'http', hostname: 'localhost' },
+    ],
   },
   async rewrites() {
     return [

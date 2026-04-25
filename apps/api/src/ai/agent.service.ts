@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import Groq from 'groq-sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogSearchService } from './catalog-search.service';
 import { BorrowStatus, BookCopyStatus } from '@prisma/client';
@@ -7,6 +6,7 @@ import { buildSystemPrompt as buildSystemPromptFromModule, PromptContext } from 
 import { ToolHookService } from './tools/tool-hook.service';
 import { ToolExecutionContext } from './tools/tool-hooks';
 import { TokenTrackerService } from './session/token-tracker.service';
+import { OPENROUTER_MODELS } from './providers/openrouter.provider';
 
 export interface BookCitation {
   title: string;
@@ -22,24 +22,62 @@ export type ChatChunk =
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger(AgentService.name);
-  private readonly groq: Groq;
+  private readonly openRouterBaseUrl = 'https://openrouter.ai/api/v1';
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly catalogSearch: CatalogSearchService,
     private readonly toolHookService: ToolHookService,
     private readonly tokenTrackerService: TokenTrackerService,
-  ) {
-    this.groq = new Groq({ apiKey: process.env.GROQ_API_KEY || '' });
-  }
+  ) {}
 
   // ── Status ─────────────────────────────────────────────────────
 
   async getStatus(): Promise<{ available: boolean; model: string }> {
     return {
-      available: !!process.env.GROQ_API_KEY,
-      model: 'llama-3.3-70b-versatile',
+      available: !!process.env.OPENROUTER_API_KEY,
+      model: OPENROUTER_MODELS.CHEAP,
     };
+  }
+
+  private get openRouterHeaders(): Record<string, string> {
+    return {
+      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': process.env.FRONTEND_URL ?? 'http://localhost:3000',
+      'X-Title': 'LibrarySystem',
+    };
+  }
+
+  /** Pick model tier based on message complexity. */
+  private pickModel(message: string, hasImage: boolean): string {
+    if (hasImage) return OPENROUTER_MODELS.CHEAP;
+    if (this.isDeepQuery(message)) return OPENROUTER_MODELS.SMART;
+    if (this.isSimpleMessage(message)) return OPENROUTER_MODELS.FREE;
+    return OPENROUTER_MODELS.CHEAP;
+  }
+
+  /** Deep analytical questions that benefit from a smarter model. */
+  private isDeepQuery(message: string): boolean {
+    const lower = message.toLowerCase();
+    const signals = ['analyze', 'analyse', 'compare', 'trend', 'forecast', 'correlation',
+      'insight', 'explain why', 'what if', 'summarize the', 'summary of',
+      'recommend a learning', 'study plan', 'research', 'evaluate'];
+    return signals.some((s) => lower.includes(s));
+  }
+
+  /** Simple greetings/chat — no tools needed. */
+  private isSimpleMessage(message: string): boolean {
+    const lower = message.trim().toLowerCase();
+    const greetings = ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening',
+      'thanks', 'thank you', 'bye', 'goodbye', 'how are you', 'whats up', "what's up",
+      'ok', 'okay', 'cool', 'nice', 'great', 'yes', 'no', 'sure', 'help'];
+    if (greetings.some((g) => lower === g || lower === g + '!')) return true;
+    if (lower.length < 15 && !lower.includes('book') && !lower.includes('borrow') &&
+        !lower.includes('catalog') && !lower.includes('search') && !lower.includes('find') &&
+        !lower.includes('reserve') && !lower.includes('reading') && !lower.includes('overdue') &&
+        !lower.includes('stat') && !lower.includes('user')) return true;
+    return false;
   }
 
   // ── Conversations ──────────────────────────────────────────────
@@ -87,7 +125,7 @@ export class AgentService {
 
   // ── Tools ──────────────────────────────────────────────────────
 
-  private getTools(): Groq.Chat.ChatCompletionTool[] {
+  private getTools(): Array<{ type: 'function'; function: { name: string; description: string; parameters: Record<string, unknown> } }> {
     return [
       {
         type: 'function',
@@ -515,10 +553,10 @@ export class AgentService {
       await this.prisma.aiConversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
     }
 
-    // Build messages — Groq uses OpenAI message format
-    type GroqMessage = Groq.Chat.ChatCompletionMessageParam;
+    // Build messages — OpenRouter uses OpenAI-compatible message format
+    type ChatMessage = Record<string, unknown>;
 
-    let userContent: GroqMessage['content'];
+    let userContent: unknown;
     if (hasImage && imageBase64) {
       userContent = [
         { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
@@ -528,18 +566,27 @@ export class AgentService {
       userContent = message;
     }
 
-    const messages: GroqMessage[] = [
+    const messages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
-      ...history.slice(-10).map((m): GroqMessage => ({
+      ...history.slice(-10).map((m) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
       })),
       { role: 'user', content: userContent },
     ];
 
-    // llama-3.3-70b-versatile: supports external tool calling (catalog search, DB queries etc).
-    // llama-4-scout: vision model for image input only.
-    const model = hasImage ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile';
+    // Decide whether to use tools based on message complexity
+    const simple = this.isSimpleMessage(message);
+    const hasFile = message.includes('[ATTACHED FILE:');
+    const deep = this.isDeepQuery(message);
+    // Files: answer from the file content, don't waste rounds on catalog tools
+    const useTools = !hasImage && !simple && !hasFile;
+    let model = hasFile
+      ? OPENROUTER_MODELS.CHEAP  // files need decent comprehension
+      : this.pickModel(message, hasImage);
+
+    const tierLabel = hasFile ? 'CHEAP(file)' : deep ? 'SMART' : simple ? 'FREE' : hasImage ? 'CHEAP(vision)' : 'CHEAP(tools)';
+    this.logger.log(`🤖 AI Request — model: ${model} | tools: ${useTools} | tier: ${tierLabel}`);
 
     // Agent loop — max 3 rounds
     const allCitations: BookCitation[] = [];
@@ -548,29 +595,61 @@ export class AgentService {
     while (round < 3) {
       round++;
 
-      const response = await this.groq.chat.completions.create({
+      const body: Record<string, unknown> = {
         model,
         messages,
-        tools: hasImage ? undefined : this.getTools(),
-        tool_choice: hasImage ? undefined : 'auto',
         stream: false,
+        max_tokens: 4096,
+      };
+
+      if (useTools) {
+        body.tools = this.getTools();
+        body.tool_choice = 'auto';
+      }
+
+      const res = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: this.openRouterHeaders,
+        body: JSON.stringify(body),
       });
 
-      const choice = response.choices[0];
+      if (!res.ok) {
+        const errText = await res.text();
+        // If free tier is rate-limited, auto-fallback to cheap tier
+        if (res.status === 429 && model === OPENROUTER_MODELS.FREE) {
+          this.logger.warn(`Free tier rate-limited, falling back to CHEAP tier`);
+          model = OPENROUTER_MODELS.CHEAP;
+          body.model = model;
+          round--; // don't count this as a tool-loop round
+          continue;
+        }
+        this.logger.error(`OpenRouter API error ${res.status}: ${errText}`);
+        throw new Error(`AI provider error: ${res.status}`);
+      }
+
+      const data = await res.json() as {
+        choices: Array<{ message: { content: string | null; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> } }>;
+        usage?: { prompt_tokens: number; completion_tokens: number };
+      };
+
+      const choice = data.choices[0];
       this.tokenTrackerService.record(userId, conversationId, {
-        provider: 'groq',
+        provider: 'openrouter',
         model,
-        inputTokens: response.usage?.prompt_tokens ?? 0,
-        outputTokens: response.usage?.completion_tokens ?? 0,
+        inputTokens: data.usage?.prompt_tokens ?? 0,
+        outputTokens: data.usage?.completion_tokens ?? 0,
       });
+
+      this.logger.log(`📊 Tokens — in: ${data.usage?.prompt_tokens ?? 0} | out: ${data.usage?.completion_tokens ?? 0} | model: ${model}`);
+
       const msg = choice?.message;
 
       if (msg?.tool_calls && msg.tool_calls.length > 0) {
         messages.push({ role: 'assistant', content: msg.content ?? '', tool_calls: msg.tool_calls });
 
         for (const toolCall of msg.tool_calls) {
-          // IMPORTANT: Groq returns arguments as a JSON string — must parse
           const args = JSON.parse(toolCall.function.arguments || '{}') as Record<string, unknown>;
+          this.logger.log(`🔧 Tool call: ${toolCall.function.name}(${JSON.stringify(args)})`);
           const { result, citations } = await this.executeTool(
             toolCall.function.name, args, userId, user.role, cookieHeader,
           );
@@ -584,9 +663,6 @@ export class AgentService {
         continue;
       }
 
-      // Final answer — yield the content from the non-streaming response directly.
-      // Do NOT make a second streaming call: Groq rejects tool calls in a
-      // streaming request that was sent without tools, causing 400 errors.
       let fullResponse = msg?.content ?? '';
 
       if (!fullResponse && hasImage) {

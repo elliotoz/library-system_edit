@@ -31,6 +31,11 @@ async function bootstrap() {
     crossOriginResourcePolicy: false,   // allow cross-origin loading of uploads (avatars, materials)
   }));
 
+  // Increase JSON body limit for AI chat (file content embedded in message)
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const bodyParser = require('body-parser');
+  app.use(bodyParser.json({ limit: '10mb' }));
+
   app.use(cookieParser());
 
   // Enable CORS for frontend — env-driven allowlist

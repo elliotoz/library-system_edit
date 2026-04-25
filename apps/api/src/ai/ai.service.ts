@@ -110,7 +110,7 @@ export class AiService {
       const sources = this.dedupeArray([...staticSources, ...linkedSources]);
       return {
         reply,
-        modelUsed: this.groq.defaultModel,
+        modelUsed: model,
         sources,
       };
     } catch (err) {
