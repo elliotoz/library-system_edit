@@ -14,12 +14,9 @@ import {
   BarChart3,
   ChevronRight,
   Activity,
-  Sparkles,
-  Brain,
   ArrowUpRight,
   BellRing,
   ShieldAlert,
-  Bot,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import api from '@/lib/api';
@@ -177,32 +174,8 @@ export default function AdminDashboard() {
       style: 'text-rose-700 dark:text-rose-200',
       surface: 'from-rose-300/20 to-transparent',
     },
-    {
-      label: 'Maintain Book Catalog',
-      description: 'Create or update records before demand spikes across branches.',
-      href: '/dashboard/admin/books/new',
-      icon: Plus,
-      style: 'text-sky-700 dark:text-sky-200',
-      surface: 'from-sky-300/20 to-transparent',
-    },
-    {
-      label: 'Export Reports',
-      description: 'Open reporting tools for trends, usage summaries, and audits.',
-      href: '/dashboard/admin/reports',
-      icon: BarChart3,
-      style: 'text-violet-700 dark:text-violet-200',
-      surface: 'from-violet-300/20 to-transparent',
-    },
   ];
 
-  const aiPrompts = [
-    'Summarize reservation backlog by urgency',
-    'Show overdue borrowing trends by category',
-    'Highlight unusual circulation activity today',
-    'Identify user growth changes this week',
-  ];
-
-  const criticalCount = (stats?.pendingReservations ?? 0) + (stats?.overdueBooks ?? 0);
   const opsStatus = getOpsStatus(stats?.pendingReservations ?? 0, stats?.overdueBooks ?? 0);
 
   return (
@@ -236,41 +209,6 @@ export default function AdminDashboard() {
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200/78 sm:text-base">
                 Monitor circulation health, resolve operational risks, and move directly into the highest-priority library workflows.
               </p>
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-white/45">Reservations</p>
-                  <p className="mt-1 text-lg font-semibold text-white">{(stats?.pendingReservations ?? 0).toLocaleString()}</p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-white/45">Overdue</p>
-                  <p className="mt-1 text-lg font-semibold text-white">{(stats?.overdueBooks ?? 0).toLocaleString()}</p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-white/45">New users</p>
-                  <p className="mt-1 text-lg font-semibold text-white">{(stats?.newUsersThisWeek ?? 0).toLocaleString()}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[520px]">
-              <div className="rounded-2xl border border-white/10 bg-white/8 px-4 py-4 backdrop-blur-md">
-                <p className="text-xs uppercase tracking-[0.22em] text-white/45">Critical Queue</p>
-                <p className="mt-2 text-3xl font-semibold text-white">{criticalCount}</p>
-                <p className="mt-1 text-xs text-white/60">Pending + overdue items</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/8 px-4 py-4 backdrop-blur-md">
-                <p className="text-xs uppercase tracking-[0.22em] text-white/45">Active Circulation</p>
-                <p className="mt-2 text-3xl font-semibold text-white">{(stats?.currentlyBorrowed ?? 0).toLocaleString()}</p>
-                <p className="mt-1 text-xs text-white/60">Books currently out</p>
-              </div>
-              <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-4 backdrop-blur-md">
-                <div className="flex items-center gap-2 text-cyan-100">
-                  <Brain className="h-4 w-4" />
-                  <span className="text-xs font-medium uppercase tracking-[0.22em]">AI Ops</span>
-                </div>
-                <p className="mt-2 text-sm font-medium text-white">Assistant is ready for admin queries</p>
-                <p className="mt-1 text-xs text-cyan-100/70">Use summaries and anomaly checks without leaving the dashboard.</p>
-              </div>
             </div>
           </div>
         </GlassCard>
@@ -455,56 +393,6 @@ export default function AdminDashboard() {
             </div>
           </GlassCard>
 
-          <GlassCard
-            liquid
-            className="relative overflow-hidden rounded-[30px] border border-cyan-300/15 p-5 sm:p-6 bg-gradient-to-b from-teal-900/20 to-slate-950/10"
-          >
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(45,212,191,0.18),transparent_25%),radial-gradient(circle_at_left,rgba(125,211,252,0.14),transparent_20%)]" />
-            <div className="relative">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2 text-cyan-700 dark:text-cyan-200">
-                    <Bot className="h-4 w-4" />
-                    <p className="text-sm font-medium">AI operations assistant</p>
-                  </div>
-                  <h2 className="mt-2 text-xl font-semibold text-gray-900 dark:text-white">Ask for admin insights</h2>
-                </div>
-                <Link
-                  href="/dashboard/ai-assistant"
-                  className="glass-button glass-button-primary relative inline-flex items-center justify-center gap-2 overflow-hidden px-4 py-2 text-xs font-semibold sm:text-sm"
-                >
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute -inset-px overflow-hidden"
-                    style={{ borderRadius: 'inherit' }}
-                  >
-                    <div className="beam beam-top" />
-                    <div className="beam beam-right" />
-                    <div className="beam beam-bottom" />
-                    <div className="beam beam-left" />
-                  </div>
-                  <Sparkles className="relative z-10 h-4 w-4" />
-                  <span className="relative z-10">Open AI</span>
-                </Link>
-              </div>
-
-              <p className="mt-3 text-sm leading-6 text-gray-600 dark:text-white/70">
-                Use the assistant to summarize risk, spot anomalies, and move from overview to action without leaving the admin workflow.
-              </p>
-
-              <div className="mt-5 space-y-3">
-                {aiPrompts.map((prompt) => (
-                  <Link
-                    key={prompt}
-                    href="/dashboard/ai-assistant"
-                    className="block rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-gray-700 transition-colors hover:bg-white/15 dark:text-white/82"
-                  >
-                    {prompt}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </GlassCard>
         </motion.section>
       </div>
     </div>

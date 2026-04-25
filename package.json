@@ -8,7 +8,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev": "concurrently \"npm run dev:api\" \"wait-on http://localhost:3001/health/live && npm run dev:web\"",
     "dev:api": "cd apps/api && npm run start:dev",
     "dev:web": "cd apps/web && npm run dev",
     "build": "npm run build:api && npm run build:web",
@@ -28,7 +28,7 @@
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
-    "dev:lan": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:lan": "concurrently \"npm run dev:api\" \"wait-on http://localhost:3001/health/live && npm run dev:web\"",
     "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules"
   },
   "keywords": [
@@ -43,7 +43,8 @@
   "license": "MIT",
   "devDependencies": {
     "@types/pdfkit": "^0.17.5",
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "wait-on": "^9.0.5"
   },
   "dependencies": {
     "exceljs": "^4.4.0",
