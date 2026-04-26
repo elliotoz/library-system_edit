@@ -116,7 +116,7 @@ export default function ReadingListDetailPage() {
           {list.semester && <span>{list.semester}</span>}
         </div>
         {/* Inline follow/unfollow button (non-self only) */}
-        {list.owner && !isSelf && (
+        {list.owner && !isSelf && user?.role !== 'ADMIN' && (
           <div className="mt-4">
             <button
               onClick={handleToggleFollow}
