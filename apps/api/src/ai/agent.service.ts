@@ -224,6 +224,27 @@ export class AgentService {
           parameters: { type: 'object', properties: {} },
         },
       },
+      {
+        type: 'function',
+        function: {
+          name: 'get_reading_lists',
+          description: 'Get published reading lists from the library. Returns title, description, course code, semester, instructor name, and the books in each list. Use this when a user asks to see reading lists, browse course lists, or find what books instructors recommend.',
+          parameters: {
+            type: 'object',
+            properties: {
+              limit: { type: 'number', description: 'Max number of lists to return (default 10, max 20)' },
+            },
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'get_my_reading_lists',
+          description: "Get the current instructor's own reading lists including drafts. Use when an instructor asks about their own lists, or wants to manage or review what they have created.",
+          parameters: { type: 'object', properties: {} },
+        },
+      },
     ];
   }
 
@@ -480,6 +501,72 @@ export class AgentService {
             result: JSON.stringify({ totalUsers: total, students, admins }),
             citations: [],
           };
+        }
+
+        case 'get_reading_lists': {
+          const limit = Math.min((args.limit as number) || 10, 20);
+          const lists = await this.prisma.readingList.findMany({
+            where: {
+              status: 'PUBLISHED',
+              isActive: true,
+              visibility: { in: ['PUBLIC', 'FOLLOWERS_ONLY'] },
+            },
+            include: {
+              owner: { select: { name: true, department: true } },
+              items: {
+                include: { book: { select: { title: true, authors: true } } },
+                orderBy: { orderIndex: 'asc' },
+              },
+              _count: { select: { items: true } },
+            },
+            orderBy: { updatedAt: 'desc' },
+            take: limit,
+          });
+          if (!lists.length) return { result: 'No published reading lists found.', citations: [] };
+          const formatted = lists.map((l) => ({
+            id: l.id,
+            title: l.title,
+            description: l.description ?? null,
+            courseCode: l.courseCode ?? null,
+            semester: l.semester ?? null,
+            instructor: l.owner.name,
+            department: l.owner.department ?? null,
+            bookCount: l._count.items,
+            books: l.items.map((i) => ({ title: i.book.title, authors: i.book.authors })),
+            catalogLink: `/dashboard/reading-lists/${l.id}`,
+          }));
+          return { result: JSON.stringify(formatted), citations: [] };
+        }
+
+        case 'get_my_reading_lists': {
+          if (userRole !== 'INSTRUCTOR' && userRole !== 'ADMIN') {
+            return { result: 'This tool is only available to instructors and administrators.', citations: [] };
+          }
+          const myLists = await this.prisma.readingList.findMany({
+            where: { ownerId: userId },
+            include: {
+              items: {
+                include: { book: { select: { title: true, authors: true } } },
+                orderBy: { orderIndex: 'asc' },
+              },
+              _count: { select: { items: true } },
+            },
+            orderBy: { updatedAt: 'desc' },
+            take: 50,
+          });
+          if (!myLists.length) return { result: 'You have no reading lists yet.', citations: [] };
+          const formatted = myLists.map((l) => ({
+            id: l.id,
+            title: l.title,
+            status: l.status,
+            visibility: l.visibility,
+            courseCode: l.courseCode ?? null,
+            semester: l.semester ?? null,
+            bookCount: l._count.items,
+            books: l.items.map((i) => ({ title: i.book.title, authors: i.book.authors })),
+            catalogLink: `/dashboard/reading-lists/${l.id}`,
+          }));
+          return { result: JSON.stringify(formatted), citations: [] };
         }
 
         default:
