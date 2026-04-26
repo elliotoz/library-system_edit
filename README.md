@@ -48,7 +48,7 @@ The **AI-Integrated University Library Management System** is a comprehensive we
 - 📊 **Analytics Dashboard** — Real-time statistics and borrowing trends
 - 🌙 **Dark Mode Support** — Eye-friendly interface for extended use
 - 🎨 **Liquid Glass Design System** — WebGL aurora background, Framer Motion spring animations, glass chrome layer with content-aware opacity
-- 🤖 **OZ AI Agentic Assistant** — SSE streaming, tool-calling agent loop with real-time library data access, per-conversation history, and book cover scanning powered by Ollama
+- 🤖 **OZ AI Agentic Assistant** — SSE streaming, tool-calling agent loop with real-time library data access, per-conversation history, image understanding, and book cover scanning powered by OpenRouter
 
 ---
 
@@ -119,7 +119,7 @@ The **AI-Integrated University Library Management System** is a comprehensive we
 | **Passport.js**     | Authentication strategies (JWT + Google) |
 | **JWT**             | Stateless authentication via HttpOnly cookies |
 | **class-validator** | Request validation                       |
-| **Ollama**          | Local LLM inference for AI assistant     |
+| **OpenRouter**      | Cloud LLM routing for AI assistant (tiered models) |
 
 ### Database & Infrastructure
 
@@ -142,8 +142,8 @@ library-system/
 │   │   │   │   ├── ai.controller.ts            # REST + SSE endpoints
 │   │   │   │   ├── agent.service.ts            # Agentic loop (tool-calling, SSE)
 │   │   │   │   ├── ai.service.ts               # Legacy orchestrator
-│   │   │   │   ├── context-builder.service.ts  # Live user/library context
-│   │   │   │   ├── ollama.service.ts           # LLM integration + cover scan
+│   │   │   │   ├── groq.service.ts             # Cover scan + OpenRouter fallback
+│   │   │   │   ├── providers/                  # OpenRouter / Gemini / Groq providers
 │   │   │   │   └── dto/                        # Request/response DTOs
 │   │   │   ├── auth/           # Authentication (JWT + Google OAuth)
 │   │   │   ├── users/          # User management
@@ -200,7 +200,7 @@ library-system/
 - **npm** >= 9.x
 - **Docker** & **Docker Compose**
 - **Git**
-- **Ollama** (optional, for AI LLM features)
+- **OpenRouter API key** (free tier available at openrouter.ai)
 
 ### Step 1: Clone the Repository
 
@@ -275,8 +275,11 @@ GOOGLE_CLIENT_ID="your-google-client-id"
 GOOGLE_CLIENT_SECRET="your-google-client-secret"
 GOOGLE_CALLBACK_URL="http://localhost:3001/auth/google/callback"
 
-# Ollama (optional — AI chat falls back to rule-based without it)
-OLLAMA_BASE_URL="http://localhost:11434"
+# OpenRouter (required for AI chat)
+OPENROUTER_API_KEY="sk-or-v1-..."
+
+# Gemini (required for book cover scanning)
+GEMINI_API_KEY="AIza..."
 
 # SMTP Email (optional — falls back to console logging if not configured)
 SMTP_HOST="smtp.example.com"
@@ -308,12 +311,13 @@ JWT_SECRET="change-me-must-match-api"
 | Feature | Required Env Vars | Fallback |
 |---------|-------------------|----------|
 | **SMTP Email** | `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` | Emails logged to console |
-| **Ollama AI** | `OLLAMA_BASE_URL` (and running Ollama) | Rule-based responses |
+| **OZ AI Chat** | `OPENROUTER_API_KEY` | AI offline indicator shown |
+| **Book Cover Scan** | `GEMINI_API_KEY` | Scan endpoint unavailable |
 | **Google OAuth** | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Button hidden on login/signup |
 
 The `/auth/config` endpoint returns the current status of each feature:
 ```json
-{ "googleOAuthEnabled": false, "smtpEnabled": false, "ollamaEnabled": true }
+{ "googleOAuthEnabled": false, "smtpEnabled": false }
 ```
 
 ---
@@ -571,7 +575,7 @@ OZ AI is the library's built-in AI assistant. It runs as a **tool-calling agent 
 ### Architecture
 
 ```
-User Message
+User Message (text or image)
      │
      ▼
 ┌──────────────────────────────────────────┐
@@ -581,7 +585,8 @@ User Message
                 │
                 ▼
 ┌──────────────────────────────────────────┐
-│  Ollama /api/chat  (mistral / llama3)    │
+│  OpenRouter /chat/completions            │
+│  Tiered model selection (FREE/CHEAP/SMART)
 │  System prompt + conversation history   │
 │  Tool definitions injected              │
 └───────────────┬──────────────────────────┘
@@ -590,26 +595,41 @@ User Message
        │ yes              │ no
        ▼                  ▼
 ┌─────────────┐   ┌───────────────────┐
-│ executeTool │   │ stream text token │
+│ executeTool │   │ stream text chunk │
 │ (Prisma /   │   │ to client via SSE │
 │  fetch)     │   └───────────────────┘
 └──────┬──────┘
        │ result injected as tool message
-       └──────────► back to Ollama (loop)
+       └──────────► back to OpenRouter (loop, max 5 rounds)
 ```
+
+### Model Tiers
+
+| Tier | Model | Used For |
+|------|-------|----------|
+| FREE | `google/gemma-4-31b-it:free` | Simple greetings, short responses |
+| CHEAP | `google/gemini-3.1-flash-lite-preview` | Tool-calling, image analysis |
+| SMART | `anthropic/claude-3-haiku` | Deep analytical queries, research |
+
+If the FREE tier is rate-limited (429), the agent automatically falls back to CHEAP.
 
 ### Tools
 
 | Tool | Description |
 |------|-------------|
-| `search_catalog` | Search books by keyword; returns title, authors, availability, cover |
+| `search_catalog` | Search books by keyword; returns title, authors, availability |
 | `get_book_details` | Full detail for a specific book ID |
 | `read_ebook` | Fetch and return e-book text content from URL |
 | `fetch_webpage` | General web fetch for research or external context |
 | `get_my_borrows` | Caller's currently active borrows with due dates |
-| `get_catalog_stats` | System-wide counts: books, copies, available, borrowed, e-books, active borrows |
-| `get_active_borrows` | Admin: all active borrows + top 5 most-borrowed titles |
-| `get_active_reservations` | Admin: pending and ready-for-pickup reservations |
+| `get_catalog_stats` | System-wide counts: books, copies, available, borrowed, e-books |
+| `get_active_borrows` | Staff/Admin: all active borrows + top 5 most-borrowed titles |
+| `get_active_reservations` | Staff/Admin: pending and ready-for-pickup reservations |
+| `get_user_stats` | Admin: total user counts by role |
+
+### Image Understanding
+
+Users can attach an image to any message (max 1024px, JPEG compressed). The image is sent as a base64 multipart content block via the OpenRouter vision API. Useful for asking about a book cover, a reading list photo, etc.
 
 ### Conversation History
 
@@ -628,24 +648,26 @@ Content-Type: application/json
 { "image": "<base64 JPEG>" }
 ```
 
-Uses `gemma3:4b` multimodal model. Extracts title, authors, ISBN, publisher, and publication year.
+Uses Google Gemini Flash. Extracts title, authors, ISBN, publisher, and publication year.
 
 ### Permission Safety
 
 - Tool results are scoped: `get_my_borrows` returns only the requesting user's data
-- Admin-only tools (`get_active_borrows`, `get_active_reservations`) are gated by `RolesGuard`
+- Staff/Admin-only tools (`get_active_borrows`, `get_active_reservations`) enforce role check inside tool handler
+- Admin-only tool (`get_user_stats`) enforces ADMIN role
 - The AI informs but never executes write actions
+- SSRF protection: `fetch_webpage` and `read_ebook` block localhost, RFC-1918, and link-local addresses
 
-### LLM Integration (Ollama)
+### LLM Configuration (OpenRouter)
 
-Requires a running Ollama instance. Recommended models:
+Requires an OpenRouter API key (free tier available):
 
-```bash
-ollama pull mistral    # primary chat model
-ollama pull gemma3:4b  # book cover scanning (multimodal)
+```env
+OPENROUTER_API_KEY="sk-or-v1-..."
+GEMINI_API_KEY="AIza..."   # for book cover scan only
 ```
 
-When Ollama is unavailable, the `/ai/status` endpoint returns `{ "available": false }` and the frontend shows a "Basic Mode" indicator.
+When `OPENROUTER_API_KEY` is not set, `/ai/status` returns `{ "available": false }` and the frontend shows an "Offline" indicator.
 
 ---
 
@@ -683,7 +705,7 @@ When Ollama is unavailable, the `/ai/status` endpoint returns `{ "available": fa
 - [x] Natural Language Catalog Search with Semantic Scoring
 - [x] Personalized Learning Path Generation
 - [x] Research Assistant with Literature Guidance
-- [x] Ollama LLM Integration with Rule-Based Fallback
+- [x] OpenRouter LLM Integration with tiered model routing (FREE/CHEAP/SMART)
 - [x] Embeddings-Ready Semantic Search Abstraction (keyword/hybrid/embedding strategy with shared types)
 
 ### 🔄 Phase 4: Production Readiness (In Progress)
@@ -879,13 +901,12 @@ No authentication required. Designed for load balancers and container orchestrat
 
 **Readiness checks:**
 - **db**: Runs `SELECT 1` against PostgreSQL
-- **ollama**: Pings Ollama API (only when `MONITOR_OLLAMA=true`)
 
 Example response:
 ```json
 {
   "status": "ready",
-  "checks": { "db": "up", "ollama": "skipped" },
+  "checks": { "db": "up" },
   "timestamp": "2026-03-12T10:00:00.000Z"
 }
 ```

@@ -9,7 +9,6 @@ import { SemanticSearchService } from './semantic-search.service';
 import { LearningPathService } from './learning-path.service';
 import { ResearchAssistantService } from './research-assistant.service';
 import { GroqService } from './groq.service';
-import { FileExtractService } from './file-extract.service';
 import { GroqProvider } from './providers/groq.provider';
 import { GeminiProvider } from './providers/gemini.provider';
 import { OpenRouterProvider } from './providers/openrouter.provider';
@@ -32,7 +31,6 @@ import { PrismaModule } from '../prisma/prisma.module';
     LearningPathService,
     ResearchAssistantService,
     GroqService,
-    FileExtractService,
     GroqProvider,
     GeminiProvider,
     OpenRouterProvider,

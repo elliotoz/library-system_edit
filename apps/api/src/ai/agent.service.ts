@@ -497,8 +497,6 @@ export class AgentService {
     imageBase64: string | null,
     cookieHeader: string,
     conversationId?: string,
-    fileContent?: string,
-    fileName?: string,
   ): AsyncGenerator<ChatChunk> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -576,33 +574,15 @@ export class AgentService {
       })),
     ];
 
-    // If a file was uploaded, insert it as a dedicated user message before the question.
-    // This keeps the user's question clean and ensures the model sees the file clearly.
-    const hasFile = !!(fileContent && fileContent.trim().length > 0);
-    if (hasFile) {
-      this.logger.log(`📎 File attached: "${fileName}" (${fileContent!.length} chars)`);
-      messages.push({
-        role: 'user',
-        content: `I have uploaded a file named "${fileName}". Here is its content:\n\n---\n${fileContent}\n---`,
-      });
-      messages.push({
-        role: 'assistant',
-        content: `I have read the file "${fileName}". What would you like to know about it?`,
-      });
-    }
-
     messages.push({ role: 'user', content: userContent });
 
     // Decide whether to use tools based on message complexity
     const simple = this.isSimpleMessage(message);
     const deep = this.isDeepQuery(message);
-    // Files: answer from the file content, don't call catalog tools
-    const useTools = !hasImage && !simple && !hasFile;
-    let model = hasFile
-      ? OPENROUTER_MODELS.CHEAP
-      : this.pickModel(message, hasImage);
+    const useTools = !hasImage && !simple;
+    let model = this.pickModel(message, hasImage);
 
-    const tierLabel = hasFile ? 'CHEAP(file)' : deep ? 'SMART' : simple ? 'FREE' : hasImage ? 'CHEAP(vision)' : 'CHEAP(tools)';
+    const tierLabel = deep ? 'SMART' : simple ? 'FREE' : hasImage ? 'CHEAP(vision)' : 'CHEAP(tools)';
     this.logger.log(`🤖 AI Request — model: ${model} | tools: ${useTools} | tier: ${tierLabel}`);
 
     // Agent loop — max 5 rounds of tool calling

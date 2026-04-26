@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Send, ImageIcon, X, BookOpen, History, Plus, Trash2, MessageSquare, Paperclip } from 'lucide-react';
+import { Send, ImageIcon, X, BookOpen, History, Plus, Trash2, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { renderMessage } from '@/lib/renderMessage';
@@ -23,7 +23,6 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   imagePreview?: string;
-  fileName?: string;
   citations?: BookCitation[];
 }
 
@@ -130,8 +129,6 @@ export default function AIAssistantPage() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [aiOnline, setAiOnline] = useState<boolean | null>(null);
   const [pendingImage, setPendingImage] = useState<{ base64: string; preview: string } | null>(null);
-  const [pendingFile, setPendingFile] = useState<{ name: string; text: string; wordCount: number; totalWordCount: number; truncated: boolean } | null>(null);
-  const [fileUploading, setFileUploading] = useState(false);
   const [bookContext, setBookContext] = useState<BookContext | null>(null);
   const [bookContextDismissed, setBookContextDismissed] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -145,7 +142,6 @@ export default function AIAssistantPage() {
   // Refs for stale-closure-free access
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const docInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const contextSentRef = useRef(false);
   const messagesRef = useRef<ChatMessage[]>([]);
@@ -175,18 +171,11 @@ export default function AIAssistantPage() {
       const res = await fetch(`/api/ai/history?conversationId=${convId}`, { credentials: 'include' });
       const history: { id: string; role: string; content: string }[] = res.ok ? await res.json() : [];
       setMessages(
-        history.map((m) => {
-          const fileMatch = m.content.match(/^\[ATTACHED FILE: (.+?) —/);
-          const displayContent = fileMatch
-            ? m.content.replace(/^\[ATTACHED FILE:.*?---\n\n?/s, '').trim() || `📎 ${fileMatch[1]}`
-            : m.content;
-          return {
-            id: m.id,
-            role: m.role as 'user' | 'assistant',
-            content: displayContent,
-            fileName: fileMatch ? fileMatch[1] : undefined,
-          };
-        }),
+        history.map((m) => ({
+          id: m.id,
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        })),
       );
     } catch {
       setMessages([]);
@@ -285,20 +274,17 @@ export default function AIAssistantPage() {
   // ── Send message ─────────────────────────────────────────────────────────────
 
   const sendMessage = useCallback(async (text: string, imgBase64?: string | null) => {
-    if ((!text.trim() && !imgBase64 && !pendingFile) || isStreaming) return;
+    if ((!text.trim() && !imgBase64) || isStreaming) return;
 
     const convId = activeConvRef.current;
 
-    const userMessage = text.trim() || (imgBase64 ? 'What can you tell me about this image?' : pendingFile ? 'What does this file say?' : '');
-    // Capture before state is cleared
-    const capturedFile = pendingFile;
+    const userMessage = text.trim() || (imgBase64 ? 'What can you tell me about this image?' : '');
 
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
       content: userMessage,
       imagePreview: imgBase64 ? `data:image/jpeg;base64,${imgBase64}` : undefined,
-      fileName: pendingFile?.name,
     };
 
     const assistantMsgId = `assistant-${Date.now() + 1}`;
@@ -311,7 +297,6 @@ export default function AIAssistantPage() {
     setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setInput('');
     setPendingImage(null);
-    setPendingFile(null);
     setIsStreaming(true);
 
     try {
@@ -325,8 +310,6 @@ export default function AIAssistantPage() {
           hasImage: !!imgBase64,
           imageBase64: imgBase64 ?? null,
           conversationId: convId,
-          fileContent: capturedFile?.text ?? undefined,
-          fileName: capturedFile?.name ?? undefined,
         }),
       });
 
@@ -411,53 +394,8 @@ export default function AIAssistantPage() {
   }, [bookContext, historyLoaded, sendMessage]);
 
   const handleSend = () => {
-    if ((!input.trim() && !pendingImage && !pendingFile) || isStreaming) return;
+    if ((!input.trim() && !pendingImage) || isStreaming) return;
     sendMessage(input.trim(), pendingImage?.base64 ?? null);
-  };
-
-  const handleDocSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
-    if (file.size > 50 * 1024 * 1024) {
-      alert('File is too large. Maximum size is 50 MB.');
-      return;
-    }
-    setFileUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch('/api/ai/upload-file', {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as { message?: string };
-        const status = res.status;
-        let userMessage = err.message ?? 'Failed to process the file. Please try again.';
-        if (status === 413) userMessage = 'File is too large. Maximum allowed size is 50 MB.';
-        if (status === 415 || status === 400) userMessage = err.message ?? 'Unsupported file type or format.';
-        if (status === 500) userMessage = 'OZ could not read this file. It may be scanned, image-based, password-protected, or corrupted.';
-        setPendingFile(null);
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `error-${Date.now()}`,
-            role: 'assistant',
-            content: `**File upload failed:** ${userMessage}`,
-          },
-        ]);
-        return;
-      }
-      const data = await res.json() as { text: string; wordCount: number; totalWordCount: number; truncated: boolean; filename: string };
-      setPendingFile({ name: data.filename, text: data.text, wordCount: data.wordCount, totalWordCount: data.totalWordCount, truncated: data.truncated });
-      inputRef.current?.focus();
-    } catch {
-      alert('Failed to upload file. Please try again.');
-    } finally {
-      setFileUploading(false);
-    }
   };
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -704,17 +642,6 @@ export default function AIAssistantPage() {
                       className="max-w-xs rounded-lg mb-2 border border-white/20"
                     />
                   )}
-                  {msg.fileName && (
-                    <div className="flex items-center gap-3 mb-2 px-3 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.10] w-fit max-w-[260px]">
-                      <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-[#2A9D9D]/20 border border-[#2A9D9D]/30 shrink-0">
-                        <svg className="w-5 h-5 text-[#2A9D9D]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-white/90 truncate">{msg.fileName}</p>
-                        <p className="text-xs text-white/40">{msg.fileName.split('.').pop()?.toUpperCase()} document</p>
-                      </div>
-                    </div>
-                  )}
                   {msg.role === 'assistant' ? (
                     <div className="leading-relaxed">
                       {renderMessage(msg.content)}
@@ -752,31 +679,6 @@ export default function AIAssistantPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* File badge strip */}
-        {pendingFile && (
-          <div className="px-4 pb-2 flex items-center gap-2 border-t border-white/[0.06] pt-2 flex-wrap">
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border ${pendingFile.truncated ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-white/[0.06] border-white/[0.12]'}`}>
-              <Paperclip className={`w-4 h-4 flex-shrink-0 ${pendingFile.truncated ? 'text-yellow-400' : 'text-[#2A9D9D]'}`} />
-              <span className="text-xs text-gray-300 truncate max-w-[180px]">{pendingFile.name}</span>
-              {pendingFile.truncated ? (
-                <span className="text-xs text-yellow-400 font-medium">
-                  {pendingFile.wordCount.toLocaleString()} / {pendingFile.totalWordCount.toLocaleString()} words
-                </span>
-              ) : (
-                <span className="text-xs text-gray-500">{pendingFile.wordCount.toLocaleString()} words</span>
-              )}
-              <button onClick={() => setPendingFile(null)} className="ml-1 text-gray-500 hover:text-red-400 transition-colors">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            {pendingFile.truncated ? (
-              <span className="text-xs text-yellow-400">Truncated to fit AI context — ask a question about it</span>
-            ) : (
-              <span className="text-xs text-gray-400">File ready — ask a question about it</span>
-            )}
-          </div>
-        )}
-
         {/* Image preview strip */}
         {pendingImage && (
           <div className="px-4 pb-2 flex items-center gap-2 border-t border-white/[0.06] pt-2">
@@ -803,13 +705,6 @@ export default function AIAssistantPage() {
               className="hidden"
               onChange={handleImageSelect}
             />
-            <input
-              ref={docInputRef}
-              type="file"
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
-              className="hidden"
-              onChange={handleDocSelect}
-            />
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isStreaming}
@@ -824,42 +719,20 @@ export default function AIAssistantPage() {
             >
               <ImageIcon className="w-5 h-5" />
             </button>
-            <button
-              onClick={() => docInputRef.current?.click()}
-              disabled={isStreaming || fileUploading}
-              title="Attach PDF, DOCX, or TXT"
-              className={cn(
-                'p-2.5 rounded-xl border transition-colors flex-shrink-0',
-                pendingFile
-                  ? 'border-[#2A9D9D]/60 bg-[#2A9D9D]/10 text-[#2A9D9D]'
-                  : 'border-white/20 text-gray-400 hover:text-[#2A9D9D] hover:border-[#2A9D9D]/40',
-                (isStreaming || fileUploading) && 'opacity-40 cursor-not-allowed',
-              )}
-            >
-              {fileUploading ? (
-                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                </svg>
-              ) : (
-                <Paperclip className="w-5 h-5" />
-              )}
-            </button>
-
             <input
               ref={inputRef}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              placeholder={pendingFile ? 'Ask a question about the file...' : pendingImage ? 'Ask about this image...' : 'Ask me anything about books...'}
+              placeholder={pendingImage ? 'Ask about this image...' : 'Ask me anything about books...'}
               disabled={isStreaming}
               className="flex-1 px-4 py-2.5 bg-white/[0.06] border border-white/20 rounded-2xl focus:ring-2 focus:ring-[#2A9D9D]/40 focus:border-[#2A9D9D]/50 text-sm placeholder:text-gray-400 text-gray-200 dark:text-gray-200 backdrop-blur-md disabled:opacity-50"
             />
 
             <button
               onClick={handleSend}
-              disabled={(!input.trim() && !pendingImage && !pendingFile) || isStreaming}
+              disabled={(!input.trim() && !pendingImage) || isStreaming}
               className="p-2.5 bg-gradient-to-br from-[#2A9D9D] to-[#1a7a7a] text-white rounded-xl hover:from-[#33b5b5] hover:to-[#228888] disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm shadow-[#2A9D9D]/20 flex-shrink-0"
             >
               <Send className="w-5 h-5" />
