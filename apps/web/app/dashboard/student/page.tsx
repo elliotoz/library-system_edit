@@ -247,10 +247,16 @@ export default function StudentDashboard() {
               const badge = bookAvailabilityBadge(book);
               return (
                 <Link key={book.id} href={`/dashboard/catalog/${book.id}`} className="group block">
-                  <div className={cn('relative aspect-[3/4] rounded-xl mb-3 flex flex-col items-center justify-center bg-gradient-to-br p-3 transition-all group-hover:shadow-lg group-hover:-translate-y-0.5 overflow-hidden', BOOK_GRADIENTS[i % 4])}>
-                    <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
-                    <BookOpen className="w-10 h-10 text-white/80 mb-2" />
-                    <p className="text-white/70 text-[10px] text-center line-clamp-3">{book.title}</p>
+                  <div className={cn('relative aspect-[3/4] rounded-xl mb-3 overflow-hidden transition-all group-hover:shadow-lg group-hover:-translate-y-0.5', !book.coverImageUrl && cn('flex flex-col items-center justify-center bg-gradient-to-br p-3', BOOK_GRADIENTS[i % 4]))}>
+                    {book.coverImageUrl ? (
+                      <img src={book.coverImageUrl} alt={book.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <>
+                        <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+                        <BookOpen className="w-10 h-10 text-white/80 mb-2" />
+                        <p className="text-white/70 text-[10px] text-center line-clamp-3">{book.title}</p>
+                      </>
+                    )}
                   </div>
                   <p className="text-sm font-medium text-gray-900 dark:text-white line-clamp-1 group-hover:text-primary-600 transition-colors">{book.title}</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">{book.authors.join(', ')}</p>
