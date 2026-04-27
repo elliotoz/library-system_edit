@@ -49,8 +49,9 @@ export class AgentService {
     };
   }
 
-  /** Pick model tier based on message complexity. */
-  private pickModel(message: string, hasImage: boolean): string {
+  /** Pick model tier based on message complexity, respecting an explicit override. */
+  private pickModel(message: string, hasImage: boolean, override?: string): string {
+    if (override) return override;
     if (hasImage) return OPENROUTER_MODELS.CHEAP;
     if (this.isDeepQuery(message)) return OPENROUTER_MODELS.SMART;
     if (this.isSimpleMessage(message)) return OPENROUTER_MODELS.FREE;
@@ -584,6 +585,7 @@ export class AgentService {
     imageBase64: string | null,
     cookieHeader: string,
     conversationId?: string,
+    modelOverride?: string,
   ): AsyncGenerator<ChatChunk> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -667,7 +669,7 @@ export class AgentService {
     const simple = this.isSimpleMessage(message);
     const deep = this.isDeepQuery(message);
     const useTools = !hasImage && !simple;
-    let model = this.pickModel(message, hasImage);
+    let model = this.pickModel(message, hasImage, modelOverride);
 
     const tierLabel = deep ? 'SMART' : simple ? 'FREE' : hasImage ? 'CHEAP(vision)' : 'CHEAP(tools)';
     this.logger.log(`🤖 AI Request — model: ${model} | tools: ${useTools} | tier: ${tierLabel}`);

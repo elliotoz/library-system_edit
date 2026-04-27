@@ -174,16 +174,16 @@ function renderInlineText(text: string): React.ReactNode[] {
   return parts.map((part, i) => {
     if (/^`[^`]+`$/.test(part)) {
       return (
-        <code key={i} className="px-1.5 py-0.5 rounded bg-white/10 text-[#86efac] text-[0.85em] font-mono border border-white/10">
+        <code key={i} className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/10 text-teal-700 dark:text-[#86efac] text-[0.85em] font-mono border border-gray-200 dark:border-white/10">
           {part.slice(1, -1)}
         </code>
       );
     }
     if (/^\*\*[^*]+\*\*$/.test(part)) {
-      return <strong key={i} className="font-semibold text-white">{part.slice(2, -2)}</strong>;
+      return <strong key={i} className="font-semibold text-gray-900 dark:text-white">{renderInlineText(part.slice(2, -2))}</strong>;
     }
     if (/^\*[^*]+\*$/.test(part)) {
-      return <em key={i} className="italic text-white/80">{part.slice(1, -1)}</em>;
+      return <em key={i} className="italic text-gray-600 dark:text-white/80">{renderInlineText(part.slice(1, -1))}</em>;
     }
     // Markdown link [label](href)
     const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
@@ -256,7 +256,7 @@ function renderTextBlock(text: string): React.ReactNode {
     if (/^###\s/.test(line)) {
       flushList();
       nodes.push(
-        <h3 key={key++} className="text-base font-semibold text-white mt-4 mb-1">
+        <h3 key={key++} className="text-base font-semibold text-gray-900 dark:text-white mt-4 mb-1">
           {renderInlineText(line.slice(4))}
         </h3>,
       );
@@ -266,7 +266,7 @@ function renderTextBlock(text: string): React.ReactNode {
     if (/^##\s/.test(line)) {
       flushList();
       nodes.push(
-        <h2 key={key++} className="text-lg font-bold text-white mt-5 mb-2">
+        <h2 key={key++} className="text-lg font-bold text-gray-900 dark:text-white mt-5 mb-2">
           {renderInlineText(line.slice(3))}
         </h2>,
       );
@@ -276,7 +276,7 @@ function renderTextBlock(text: string): React.ReactNode {
     if (/^#\s/.test(line)) {
       flushList();
       nodes.push(
-        <h1 key={key++} className="text-xl font-bold text-white mt-6 mb-2">
+        <h1 key={key++} className="text-xl font-bold text-gray-900 dark:text-white mt-6 mb-2">
           {renderInlineText(line.slice(2))}
         </h1>,
       );
@@ -289,7 +289,7 @@ function renderTextBlock(text: string): React.ReactNode {
         listType = 'ul';
       }
       listItems.push(
-        <li key={key++} className="flex gap-2 text-white/85">
+        <li key={key++} className="flex gap-2 text-gray-700 dark:text-white/85">
           <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#2A9D9D] flex-shrink-0" />
           <span>{renderInlineText(line.replace(/^[-*]\s/, ''))}</span>
         </li>,
@@ -303,7 +303,7 @@ function renderTextBlock(text: string): React.ReactNode {
         listType = 'ol';
       }
       listItems.push(
-        <li key={key++} className="text-white/85 ml-1">
+        <li key={key++} className="text-gray-700 dark:text-white/85 ml-1">
           {renderInlineText(line.replace(/^\d+\.\s/, ''))}
         </li>,
       );
@@ -312,7 +312,7 @@ function renderTextBlock(text: string): React.ReactNode {
     // Regular line
     flushList();
     nodes.push(
-      <span key={key++} className="text-white/85 leading-relaxed block">
+      <span key={key++} className="text-gray-700 dark:text-white/85 leading-relaxed block">
         {renderInlineText(line)}
       </span>,
     );

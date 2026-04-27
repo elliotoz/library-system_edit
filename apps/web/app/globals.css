@@ -47,15 +47,26 @@
   --sidebar-accent-foreground: #374151;
   --sidebar-primary-foreground: #ffffff;
 
-  /* Glass tokens — light mode */
-  --glass-bg:        rgba(255, 255, 255, 0.72);
-  --glass-border:    rgba(0, 0, 0, 0.09);
-  --glass-shadow:    0 4px 24px rgba(0, 0, 0, 0.07),
-                     0 1px 6px  rgba(0, 0, 0, 0.04),
-                     inset 0 1px 0 rgba(255, 255, 255, 0.95);
-  --glass-highlight: linear-gradient(135deg, rgba(255,255,255,0.82) 0%, transparent 55%);
-  --glass-rim:         rgba(255, 255, 255, 0.55);
-  --glass-chrome-bg:   rgba(255, 255, 255, 0.68);
+  /* Chat token scales */
+  --bg-0:     #f8fafc;
+  --bg-100:   #ffffff;
+  --bg-200:   #f1f5f9;
+  --bg-300:   #e2e8f0;
+  --text-100: #1e293b;
+  --text-200: #334155;
+  --text-300: #64748b;
+  --text-400: #94a3b8;
+  --text-500: #a8a29e;
+  --accent-hover: #1D7A7A;
+
+  /* Glass tokens — light mode (solid cards, no blur) */
+  --glass-bg:        #ffffff;
+  --glass-border:    #e5e7eb;
+  --glass-shadow:    0 1px 3px rgba(0, 0, 0, 0.08),
+                     0 1px 2px rgba(0, 0, 0, 0.04);
+  --glass-highlight: none;
+  --glass-rim:       transparent;
+  --glass-chrome-bg:   #ffffff;
   --glass-btn-bg:      rgba(255, 255, 255, 0.55);
   --glass-btn-top:     rgba(255, 255, 255, 0.90);
   --glass-search-bg:   rgba(255, 255, 255, 0.50);
@@ -101,6 +112,18 @@
   --destructive-foreground: #0f172a;
   --sidebar-accent-foreground: #d1d5db;
   --sidebar-primary-foreground: #0f172a;
+
+  /* Chat token scales — dark mode */
+  --bg-0:     #0f172a;
+  --bg-100:   #1e293b;
+  --bg-200:   #1e293b;
+  --bg-300:   #334155;
+  --text-100: #e2e8f0;
+  --text-200: #cbd5e1;
+  --text-300: #94a3b8;
+  --text-400: #64748b;
+  --text-500: #475569;
+  --accent-hover: #2A9D9D;
 
   /* Glass tokens — dark mode */
   --glass-bg:        rgba(11, 17, 32, 0.78);
@@ -266,17 +289,22 @@ body {
 /* ── Glass Card ─────────────────────────────────────────────────────── */
 .glass-card {
   background: var(--glass-bg);
-  backdrop-filter: blur(22px) saturate(180%);
-  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
   border-radius: 16px;
   position: relative;
   overflow: hidden;
-  transform: translateZ(0); /* compositor layer — prevents repaints */
+  transform: translateZ(0);
 }
 
-/* Specular highlight — light catch at top-left */
+.dark .glass-card {
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+}
+
+/* Specular highlight — light catch at top-left (dark mode only) */
 .glass-card::before {
   content: '';
   position: absolute;
@@ -285,6 +313,11 @@ body {
   pointer-events: none;
   border-radius: inherit;
   z-index: 0;
+  display: none;
+}
+
+.dark .glass-card::before {
+  display: block;
 }
 
 /* Bottom rim shadow for depth */
@@ -322,14 +355,18 @@ body {
 }
 
 /* ── Glass Chrome — header, sidebar, bars, toolbars ─────────────────── */
-/* Lighter blur, more transparent: chrome floats above content */
 .glass-chrome {
   background: var(--glass-chrome-bg);
-  backdrop-filter: blur(28px) saturate(200%);
-  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
   transform: translateZ(0);
+}
+
+.dark .glass-chrome {
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
 }
 
 /* ── Glass Button ────────────────────────────────────────────────────── */

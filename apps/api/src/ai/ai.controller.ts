@@ -106,6 +106,7 @@ export class AiController {
       hasImage?: boolean;
       imageBase64?: string;
       conversationId?: string;
+      model?: string;
     },
     @Req() req: Request,
     @Res() res: Response,
@@ -126,6 +127,7 @@ export class AiController {
         body.imageBase64 ?? null,
         cookieHeader,
         body.conversationId,
+        body.model,
       );
 
       for await (const chunk of stream) {

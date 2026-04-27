@@ -10,6 +10,21 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Assistant chat token scales
+        bg: {
+          '0':   'var(--bg-0)',
+          '100': 'var(--bg-100)',
+          '200': 'var(--bg-200)',
+          '300': 'var(--bg-300)',
+        },
+        text: {
+          '100': 'var(--text-100)',
+          '200': 'var(--text-200)',
+          '300': 'var(--text-300)',
+          '400': 'var(--text-400)',
+          '500': 'var(--text-500)',
+        },
+        'accent-hover': 'var(--accent-hover)',
         // Primary - Üsküdar University Teal
         primary: {
           DEFAULT: 'var(--primary)',

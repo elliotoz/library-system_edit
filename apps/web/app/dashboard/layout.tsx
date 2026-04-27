@@ -249,8 +249,8 @@ export default function DashboardLayout({
       </svg>
 
       <div className="min-h-screen">
-        {/* WebGL animated mesh background */}
-        <WebGLBackground />
+        {/* WebGL animated mesh background — dark mode only */}
+        {darkMode && <WebGLBackground />}
 
         <Toaster position="top-right" />
 
@@ -259,9 +259,11 @@ export default function DashboardLayout({
           className="fixed top-0 z-50 flex h-16 w-full items-center justify-between px-4 glass-chrome"
           style={{
             borderBottom: '1px solid var(--glass-border)',
-            background: isDarkContent
-              ? 'rgba(255,255,255,0.72)'
-              : 'var(--glass-chrome-bg)',
+            background: darkMode
+              ? isDarkContent
+                ? 'rgba(255,255,255,0.72)'
+                : 'var(--glass-chrome-bg)'
+              : '#ffffff',
             transition: 'background 0.4s var(--spring-gentle)',
           }}
         >

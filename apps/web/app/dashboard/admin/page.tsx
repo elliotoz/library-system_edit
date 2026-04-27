@@ -24,8 +24,6 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { GlassCard } from '@/components/ui/glass-card';
-import { Spotlight } from '@/components/ui/spotlight';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -56,9 +54,9 @@ const CONTAINER_MOTION = {
 
 function getOpsStatus(pendingReservations: number, overdueBooks: number) {
   const critical = pendingReservations + overdueBooks;
-  if (critical >= 20) return { label: 'High attention', tone: 'text-rose-100 bg-rose-400/15 border-rose-300/20' };
-  if (critical >= 8) return { label: 'Watch closely', tone: 'text-amber-100 bg-amber-400/15 border-amber-300/20' };
-  return { label: 'Stable flow', tone: 'text-emerald-100 bg-emerald-400/15 border-emerald-300/20' };
+  if (critical >= 20) return { label: 'High attention', tone: 'text-rose-700 dark:text-rose-100 bg-rose-50 dark:bg-rose-400/15 border-rose-300 dark:border-rose-300/20' };
+  if (critical >= 8) return { label: 'Watch closely', tone: 'text-amber-700 dark:text-amber-100 bg-amber-50 dark:bg-amber-400/15 border-amber-300 dark:border-amber-300/20' };
+  return { label: 'Stable flow', tone: 'text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-500/20 border-teal-400 dark:border-teal-500' };
 }
 
 const AI_TABS = [
@@ -229,37 +227,25 @@ export default function AdminDashboard() {
     <div className="space-y-6">
       {/* 1 — Hero banner */}
       <motion.section {...CONTAINER_MOTION}>
-        <GlassCard
-          liquid
-          className="relative overflow-hidden rounded-[30px] border border-white/10 p-6 sm:p-7 bg-gradient-to-br from-slate-950/90 via-slate-900/85 to-slate-950/90"
-        >
-          <div className="pointer-events-none absolute inset-0">
-            <Spotlight className="left-[45%] top-[-38%] opacity-100" fill="#5eead4" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(45,212,191,0.18),transparent_28%),radial-gradient(circle_at_left,rgba(56,189,248,0.12),transparent_24%)]" />
-            <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-cyan-300/30 to-transparent" />
-            <div className="absolute right-5 top-5 h-32 w-32 rounded-full bg-cyan-300/10 blur-3xl" />
-          </div>
-
-          <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-3xl">
-              <p className="text-sm font-medium text-teal-200/85">{greeting()}</p>
-              <div className="mt-2 flex flex-wrap items-center gap-3">
-                <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-                  {user?.name?.split(' ')[0] || 'Admin'} control center
-                </h1>
-                <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-cyan-100/85">
-                  Administrator
-                </span>
-                <span className={cn('rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.18em]', opsStatus.tone)}>
-                  {opsStatus.label}
-                </span>
-              </div>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200/78 sm:text-base">
-                Monitor circulation health, resolve operational risks, and move directly into the highest-priority library workflows.
-              </p>
+        <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{greeting()}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-white sm:text-4xl">
+                {user?.name?.split(' ')[0] || 'Admin'} control center
+              </h1>
+              <span className="rounded-full border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-white/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-gray-700 dark:text-gray-300">
+                Administrator
+              </span>
+              <span className={cn('rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.18em]', opsStatus.tone)}>
+                {opsStatus.label}
+              </span>
             </div>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-600 dark:text-gray-400 sm:text-base">
+              Monitor circulation health, resolve operational risks, and move directly into the highest-priority library workflows.
+            </p>
           </div>
-        </GlassCard>
+        </div>
       </motion.section>
 
       {/* Quick actions row */}
@@ -272,13 +258,13 @@ export default function AdminDashboard() {
         <Button asChild variant="outline" size="sm">
           <Link href="/dashboard/admin/users">
             <UserPlus className="h-4 w-4" />
-            Add User
+            Manage Users
           </Link>
         </Button>
         <Button asChild variant="outline" size="sm">
-          <Link href="/dashboard/catalog">
+          <Link href="/dashboard/admin/books">
             <BookOpen className="h-4 w-4" />
-            Add Book
+            Manage Books
           </Link>
         </Button>
         <Button asChild size="sm">
