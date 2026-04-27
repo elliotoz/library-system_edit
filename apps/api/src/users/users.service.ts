@@ -174,6 +174,51 @@ export class UsersService {
     });
   }
 
+  async getPreferences(userId: string): Promise<{ notificationPrefs: Record<string, boolean> }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { notificationPrefs: true },
+    });
+
+    if (!user) throw new NotFoundException('User not found');
+
+    const prefs = (user.notificationPrefs as Record<string, boolean>) ?? {
+      emailNotifications: true,
+      dueDateReminders: true,
+      reservationAlerts: true,
+    };
+
+    return { notificationPrefs: prefs };
+  }
+
+  async updatePreferences(userId: string, prefs: {
+    emailNotifications?: boolean;
+    dueDateReminders?: boolean;
+    reservationAlerts?: boolean;
+  }): Promise<{ notificationPrefs: Record<string, boolean> }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { notificationPrefs: true },
+    });
+
+    if (!user) throw new NotFoundException('User not found');
+
+    const current = (user.notificationPrefs as Record<string, boolean>) ?? {
+      emailNotifications: true,
+      dueDateReminders: true,
+      reservationAlerts: true,
+    };
+
+    const merged = { ...current, ...prefs };
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { notificationPrefs: merged },
+    });
+
+    return { notificationPrefs: merged };
+  }
+
   /**
    * Get user statistics
    */

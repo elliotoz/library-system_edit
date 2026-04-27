@@ -27,6 +27,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateInterestsDto } from './dto/update-interests.dto';
+import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 
 const avatarStorage = diskStorage({
   destination: './uploads/avatars',
@@ -142,6 +143,23 @@ export class UsersController {
     @Body() dto: UpdateInterestsDto,
   ) {
     return this.usersService.updateInterests(userId, dto.interests);
+  }
+
+  @Get('preferences')
+  @ApiOperation({ summary: 'Get current user notification preferences' })
+  @ApiResponse({ status: 200, description: 'Preferences returned' })
+  async getMyPreferences(@CurrentUser('id') userId: string) {
+    return this.usersService.getPreferences(userId);
+  }
+
+  @Patch('preferences')
+  @ApiOperation({ summary: 'Update current user notification preferences' })
+  @ApiResponse({ status: 200, description: 'Preferences updated' })
+  async updateMyPreferences(
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdatePreferencesDto,
+  ) {
+    return this.usersService.updatePreferences(userId, dto);
   }
 
   @Patch(':id/deactivate')
