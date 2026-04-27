@@ -120,3 +120,16 @@ export class ResetPasswordDto {
   })
   password: string;
 }
+
+export class ChangePasswordDto {
+  @ApiProperty({ example: 'OldPassword123!', description: 'Current password' })
+  @IsString()
+  @IsNotEmpty({ message: 'Current password is required' })
+  currentPassword: string;
+
+  @ApiProperty({ example: 'NewPassword456!', description: 'New password (min 8 chars)' })
+  @IsString()
+  @MinLength(8, { message: 'New password must be at least 8 characters' })
+  @IsNotEmpty({ message: 'New password is required' })
+  newPassword: string;
+}
