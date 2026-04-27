@@ -219,6 +219,110 @@ export class UsersService {
     return { notificationPrefs: merged };
   }
 
+  async exportData(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        studentId: true,
+        staffId: true,
+        bio: true,
+        department: true,
+        interests: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) throw new NotFoundException('User not found');
+
+    const [borrows, reservations, readingLists] = await Promise.all([
+      this.prisma.borrow.findMany({
+        where: { userId },
+        select: {
+          id: true,
+          status: true,
+          borrowedAt: true,
+          dueAt: true,
+          returnedAt: true,
+          bookCopy: {
+            select: {
+              book: { select: { title: true, authors: true } },
+            },
+          },
+        },
+        orderBy: { borrowedAt: 'desc' },
+      }),
+      this.prisma.reservation.findMany({
+        where: { userId },
+        select: {
+          id: true,
+          status: true,
+          createdAt: true,
+          expiresAt: true,
+          bookCopy: {
+            select: {
+              book: { select: { title: true, authors: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.readingList.findMany({
+        where: { ownerId: userId },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          visibility: true,
+          createdAt: true,
+          items: {
+            select: {
+              book: { select: { title: true, authors: true } },
+              createdAt: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      exportedAt: new Date().toISOString(),
+      profile: user,
+      borrows: borrows.map((b) => ({
+        id: b.id,
+        status: b.status,
+        borrowedAt: b.borrowedAt,
+        dueAt: b.dueAt,
+        returnedAt: b.returnedAt,
+        book: b.bookCopy?.book?.title ?? 'Unknown',
+        authors: b.bookCopy?.book?.authors ?? [],
+      })),
+      reservations: reservations.map((r) => ({
+        id: r.id,
+        status: r.status,
+        createdAt: r.createdAt,
+        expiresAt: r.expiresAt,
+        book: r.bookCopy?.book?.title ?? 'Unknown',
+        authors: r.bookCopy?.book?.authors ?? [],
+      })),
+      readingLists: readingLists.map((rl) => ({
+        id: rl.id,
+        title: rl.title,
+        description: rl.description,
+        visibility: rl.visibility,
+        createdAt: rl.createdAt,
+        books: rl.items.map((item) => ({
+          title: item.book?.title ?? 'Unknown',
+          authors: item.book?.authors ?? [],
+          addedAt: item.createdAt,
+        })),
+      })),
+    };
+  }
+
   /**
    * Get user statistics
    */

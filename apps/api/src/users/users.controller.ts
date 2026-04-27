@@ -162,6 +162,13 @@ export class UsersController {
     return this.usersService.updatePreferences(userId, dto);
   }
 
+  @Get('export')
+  @ApiOperation({ summary: 'Export current user data as JSON' })
+  @ApiResponse({ status: 200, description: 'Data export returned' })
+  async exportMyData(@CurrentUser('id') userId: string) {
+    return this.usersService.exportData(userId);
+  }
+
   @Patch(':id/deactivate')
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Deactivate user (Admin only)' })
