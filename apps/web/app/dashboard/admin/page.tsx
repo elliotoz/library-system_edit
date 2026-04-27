@@ -10,19 +10,28 @@ import {
   Clock,
   AlertTriangle,
   UserPlus,
-  Plus,
   BarChart3,
   ChevronRight,
   Activity,
   ArrowUpRight,
   BellRing,
   ShieldAlert,
+  GraduationCap,
+  Briefcase,
+  Shield,
+  Brain,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { GlassCard } from '@/components/ui/glass-card';
 import { Spotlight } from '@/components/ui/spotlight';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
 
 interface AdminStats {
   totalBooks: number;
@@ -51,6 +60,42 @@ function getOpsStatus(pendingReservations: number, overdueBooks: number) {
   if (critical >= 8) return { label: 'Watch closely', tone: 'text-amber-100 bg-amber-400/15 border-amber-300/20' };
   return { label: 'Stable flow', tone: 'text-emerald-100 bg-emerald-400/15 border-emerald-300/20' };
 }
+
+const AI_TABS = [
+  {
+    key: 'week',
+    label: 'Week',
+    metrics: [
+      { label: 'Query Success Rate', value: 94 },
+      { label: 'User Satisfaction', value: 88 },
+      { label: 'Book Recommendations', value: 78 },
+    ],
+  },
+  {
+    key: 'month',
+    label: 'Month',
+    metrics: [
+      { label: 'Query Success Rate', value: 92 },
+      { label: 'User Satisfaction', value: 86 },
+      { label: 'Book Recommendations', value: 82 },
+    ],
+  },
+  {
+    key: 'year',
+    label: 'Year',
+    metrics: [
+      { label: 'Query Success Rate', value: 91 },
+      { label: 'User Satisfaction', value: 89 },
+      { label: 'Book Recommendations', value: 85 },
+    ],
+  },
+];
+
+const USER_DISTRIBUTION = [
+  { label: 'Students', count: 892, pct: 71.5, icon: GraduationCap, color: 'text-sky-500' },
+  { label: 'Instructors', count: 156, pct: 12.5, icon: Briefcase, color: 'text-violet-500' },
+  { label: 'Staff', count: 199, pct: 16, icon: Shield, color: 'text-emerald-500' },
+];
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -87,12 +132,13 @@ export default function AdminDashboard() {
     return (
       <div className="space-y-6 animate-pulse">
         <div className="h-40 rounded-[28px] bg-gray-200 dark:bg-gray-700" />
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="h-28 rounded-2xl bg-gray-200 dark:bg-gray-700" />
           ))}
         </div>
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="h-72 rounded-[28px] bg-gray-200 dark:bg-gray-700" />
           <div className="h-72 rounded-[28px] bg-gray-200 dark:bg-gray-700" />
           <div className="h-72 rounded-[28px] bg-gray-200 dark:bg-gray-700" />
         </div>
@@ -105,7 +151,7 @@ export default function AdminDashboard() {
       label: 'Total Books',
       value: stats?.totalBooks ?? 0,
       icon: BookOpen,
-      iconBg: 'from-sky-400/30 to-blue-500/20',
+      iconBg: 'bg-sky-400/15',
       iconColor: 'text-sky-600 dark:text-sky-300',
       meta: 'Catalog inventory',
     },
@@ -113,7 +159,7 @@ export default function AdminDashboard() {
       label: 'Active Users',
       value: stats?.activeUsers ?? 0,
       icon: Users,
-      iconBg: 'from-emerald-400/30 to-green-500/20',
+      iconBg: 'bg-emerald-400/15',
       iconColor: 'text-emerald-600 dark:text-emerald-300',
       meta: 'Currently using the system',
     },
@@ -121,7 +167,7 @@ export default function AdminDashboard() {
       label: 'Currently Borrowed',
       value: stats?.currentlyBorrowed ?? 0,
       icon: BookMarked,
-      iconBg: 'from-fuchsia-400/25 to-violet-500/15',
+      iconBg: 'bg-violet-400/15',
       iconColor: 'text-violet-600 dark:text-violet-300',
       meta: 'Active circulation load',
     },
@@ -130,8 +176,7 @@ export default function AdminDashboard() {
       value: stats?.pendingReservations ?? 0,
       icon: Clock,
       href: '/dashboard/admin/reservations',
-      accent: 'border-l-amber-400',
-      iconBg: 'from-amber-300/35 to-orange-500/15',
+      iconBg: 'bg-amber-400/15',
       iconColor: 'text-amber-600 dark:text-amber-300',
       meta: 'Needs review',
     },
@@ -140,8 +185,7 @@ export default function AdminDashboard() {
       value: stats?.overdueBooks ?? 0,
       icon: AlertTriangle,
       href: '/dashboard/admin/books',
-      accent: 'border-l-rose-400',
-      iconBg: 'from-rose-300/35 to-red-500/15',
+      iconBg: 'bg-rose-400/15',
       iconColor: 'text-rose-600 dark:text-rose-300',
       meta: 'Requires follow-up',
     },
@@ -150,8 +194,7 @@ export default function AdminDashboard() {
       value: stats?.newUsersThisWeek ?? 0,
       icon: UserPlus,
       href: '/dashboard/admin/users',
-      accent: 'border-l-teal-400',
-      iconBg: 'from-teal-300/35 to-cyan-500/15',
+      iconBg: 'bg-teal-400/15',
       iconColor: 'text-teal-600 dark:text-teal-300',
       meta: 'Recent signups',
     },
@@ -163,16 +206,20 @@ export default function AdminDashboard() {
       description: `${stats?.pendingReservations ?? 0} pending requests waiting for admin review.`,
       href: '/dashboard/admin/reservations',
       icon: BellRing,
-      style: 'text-amber-700 dark:text-amber-200',
-      surface: 'from-amber-300/20 to-transparent',
+      badge: 'Immediate',
+      badgeClass: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-400/15 dark:text-amber-300 dark:border-amber-400/20',
+      iconBg: 'bg-amber-400/15',
+      iconColor: 'text-amber-600 dark:text-amber-300',
     },
     {
       label: 'Review Overdue Loans',
       description: `${stats?.overdueBooks ?? 0} overdue items need outreach or enforcement.`,
       href: '/dashboard/admin/borrows',
       icon: ShieldAlert,
-      style: 'text-rose-700 dark:text-rose-200',
-      surface: 'from-rose-300/20 to-transparent',
+      badge: 'Attention',
+      badgeClass: 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-400/15 dark:text-rose-300 dark:border-rose-400/20',
+      iconBg: 'bg-rose-400/15',
+      iconColor: 'text-rose-600 dark:text-rose-300',
     },
   ];
 
@@ -180,6 +227,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* 1 — Hero banner */}
       <motion.section {...CONTAINER_MOTION}>
         <GlassCard
           liquid
@@ -214,187 +262,265 @@ export default function AdminDashboard() {
         </GlassCard>
       </motion.section>
 
+      {/* Quick actions row */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.04, duration: 0.35 }}
+        className="flex flex-wrap gap-3"
+      >
+        <Button asChild variant="outline" size="sm">
+          <Link href="/dashboard/admin/users">
+            <UserPlus className="h-4 w-4" />
+            Add User
+          </Link>
+        </Button>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/dashboard/catalog">
+            <BookOpen className="h-4 w-4" />
+            Add Book
+          </Link>
+        </Button>
+        <Button asChild size="sm">
+          <Link href="/dashboard/admin/reports">
+            <BarChart3 className="h-4 w-4" />
+            Reports
+          </Link>
+        </Button>
+      </motion.div>
+
+      {/* 2 — KPI stat cards */}
       <motion.section
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.06, duration: 0.35 }}
-        className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
       >
         {kpiCards.map((card, index) => {
-          const Icon = card.icon;
-          const content = (
-            <GlassCard
-              liquid={index === 0}
-              className={cn(
-                'group relative h-full overflow-hidden rounded-[26px] border border-white/10 p-5',
-                'transition-transform duration-200 hover:-translate-y-0.5',
-                card.accent
-              )}
-            >
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-70" />
-              <div className="relative flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-white/62">{card.label}</p>
-                  <p className="mt-3 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">
-                    {card.value.toLocaleString()}
-                  </p>
-                  <div className="mt-3 h-px w-12 bg-gradient-to-r from-cyan-400/45 to-transparent" />
-                  <p className="mt-2 text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-white/45">
-                    {card.meta}
-                  </p>
+          const cardEl = (
+            <Card className="group hover:-translate-y-0.5 transition-transform duration-200 cursor-pointer">
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">{card.label}</p>
+                    <p className="text-3xl font-bold mt-2">{card.value.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground mt-1 uppercase tracking-wide">{card.meta}</p>
+                  </div>
+                  <div className={cn('p-2.5 rounded-xl', card.iconBg)}>
+                    <card.icon className={cn('h-5 w-5', card.iconColor)} />
+                  </div>
                 </div>
-                <div className={cn('flex h-12 w-12 items-center justify-center rounded-2xl border border-white/15 bg-gradient-to-br', card.iconBg)}>
-                  <Icon className={cn('h-5 w-5', card.iconColor)} />
-                </div>
-              </div>
-              {card.href && (
-                <div className="relative mt-5 flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-white/65">
-                  <span>Open details</span>
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </div>
-              )}
-            </GlassCard>
+                {card.href && (
+                  <div className="mt-4 flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                    <span>View details</span>
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           );
 
           return card.href ? (
-            <Link key={card.label} href={card.href} className="block">
-              {content}
+            <Link key={`${card.label}-${index}`} href={card.href} className="block">
+              {cardEl}
             </Link>
           ) : (
-            <div key={card.label}>{content}</div>
+            <div key={`${card.label}-${index}`}>{cardEl}</div>
           );
         })}
       </motion.section>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <motion.section
-          initial={{ opacity: 0, y: 18 }}
+      {/* 3 — Bottom section: 3-column grid */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Column 1 — Priority Actions */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.12, duration: 0.35 }}
+          className="lg:col-span-1"
         >
-          <GlassCard className="overflow-hidden rounded-[30px] border border-white/10">
-            <div className="border-b border-black/[0.06] px-5 py-5 dark:border-white/[0.06] sm:px-6">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm text-cyan-700 dark:text-cyan-200/80">Today&apos;s Focus</p>
-                  <h2 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
-                    Priority admin actions
-                  </h2>
-                </div>
-                <Link
-                  href="/dashboard/admin/reports"
-                  className="glass-button self-start px-4 py-2 text-xs font-semibold sm:text-sm"
-                >
-                  <BarChart3 className="h-4 w-4" />
-                  Open reports
-                </Link>
-              </div>
-            </div>
-
-            <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
-              {focusActions.map((action, index) => {
+          <Card className="h-full">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Priority Actions</CardTitle>
+              <CardDescription>Immediate operational attention required</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {focusActions.map((action) => {
                 const Icon = action.icon;
                 return (
                   <Link key={action.label} href={action.href} className="block">
-                    <GlassCard
-                      beams={index === 0}
-                      liquid={index === 0}
-                      className="group relative h-full overflow-hidden rounded-[24px] border border-white/10 p-5 transition-transform duration-200 hover:-translate-y-1"
-                    >
-                      <div className={cn('pointer-events-none absolute inset-0 bg-gradient-to-br', action.surface)} />
-                      <div className="relative flex h-full flex-col">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className={cn('flex h-11 w-11 items-center justify-center rounded-2xl border border-white/12 bg-white/10', action.style)}>
-                            <Icon className="h-5 w-5" />
-                          </div>
-                          <ArrowUpRight className="h-4 w-4 text-gray-400 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 dark:text-white/45" />
+                    <div className="group flex items-start gap-4 rounded-xl border p-4 hover:-translate-y-0.5 transition-transform duration-200 cursor-pointer">
+                      <div className={cn('p-2.5 rounded-xl shrink-0', action.iconBg)}>
+                        <Icon className={cn('h-5 w-5', action.iconColor)} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold">{action.label}</p>
+                          <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                         </div>
-                        <div className="mt-4">
-                          <span className="rounded-full border border-black/5 bg-white/55 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-gray-500 dark:border-white/10 dark:bg-white/8 dark:text-white/50">
-                            {index === 0 ? 'Immediate' : index === 1 ? 'Attention' : index === 2 ? 'Catalog' : 'Reporting'}
-                          </span>
-                        </div>
-                        <h3 className="mt-5 text-lg font-semibold text-gray-900 dark:text-white">{action.label}</h3>
-                        <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-white/68">{action.description}</p>
-                        <div className="mt-5 text-xs font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-white/42">
-                          Open workflow
+                        <p className="mt-1 text-xs text-muted-foreground leading-5">{action.description}</p>
+                        <div className="mt-2">
+                          <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                            {action.badge}
+                          </Badge>
                         </div>
                       </div>
-                    </GlassCard>
+                    </div>
                   </Link>
                 );
               })}
-            </div>
-          </GlassCard>
-        </motion.section>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <motion.section
-          initial={{ opacity: 0, y: 18 }}
+        {/* Column 2 — User Distribution */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.18, duration: 0.35 }}
-          className="space-y-6"
+          className="lg:col-span-1"
         >
-          <GlassCard className="overflow-hidden rounded-[30px] border border-white/10">
-            <div className="flex items-center justify-between border-b border-black/[0.06] px-5 py-4 dark:border-white/[0.06]">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-white/55">Live activity</p>
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Operations feed</h2>
-              </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10">
-                <Activity className="h-4 w-4 text-gray-500 dark:text-white/70" />
-              </div>
-            </div>
-            <div className="p-5">
-              {activities.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-black/10 px-4 py-10 text-center dark:border-white/10">
-                  <Activity className="mx-auto h-9 w-9 text-gray-300 dark:text-white/25" />
-                  <p className="mt-3 text-sm text-gray-500 dark:text-white/55">No recent activity</p>
-                </div>
-              ) : (
-                <div className="relative">
-                  <div className="mb-4 rounded-2xl border border-black/[0.05] bg-black/[0.02] px-4 py-3 dark:border-white/[0.06] dark:bg-white/[0.03]">
-                    <p className="text-xs uppercase tracking-[0.18em] text-gray-400 dark:text-white/35">Feed summary</p>
-                    <p className="mt-1 text-sm text-gray-600 dark:text-white/68">
-                      {activities.length} recent event{activities.length === 1 ? '' : 's'} across circulation and admin activity.
-                    </p>
+          <Card className="h-full">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">User Distribution</CardTitle>
+              <CardDescription>Active users by category</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {USER_DISTRIBUTION.map((row) => {
+                const Icon = row.icon;
+                return (
+                  <div key={row.label} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Icon className={cn('h-4 w-4', row.color)} />
+                        <span className="text-sm font-medium">{row.label}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold">{row.count.toLocaleString()}</span>
+                        <span className="text-xs text-muted-foreground">{row.pct}%</span>
+                      </div>
+                    </div>
+                    <Progress value={row.pct} className="h-2" />
                   </div>
-                  <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gradient-to-b from-cyan-400/45 via-cyan-400/20 to-transparent" />
-                  <div className="space-y-4">
-                    {activities.slice(0, 6).map((item, index) => {
-                      const isBorrow = item.type === 'borrow';
-                      const tone = isBorrow
-                        ? 'bg-sky-100 text-sky-600 dark:bg-sky-400/15 dark:text-sky-300'
-                        : item.type === 'user'
-                          ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-300'
-                          : 'bg-violet-100 text-violet-600 dark:bg-violet-400/15 dark:text-violet-300';
+                );
+              })}
+            </CardContent>
+          </Card>
+        </motion.div>
 
-                      return (
-                        <div key={`${item.time}-${index}`} className="relative flex items-start gap-4">
-                          <div className={cn('relative z-10 flex h-8 w-8 items-center justify-center rounded-full ring-4 ring-white dark:ring-[#101823]', tone)}>
-                            {isBorrow ? <BookMarked className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-                          </div>
-                          <div className="min-w-0 flex-1 rounded-2xl border border-black/[0.05] bg-white/50 px-4 py-3 dark:border-white/[0.08] dark:bg-white/[0.03]">
-                            <p className="text-sm leading-6 text-gray-700 dark:text-white/80">{item.message}</p>
-                            <p className="mt-1 text-xs uppercase tracking-[0.16em] text-gray-400 dark:text-white/35">
-                              {new Date(item.time).toLocaleString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </p>
-                          </div>
+        {/* Column 3 — AI Performance */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.24, duration: 0.35 }}
+          className="lg:col-span-1"
+        >
+          <Card className="h-full">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Brain className="h-4 w-4 text-primary" />
+                <CardTitle className="text-lg">AI Performance</CardTitle>
+              </div>
+              <CardDescription>Assistant metrics over time</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="week">
+                <TabsList className="w-full mb-4">
+                  {AI_TABS.map((tab) => (
+                    <TabsTrigger key={tab.key} value={tab.key} className="flex-1">
+                      {tab.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+                {AI_TABS.map((tab) => (
+                  <TabsContent key={tab.key} value={tab.key} className="space-y-4 mt-0">
+                    {tab.metrics.map((metric) => (
+                      <div key={metric.label} className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">{metric.label}</span>
+                          <span className="text-sm font-semibold">{metric.value}%</span>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          </GlassCard>
-
-        </motion.section>
+                        <Progress value={metric.value} className="h-2" />
+                      </div>
+                    ))}
+                  </TabsContent>
+                ))}
+              </Tabs>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
+
+      {/* 4 — Activity feed */}
+      <motion.section
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.30, duration: 0.35 }}
+      >
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg">Activity Feed</CardTitle>
+                <CardDescription className="mt-1">
+                  {activities.length > 0
+                    ? `${activities.length} recent event${activities.length === 1 ? '' : 's'} across circulation and admin activity`
+                    : 'No recent activity recorded'}
+                </CardDescription>
+              </div>
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted">
+                <Activity className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {activities.length === 0 ? (
+              <div className="rounded-xl border border-dashed py-10 text-center">
+                <Activity className="mx-auto h-9 w-9 text-muted-foreground/40" />
+                <p className="mt-3 text-sm text-muted-foreground">No recent activity</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {activities.slice(0, 6).map((item, index) => {
+                  const tone =
+                    item.type === 'borrow'
+                      ? 'bg-sky-100 text-sky-600 dark:bg-sky-400/15 dark:text-sky-300'
+                      : item.type === 'user'
+                        ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-300'
+                        : 'bg-violet-100 text-violet-600 dark:bg-violet-400/15 dark:text-violet-300';
+
+                  return (
+                    <motion.div
+                      key={`${item.time}-${index}`}
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.06 * index }}
+                      className="flex items-start gap-3"
+                    >
+                      <Avatar className="size-8 shrink-0">
+                        <AvatarFallback className={cn('text-xs', tone)}>
+                          {item.type === 'borrow' ? 'B' : item.type === 'user' ? 'U' : 'A'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1 rounded-xl border px-4 py-3">
+                        <p className="text-sm leading-6 text-foreground">{item.message}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {new Date(item.time).toLocaleString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.section>
     </div>
   );
 }
