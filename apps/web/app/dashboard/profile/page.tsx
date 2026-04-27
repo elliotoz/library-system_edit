@@ -25,10 +25,10 @@ interface UserProfile {
 }
 
 const roleColors = {
-  STUDENT: 'bg-blue-100 text-blue-700',
-  INSTRUCTOR: 'bg-purple-100 text-purple-700',
-  STAFF: 'bg-orange-100 text-orange-700',
-  ADMIN: 'bg-red-100 text-red-700',
+  STUDENT: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  INSTRUCTOR: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  STAFF: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+  ADMIN: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
 };
 
 export default function ProfilePage() {
@@ -181,13 +181,13 @@ export default function ProfilePage() {
   if (isLoading) {
     return (
       <div className="space-y-6 animate-pulse">
-        <div className="h-8 w-48 bg-gray-200 rounded" />
+        <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded" />
         <div className="glass-card p-6">
           <div className="flex gap-6">
-            <div className="w-24 h-24 bg-gray-200 rounded-full" />
+            <div className="w-24 h-24 bg-gray-200 dark:bg-gray-700 rounded-full" />
             <div className="flex-1 space-y-3">
-              <div className="h-6 bg-gray-200 rounded w-1/3" />
-              <div className="h-4 bg-gray-200 rounded w-1/4" />
+              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4" />
             </div>
           </div>
         </div>
@@ -206,7 +206,7 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Profile</h1>
 
       <div className="glass-card p-6">
         <div className="flex flex-col sm:flex-row gap-6">
@@ -224,7 +224,7 @@ export default function ProfilePage() {
               {isEditingProfile ? (
                 <div className="flex-1 space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Avatar</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Avatar</label>
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -238,54 +238,54 @@ export default function ProfilePage() {
                       ) : profile.avatarUrl ? (
                         <img src={profile.avatarUrl} alt={profile.name} className="w-16 h-16 rounded-full object-cover" />
                       ) : (
-                        <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center text-gray-400">
+                        <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 dark:text-gray-500">
                           <Camera className="w-6 h-6" />
                         </div>
                       )}
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+                        className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                       >
                         {avatarPreview || profile.avatarUrl ? 'Change image' : 'Upload image'}
                       </button>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
                     <input
                       type="text"
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-400"
+                      className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-400"
                     />
                   </div>
                   {profile.role === 'INSTRUCTOR' && (
                     <>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bio</label>
                         <textarea
                           value={editBio}
                           onChange={(e) => setEditBio(e.target.value)}
                           maxLength={500}
                           rows={3}
                           placeholder="Tell students about yourself..."
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-400 resize-none"
+                          className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-2 focus:ring-primary-400 resize-none"
                         />
-                        <p className="text-xs text-gray-400 mt-1">{editBio.length}/500</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{editBio.length}/500</p>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Department</label>
                         <input
                           type="text"
                           value={editDepartment}
                           onChange={(e) => setEditDepartment(e.target.value)}
                           placeholder="e.g. Software Engineering"
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-400"
+                          className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-2 focus:ring-primary-400"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Courses</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Courses</label>
                         <div className="flex gap-2 mb-2">
                           <input
                             type="text"
@@ -301,7 +301,7 @@ export default function ProfilePage() {
                               }
                             }}
                             placeholder="Add a course..."
-                            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-400"
+                            className="flex-1 px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-2 focus:ring-primary-400"
                           />
                           <button
                             type="button"
@@ -320,7 +320,7 @@ export default function ProfilePage() {
                           {editCourses.map((course) => (
                             <span
                               key={course}
-                              className="inline-flex items-center gap-1 px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-sm"
+                              className="inline-flex items-center gap-1 px-3 py-1 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 rounded-full text-sm"
                             >
                               {course}
                               <button
@@ -337,7 +337,7 @@ export default function ProfilePage() {
                     </>
                   )}
                   <div className="flex gap-2">
-                    <button onClick={() => { setIsEditingProfile(false); if (avatarPreview) URL.revokeObjectURL(avatarPreview); setAvatarPreview(null); setAvatarFile(null); }} className="text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
+                    <button onClick={() => { setIsEditingProfile(false); if (avatarPreview) URL.revokeObjectURL(avatarPreview); setAvatarPreview(null); setAvatarFile(null); }} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-sm">Cancel</button>
                     <button onClick={handleSaveProfile} disabled={isSavingProfile} className="flex items-center gap-1 px-3 py-1 bg-primary-500 text-white rounded-lg text-sm hover:bg-primary-600 disabled:opacity-50">
                       <Save className="w-4 h-4" />{isSavingProfile ? 'Saving...' : 'Save'}
                     </button>
@@ -346,7 +346,7 @@ export default function ProfilePage() {
               ) : (
                 <>
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">{profile.name}</h2>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">{profile.name}</h2>
                     <span className={cn('inline-block px-3 py-1 rounded-full text-sm font-medium mt-1', roleColors[profile.role as keyof typeof roleColors])}>
                       {profile.role}
                     </span>
@@ -358,30 +358,30 @@ export default function ProfilePage() {
               )}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-              <div className="flex items-center gap-2 text-gray-600">
+              <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
                 <Mail className="w-4 h-4" />
                 <span>{profile.email}</span>
               </div>
               {profile.faculty && (
-                <div className="flex items-center gap-2 text-gray-600">
+                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
                   <Building className="w-4 h-4" />
                   <span>{profile.faculty.name}</span>
                 </div>
               )}
               {profile.studentId && (
-                <div className="flex items-center gap-2 text-gray-600">
+                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
                   <BookOpen className="w-4 h-4" />
                   <span>Student ID: {profile.studentId}</span>
                 </div>
               )}
               {profile.staffId && (
-                <div className="flex items-center gap-2 text-gray-600">
+                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
                   <BookOpen className="w-4 h-4" />
                   <span>Staff ID: {profile.staffId}</span>
                 </div>
               )}
             </div>
-            <p className="text-sm text-gray-400 mt-4">Member since {new Date(profile.createdAt).toLocaleDateString()}</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 mt-4">Member since {new Date(profile.createdAt).toLocaleDateString()}</p>
           </div>
         </div>
       </div>
@@ -390,20 +390,20 @@ export default function ProfilePage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Tag className="w-5 h-5 text-primary-500" />
-            <h3 className="text-lg font-semibold text-gray-900">My Interests</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">My Interests</h3>
           </div>
           {!isEditing ? (
             <button onClick={() => setIsEditing(true)} className="text-primary-600 hover:text-primary-700 text-sm font-medium">Edit</button>
           ) : (
             <div className="flex gap-2">
-              <button onClick={() => { setIsEditing(false); setInterests(profile.interests || []); }} className="text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
+              <button onClick={() => { setIsEditing(false); setInterests(profile.interests || []); }} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-sm">Cancel</button>
               <button onClick={handleSaveInterests} disabled={isSaving} className="flex items-center gap-1 px-3 py-1 bg-primary-500 text-white rounded-lg text-sm hover:bg-primary-600 disabled:opacity-50">
                 <Save className="w-4 h-4" />Save
               </button>
             </div>
           )}
         </div>
-        <p className="text-sm text-gray-500 mb-4">Your interests help us recommend relevant books for you.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Your interests help us recommend relevant books for you.</p>
         {isEditing && (
           <div className="flex gap-2 mb-4">
             <input
@@ -412,7 +412,7 @@ export default function ProfilePage() {
               onChange={(e) => setNewInterest(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleAddInterest()}
               placeholder="Add an interest..."
-              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-400"
+              className="flex-1 px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-2 focus:ring-primary-400"
             />
             <button onClick={handleAddInterest} className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600">Add</button>
           </div>
@@ -422,7 +422,7 @@ export default function ProfilePage() {
             <p className="text-gray-400 text-sm">No interests added yet. Add some to get personalised book recommendations.</p>
           ) : (
             interests.map((interest, index) => (
-              <span key={index} className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-full text-sm">
+              <span key={index} className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 rounded-full text-sm">
                 {interest}
                 {isEditing && (
                   <button onClick={() => handleRemoveInterest(interest)} className="hover:text-primary-900">
@@ -436,23 +436,23 @@ export default function ProfilePage() {
       </div>
 
       <div className="glass-card p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Borrow Policy</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Your Borrow Policy</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="glass-card p-4">
-            <p className="text-sm text-gray-500">Max Books</p>
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="text-sm text-gray-500 dark:text-gray-400">Max Books</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">
               {profile.role === 'STUDENT' ? '5' : profile.role === 'INSTRUCTOR' ? '10' : profile.role === 'ADMIN' ? '20' : '5'}
             </p>
           </div>
           <div className="glass-card p-4">
-            <p className="text-sm text-gray-500">Borrow Duration</p>
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="text-sm text-gray-500 dark:text-gray-400">Borrow Duration</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">
               {profile.role === 'STUDENT' ? '14' : profile.role === 'INSTRUCTOR' ? '30' : profile.role === 'ADMIN' ? '60' : '14'} days
             </p>
           </div>
           <div className="glass-card p-4">
-            <p className="text-sm text-gray-500">Max Extensions</p>
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="text-sm text-gray-500 dark:text-gray-400">Max Extensions</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">
               {profile.role === 'STUDENT' ? '2' : profile.role === 'INSTRUCTOR' ? '3' : profile.role === 'ADMIN' ? '5' : '2'}
             </p>
           </div>
