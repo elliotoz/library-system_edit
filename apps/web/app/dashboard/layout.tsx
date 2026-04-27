@@ -7,7 +7,6 @@ import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GlassNavIcon } from '@/components/ui/glass-nav-icon';
-import { useContentAwareGlass } from '@/hooks/useContentAwareGlass';
 
 const WebGLBackground = dynamic(
   () => import('@/components/ui/webgl-background').then((m) => ({ default: m.WebGLBackground })),
@@ -75,7 +74,6 @@ export default function DashboardLayout({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const notificationRef = useRef<HTMLDivElement>(null);
 
-  const isDarkContent = useContentAwareGlass(80);
 
   // ── Swipe-to-close sidebar (touch) ──────────────────────────────────
   const touchStartX = useRef<number | null>(null);
@@ -259,11 +257,7 @@ export default function DashboardLayout({
           className="fixed top-0 z-50 flex h-16 w-full items-center justify-between px-4 glass-chrome"
           style={{
             borderBottom: '1px solid var(--glass-border)',
-            background: darkMode
-              ? isDarkContent
-                ? 'rgba(255,255,255,0.72)'
-                : 'var(--glass-chrome-bg)'
-              : '#ffffff',
+            background: darkMode ? 'var(--glass-chrome-bg)' : '#ffffff',
             transition: 'background 0.4s var(--spring-gentle)',
           }}
         >
