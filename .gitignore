@@ -133,5 +133,6 @@ cookie.txt
 !apps/api/.env.example
 !apps/web/.env.example
 
-# AI collaboration docs/logs are intentionally tracked
+# local tooling agent files — local only, never commit
+local-notes/
 .worktrees/
