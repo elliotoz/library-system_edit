@@ -148,17 +148,20 @@ export class BorrowSchedulerService implements OnModuleInit, OnModuleDestroy {
           },
         });
         if (!alreadySent) {
-          const fine = overdueDays * FINE_RATE_PER_DAY;
-          await this.prisma.notification.create({
-            data: {
-              userId: borrow.userId,
-              type: NotificationType.BORROW_OVERDUE,
-              title: 'Book Overdue ⚠️',
-              message: `"${bookTitle}" is ${overdueDays} day${overdueDays > 1 ? 's' : ''} overdue. Estimated fine: ₺${fine}. Please return it as soon as possible.`,
-              bookId,
-            },
-          });
-          overdueSent++;
+          const overduePrefs = await this.getNotifPrefs(borrow.userId);
+          if (overduePrefs.dueDateReminders) {
+            const fine = overdueDays * FINE_RATE_PER_DAY;
+            await this.prisma.notification.create({
+              data: {
+                userId: borrow.userId,
+                type: NotificationType.BORROW_OVERDUE,
+                title: 'Book Overdue ⚠️',
+                message: `"${bookTitle}" is ${overdueDays} day${overdueDays > 1 ? 's' : ''} overdue. Estimated fine: ₺${fine}. Please return it as soon as possible.`,
+                bookId,
+              },
+            });
+            overdueSent++;
+          }
         }
       } else if (daysUntilDue <= 3) {
         const daysLeft = Math.ceil(daysUntilDue);
@@ -171,8 +174,11 @@ export class BorrowSchedulerService implements OnModuleInit, OnModuleDestroy {
           },
         });
         if (!alreadySent) {
-          await this.notifications.notifyDueSoon(borrow.userId, bookTitle, daysLeft, bookId);
-          dueSoonSent++;
+          const prefs = await this.getNotifPrefs(borrow.userId);
+          if (prefs.dueDateReminders) {
+            await this.notifications.notifyDueSoon(borrow.userId, bookTitle, daysLeft, bookId);
+            dueSoonSent++;
+          }
         }
       }
     }
@@ -180,5 +186,17 @@ export class BorrowSchedulerService implements OnModuleInit, OnModuleDestroy {
     if (overdueSent > 0 || dueSoonSent > 0) {
       this.logger.log(`Notifications sent — overdue: ${overdueSent}, due soon: ${dueSoonSent}`);
     }
+  }
+
+  private async getNotifPrefs(userId: string): Promise<{ dueDateReminders: boolean; emailNotifications: boolean }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { notificationPrefs: true },
+    });
+    const prefs = (user?.notificationPrefs as Record<string, boolean>) ?? {};
+    return {
+      dueDateReminders: prefs.dueDateReminders !== false,
+      emailNotifications: prefs.emailNotifications !== false,
+    };
   }
 }

@@ -253,13 +253,20 @@ export class ReservationsService {
       throw err;
     }
 
-    await this.notificationsService.notifyReservationCreated(
-      userId,
-      result.book.title,
-      result.branch.name,
-      result.book.id,
-      result.branch.id
-    );
+    const reservUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { notificationPrefs: true },
+    });
+    const reservPrefs = (reservUser?.notificationPrefs as Record<string, boolean>) ?? {};
+    if (reservPrefs.reservationAlerts !== false) {
+      await this.notificationsService.notifyReservationCreated(
+        userId,
+        result.book.title,
+        result.branch.name,
+        result.book.id,
+        result.branch.id
+      );
+    }
 
     const admins = await this.prisma.user.findMany({
       where: { role: "ADMIN", isActive: true },
@@ -349,13 +356,20 @@ export class ReservationsService {
       },
     });
 
-    await this.notificationsService.notifyReservationApproved(
-      updatedReservation.user.id,
-      updatedReservation.bookCopy.book.title,
-      updatedReservation.branch.name,
-      updatedReservation.bookCopy.book.id,
-      updatedReservation.branch.id
-    );
+    const approveUser = await this.prisma.user.findUnique({
+      where: { id: updatedReservation.user.id },
+      select: { notificationPrefs: true },
+    });
+    const approvePrefs = (approveUser?.notificationPrefs as Record<string, boolean>) ?? {};
+    if (approvePrefs.reservationAlerts !== false) {
+      await this.notificationsService.notifyReservationApproved(
+        updatedReservation.user.id,
+        updatedReservation.bookCopy.book.title,
+        updatedReservation.branch.name,
+        updatedReservation.bookCopy.book.id,
+        updatedReservation.branch.id
+      );
+    }
 
     return {
       id: updatedReservation.id,
@@ -397,14 +411,21 @@ export class ReservationsService {
       },
     });
 
-    await this.notificationsService.notifyReservationReady(
-      updatedReservation.user.id,
-      updatedReservation.bookCopy.book.title,
-      updatedReservation.branch.name,
-      pickupDeadline,
-      updatedReservation.bookCopy.book.id,
-      updatedReservation.branch.id
-    );
+    const readyUser = await this.prisma.user.findUnique({
+      where: { id: updatedReservation.user.id },
+      select: { notificationPrefs: true },
+    });
+    const readyPrefs = (readyUser?.notificationPrefs as Record<string, boolean>) ?? {};
+    if (readyPrefs.reservationAlerts !== false) {
+      await this.notificationsService.notifyReservationReady(
+        updatedReservation.user.id,
+        updatedReservation.bookCopy.book.title,
+        updatedReservation.branch.name,
+        pickupDeadline,
+        updatedReservation.bookCopy.book.id,
+        updatedReservation.branch.id
+      );
+    }
 
     return {
       id: updatedReservation.id,
@@ -458,12 +479,19 @@ export class ReservationsService {
       }),
     ]);
 
-    await this.notificationsService.notifyReservationRejected(
-      reservation.user.id,
-      reservation.bookCopy.book.title,
-      reason,
-      reservation.bookCopy.book.id
-    );
+    const rejectUser = await this.prisma.user.findUnique({
+      where: { id: reservation.user.id },
+      select: { notificationPrefs: true },
+    });
+    const rejectPrefs = (rejectUser?.notificationPrefs as Record<string, boolean>) ?? {};
+    if (rejectPrefs.reservationAlerts !== false) {
+      await this.notificationsService.notifyReservationRejected(
+        reservation.user.id,
+        reservation.bookCopy.book.title,
+        reason,
+        reservation.bookCopy.book.id
+      );
+    }
 
     return {
       id: updatedReservation.id,
@@ -655,12 +683,19 @@ export class ReservationsService {
       return { updatedReservation, borrow };
     });
 
-    await this.notificationsService.notifyBookCollected(
-      updatedReservation.user.id,
-      updatedReservation.bookCopy.book.title,
-      borrow.dueAt,
-      updatedReservation.bookCopy.book.id
-    );
+    const collectUser = await this.prisma.user.findUnique({
+      where: { id: updatedReservation.user.id },
+      select: { notificationPrefs: true },
+    });
+    const collectPrefs = (collectUser?.notificationPrefs as Record<string, boolean>) ?? {};
+    if (collectPrefs.reservationAlerts !== false) {
+      await this.notificationsService.notifyBookCollected(
+        updatedReservation.user.id,
+        updatedReservation.bookCopy.book.title,
+        borrow.dueAt,
+        updatedReservation.bookCopy.book.id
+      );
+    }
 
     return {
       reservation: {
