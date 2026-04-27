@@ -147,7 +147,7 @@ export default function StaffDashboard() {
                   { id: '4', title: 'Influence', authors: ['Robert Cialdini'], category: 'Psychology', availableCopies: 1 },
                 ]
             ).map((book, i) => (
-              <Link key={book.id} href={`/dashboard/catalog/${book.id}`} className="group block">
+              <Link key={book.id} href={recommendations.length > 0 ? `/dashboard/catalog/${book.id}` : '/dashboard/catalog'} className="group block">
                 <div className={cn('relative aspect-[3/4] rounded-xl mb-3 overflow-hidden transition-all group-hover:shadow-lg group-hover:-translate-y-0.5', !book.coverImageUrl && cn('flex flex-col items-center justify-center bg-gradient-to-br p-3', BOOK_GRADIENTS[i % 4]))}>
                   {book.coverImageUrl ? (
                     <img src={book.coverImageUrl} alt={book.title} className="w-full h-full object-cover" />

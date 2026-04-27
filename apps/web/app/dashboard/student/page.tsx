@@ -60,6 +60,13 @@ const BOOK_GRADIENTS = [
   'from-amber-400 to-amber-600',
 ];
 
+const PLACEHOLDER_BOOKS = [
+  { title: 'Introduction to Algorithms', author: 'Thomas Cormen' },
+  { title: 'Clean Code', author: 'Robert C. Martin' },
+  { title: 'The Pragmatic Programmer', author: 'Andrew Hunt' },
+  { title: 'Design Patterns', author: 'Gang of Four' },
+];
+
 function bookAvailabilityBadge(book: Book) {
   if (book.availableCopies > 0)
     return { label: 'Available', className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' };
@@ -95,7 +102,18 @@ export default function StudentDashboard() {
         }).catch(() => {});
 
         if (statsRes?.ok) setStats(await statsRes.json());
-        if (booksRes?.ok) { const d = await booksRes.json(); setRecommendations(d.data || []); }
+        if (booksRes?.ok) {
+          const d = await booksRes.json();
+          let books: Book[] = d.data || [];
+          if (books.length === 0 && deptTerm) {
+            const fallbackRes = await fetch('/api/books?pageSize=4', { credentials: 'include' }).catch(() => null);
+            if (fallbackRes?.ok) {
+              const fd = await fallbackRes.json();
+              books = fd.data || [];
+            }
+          }
+          setRecommendations(books);
+        }
         if (borrowsRes?.ok) { const d = await borrowsRes.json(); setBorrows(d.filter((b: Borrow) => b.status === 'ACTIVE').slice(0, 5)); }
       } catch (e) {
         console.error(e);
@@ -232,19 +250,22 @@ export default function StudentDashboard() {
         </div>
         <div className="p-5">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {(recommendations.length > 0 ? recommendations : Array(4).fill(null)).map((book, i) => {
-              if (!book) return (
+            {(recommendations.length > 0 ? recommendations : PLACEHOLDER_BOOKS).map((book, i) => {
+              if (!('id' in book)) {
+                const placeholder = book as { title: string; author: string };
+                return (
                 <Link key={i} href="/dashboard/catalog" className="group block">
                   <div className={cn('relative aspect-[3/4] rounded-xl mb-3 flex flex-col items-center justify-center bg-gradient-to-br p-3 transition-all group-hover:shadow-lg group-hover:-translate-y-0.5 overflow-hidden', BOOK_GRADIENTS[i % 4])}>
                     <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
                     <BookOpen className="w-10 h-10 text-white/80 mb-2" />
-                    <p className="text-white/70 text-[10px] text-center">Introduction to Algorithms</p>
+                    <p className="text-white/70 text-[10px] text-center">{placeholder.title}</p>
                   </div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white line-clamp-1 group-hover:text-primary-600 transition-colors">Introduction to Algorithms</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Thomas Cormen</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white line-clamp-1 group-hover:text-primary-600 transition-colors">{placeholder.title}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{placeholder.author}</p>
                   <span className="inline-flex items-center gap-1 mt-1.5 text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Available</span>
                 </Link>
-              );
+                );
+              }
               const badge = bookAvailabilityBadge(book);
               return (
                 <Link key={book.id} href={`/dashboard/catalog/${book.id}`} className="group block">
