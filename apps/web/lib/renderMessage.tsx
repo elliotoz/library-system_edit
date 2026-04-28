@@ -183,7 +183,7 @@ function renderInlineText(text: string): React.ReactNode[] {
       return <strong key={i} className="font-semibold text-gray-900 dark:text-white">{renderInlineText(part.slice(2, -2))}</strong>;
     }
     if (/^\*[^*]+\*$/.test(part)) {
-      return <em key={i} className="italic text-gray-600 dark:text-white/80">{renderInlineText(part.slice(1, -1))}</em>;
+      return <em key={i} className="italic text-gray-600 dark:text-gray-200">{renderInlineText(part.slice(1, -1))}</em>;
     }
     // Markdown link [label](href)
     const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
@@ -289,7 +289,7 @@ function renderTextBlock(text: string): React.ReactNode {
         listType = 'ul';
       }
       listItems.push(
-        <li key={key++} className="flex gap-2 text-gray-700 dark:text-white/85">
+        <li key={key++} className="flex gap-2 text-gray-700 dark:text-gray-100">
           <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#2A9D9D] flex-shrink-0" />
           <span>{renderInlineText(line.replace(/^[-*]\s/, ''))}</span>
         </li>,
@@ -303,7 +303,7 @@ function renderTextBlock(text: string): React.ReactNode {
         listType = 'ol';
       }
       listItems.push(
-        <li key={key++} className="text-gray-700 dark:text-white/85 ml-1">
+        <li key={key++} className="text-gray-700 dark:text-gray-100 ml-1">
           {renderInlineText(line.replace(/^\d+\.\s/, ''))}
         </li>,
       );
@@ -312,7 +312,7 @@ function renderTextBlock(text: string): React.ReactNode {
     // Regular line
     flushList();
     nodes.push(
-      <span key={key++} className="text-gray-700 dark:text-white/85 leading-relaxed block">
+      <span key={key++} className="text-gray-700 dark:text-gray-100 leading-relaxed block">
         {renderInlineText(line)}
       </span>,
     );

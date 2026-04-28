@@ -649,6 +649,18 @@ button {
   background-color: rgba(255, 255, 255, 0.12) !important;
 }
 
+/* ── Dark mode text contrast ────────────────────────────────────────────────
+   Many components use text-gray-500 / text-gray-600 without dark: variants.
+   Those classes produce #6b7280 / #4b5563 on near-black — too low contrast.
+   These @layer base rules lift them to readable shades in dark mode.
+   Being in @layer base, they lose to any explicit dark:text-* utility
+   class on the same element (which lives in @layer utilities). ─────────── */
+@layer base {
+  .dark .text-gray-500 { color: #9ca3af; }   /* → gray-400: readable muted    */
+  .dark .text-gray-600 { color: #d1d5db; }   /* → gray-300: readable secondary */
+  .dark .text-gray-700 { color: #e5e7eb; }   /* → gray-200: readable body      */
+}
+
 /* Sidebar swipe — allow vertical scroll, capture horizontal swipe */
 aside nav {
   touch-action: pan-y;
