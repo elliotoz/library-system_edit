@@ -81,6 +81,10 @@ export const authApi = {
     return response.data;
   },
 
+  changePassword: async (data: { currentPassword: string; newPassword: string }): Promise<void> => {
+    await api.patch('/auth/change-password', data);
+  },
+
   getConfig: async (): Promise<{ googleOAuthEnabled: boolean; smtpEnabled: boolean; ollamaEnabled: boolean }> => {
     const response = await api.get('/auth/config');
     return response.data;
@@ -128,6 +132,21 @@ export const usersApi = {
 
   activate: async (id: string) => {
     const response = await api.patch(`/users/${id}/activate`);
+    return response.data;
+  },
+
+  getPreferences: async (): Promise<{ notificationPrefs: { emailNotifications: boolean; dueDateReminders: boolean; reservationAlerts: boolean } }> => {
+    const response = await api.get('/users/preferences');
+    return response.data;
+  },
+
+  updatePreferences: async (prefs: { emailNotifications?: boolean; dueDateReminders?: boolean; reservationAlerts?: boolean }): Promise<{ notificationPrefs: Record<string, boolean> }> => {
+    const response = await api.patch('/users/preferences', prefs);
+    return response.data;
+  },
+
+  exportData: async (): Promise<Blob> => {
+    const response = await api.get('/users/export', { responseType: 'blob' });
     return response.data;
   },
 };
