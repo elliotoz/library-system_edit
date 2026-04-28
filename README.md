@@ -113,11 +113,15 @@ The **AI-Integrated University Library Management System** is a comprehensive we
 
 ### For Staff
 
+**Staff** = any Üsküdar University employee who is not a librarian (e.g. department secretaries, lab assistants, IT personnel, administrative staff). They have a library card and can borrow books, but they do not manage the library — that is the Admin's job.
+
 - All student features plus:
 - Interest-based AI recommendations (with onboarding prompt if interests are missing)
-- Extended borrowing limits
+- Slightly extended borrowing limits (7 books, 14-day period)
 
-### For Administrators
+### For Administrators (Librarians)
+
+**Admin** = the librarian(s) who operate the physical library. They are Üsküdar University library staff responsible for the day-to-day running of the system — approving reservations, processing returns, managing the catalog, and overseeing users.
 
 - **Book Management**: Add, edit, delete books and manage copies across branches
 - **User Management**: View, activate/deactivate user accounts
