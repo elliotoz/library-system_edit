@@ -35,6 +35,43 @@ A modern, full-stack university library management system with role-based access
 
 ---
 
+## 🌿 Version History & Branch Structure
+
+This repository has two active branches that represent two distinct generations of the system.
+
+### `main` — V1 (Stable Baseline)
+
+The original version of the system. Contains the complete core feature set (borrowing, reservations, reading lists, notifications, admin dashboard, roles), but used a **local Ollama LLM** running on the developer's machine for AI assistance.
+
+**Why V1 was replaced:**
+- Required a powerful local machine to run the model (slow on CPU, needed GPU for reasonable speed)
+- Local models (Ollama / llama3 / mistral) have limited intelligence compared to frontier cloud models
+- Not practical for real deployment — every new machine needs the model pulled and running
+- High RAM consumption competing with the Node.js + PostgreSQL stack
+- Response times of 10–60 seconds on CPU made the AI assistant unusable in practice
+
+### `v2-ai-upgrade` — V2 (Active Development)
+
+V2 replaces the local Ollama dependency with **[OpenRouter](https://openrouter.ai)** — a cloud LLM gateway that provides access to multiple models through a single API key, including a generous free tier.
+
+**What V2 brings over V1:**
+
+| Area | V1 (main) | V2 (v2-ai-upgrade) |
+|------|-----------|---------------------|
+| **AI Engine** | Local Ollama (llama3/mistral) | OpenRouter cloud (Gemma, Gemini Flash, Claude Haiku) |
+| **Response Speed** | 10–60s on CPU | 1–3s cloud inference |
+| **Model Intelligence** | Limited (7B–13B local models) | State-of-the-art frontier models |
+| **Deployment** | Requires GPU/high-RAM machine | Runs anywhere with an API key |
+| **Cost** | Free but hardware-bound | Free tier available ($0 for basic queries) |
+| **AI Architecture** | Single model, intent router | Multi-provider factory, tiered model selection, tool-calling agent loop |
+| **Settings Page** | Placeholder toggles (fake saves) | Fully wired: real Change Password, Notification Prefs, Download My Data |
+| **Dark Mode** | Partial (admin pages broken) | Fixed globally; muted text contrast improved across all pages |
+| **Admin Security** | Admins could follow instructors | Backend + frontend guard prevents it |
+
+**To run V2**, you only need an `OPENROUTER_API_KEY` (free tier at [openrouter.ai](https://openrouter.ai)) — no local model setup required.
+
+---
+
 ## 🎯 Overview
 
 The **AI-Integrated University Library Management System** is a comprehensive web-based platform designed to manage all aspects of university library operations. Built for Üsküdar University, the system supports physical book management, digital resources, borrowing workflows, research material sharing, and administrative oversight.
@@ -428,8 +465,8 @@ All protected endpoints require a JWT token sent via HttpOnly cookie.
 
 | Module                   | Endpoints | Description                                    |
 | ------------------------ | --------- | ---------------------------------------------- |
-| **Auth**                 | 10        | Login, register, Google OAuth, password reset, email verification, logout |
-| **Users**                | 6         | CRUD, activate/deactivate, interests           |
+| **Auth**                 | 11        | Login, register, Google OAuth, password reset, email verification, logout, change password |
+| **Users**                | 9         | CRUD, activate/deactivate, interests, preferences (GET/PATCH), data export |
 | **Books**                | 8         | Catalog, search, copies management             |
 | **Reservations**         | 7         | Create, approve, reject, collect               |
 | **Borrows**              | 10        | Checkout, return, history, statistics           |
@@ -565,6 +602,10 @@ Authorization: Cookie (access_token)
 - **ReadingListItem**: Books within a reading list
 - **InstructorFollower**: Student-to-instructor follow relationships
 - **BorrowPolicy**: Role-specific borrowing limits and rules
+
+### Notable Schema Fields (V2)
+
+- **`User.notificationPrefs`** (`Json`) — Per-user notification preferences stored as JSON: `{ emailNotifications, dueDateReminders, reservationAlerts }`. Defaults all to `true`. The borrow scheduler and reservation service check these before sending any notification.
 
 ---
 
@@ -734,6 +775,18 @@ When `OPENROUTER_API_KEY` is not set, `/ai/status` returns `{ "available": false
 - [x] Student UX audit — fines page, department-based recommendations, borrow history fine cross-reference, a11y toggle roles
 - [x] Instructor dashboard — new-list flow, share-research widget, followers widget
 - [x] Automated overdue/due-soon notification scheduler (hourly, 22h dedup)
+
+### ✅ Phase 7: V2 Polish & Settings Wiring (Completed)
+
+- [x] **OpenRouter migration** — replaced local Ollama with cloud LLM routing; tiered model selection (FREE/CHEAP/SMART)
+- [x] **Multi-provider AI factory** — OpenRouterProvider, GeminiProvider, GroqProvider behind a unified `ProviderFactory`; falls back gracefully
+- [x] **Change Password** — authenticated `PATCH /auth/change-password` endpoint; bcrypt re-hash; blocks OAuth accounts; modal UI with show/hide toggles
+- [x] **Notification Preferences** — `notificationPrefs Json` column on User; `GET/PATCH /users/preferences`; borrow scheduler and reservations service check prefs before sending any alert
+- [x] **Download My Data** — `GET /users/export` returns all user borrows, reservations, reading lists, and profile as JSON; frontend triggers browser file download
+- [x] **Dark mode fixes** — admin pages text was invisible; header was white in dark mode; inverted `isDarkContent` branch removed; global `@layer base` rule lifts `text-gray-500/600/700` to readable shades in dark mode
+- [x] **AI chat text contrast** — `renderMessage` opacity-based `dark:text-white/85` replaced with solid `dark:text-gray-100` (opacity blending on dark backgrounds produced medium gray, not white)
+- [x] **Admin follow guard** — admins blocked from following instructors at both controller and service level
+- [x] **AdminPageLayout** — reusable admin page wrapper component for design consistency
 
 ---
 
