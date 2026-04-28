@@ -44,8 +44,8 @@ export default function SettingsPage() {
   // Load settings on mount
   useEffect(() => {
     // Dark mode from localStorage (controlled by dashboard layout)
-    const saved = localStorage.getItem('darkMode') === 'true';
-    setDarkMode(saved);
+    const isDarkSaved = localStorage.getItem('darkMode') === 'true';
+    setDarkMode(isDarkSaved);
 
     // Language from localStorage (frontend-only)
     const savedLang = localStorage.getItem('language') ?? 'en';
