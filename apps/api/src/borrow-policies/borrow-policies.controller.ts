@@ -5,6 +5,7 @@ import { UpdateBorrowPolicyDto } from "./dto/update-policy.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Role } from "@prisma/client";
 
 @ApiTags("borrow-policies")
@@ -13,6 +14,12 @@ import { Role } from "@prisma/client";
 @ApiBearerAuth()
 export class BorrowPoliciesController {
   constructor(private readonly service: BorrowPoliciesService) {}
+
+  @Get('me')
+  @ApiOperation({ summary: "Get borrow policy for the current user's role" })
+  async findMine(@CurrentUser('role') role: Role) {
+    return this.service.findByRole(role);
+  }
 
   @Get()
   @Roles(Role.ADMIN)

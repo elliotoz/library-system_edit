@@ -73,17 +73,10 @@ export default function BorrowedBooksPage() {
 
   const fetchPolicy = async () => {
     try {
-      const response = await fetch('/api/auth/me', { credentials: 'include' });
+      const response = await fetch('/api/borrow-policies/me', { credentials: 'include' });
       if (response.ok) {
-        const user = await response.json();
-        // Get policy based on role - default values
-        const policies: Record<string, BorrowPolicy> = {
-          STUDENT: { maxExtensions: 2, extensionDays: 7 },
-          INSTRUCTOR: { maxExtensions: 3, extensionDays: 14 },
-          STAFF: { maxExtensions: 3, extensionDays: 14 },
-          ADMIN: { maxExtensions: 5, extensionDays: 14 },
-        };
-        setPolicy(policies[user.role] || policies.STUDENT);
+        const data = await response.json();
+        setPolicy({ maxExtensions: data.maxExtensions, extensionDays: data.extensionDays });
       }
     } catch (error) {
       console.error('Error fetching policy:', error);

@@ -64,7 +64,6 @@ export default function AdminMaterialsPage() {
 
   const fetchMaterials = async () => {
     setIsLoading(true);
-    console.log('fetchMaterials called, statusFilter:', statusFilter);
     try {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -74,17 +73,13 @@ export default function AdminMaterialsPage() {
       if (search) params.append('search', search);
 
       const url = `/api/materials/admin?${params}`;
-      console.log('Fetching:', url);
 
       const response = await fetch(url, {
         credentials: 'include',
       });
 
-      console.log('Response status:', response.status);
-
       if (response.ok) {
         const data = await response.json();
-        console.log('Data received:', data);
         setMaterials(data.data || []);
         setTotalPages(data.meta?.totalPages || 1);
       } else {

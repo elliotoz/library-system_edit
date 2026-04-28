@@ -15,6 +15,14 @@ export class BorrowPoliciesService {
     });
   }
 
+  async findByRole(role: Role) {
+    const policy = await this.prisma.borrowPolicy.findUnique({
+      where: { role },
+    });
+    if (!policy) throw new NotFoundException(`No borrow policy found for role: ${role}`);
+    return policy;
+  }
+
   async updateByRole(role: string, dto: UpdateBorrowPolicyDto) {
     if (!VALID_ROLES.includes(role as Role)) {
       throw new BadRequestException(`Invalid role: ${role}`);
