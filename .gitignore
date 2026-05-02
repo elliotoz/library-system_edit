@@ -133,7 +133,5 @@ cookie.txt
 !apps/api/.env.example
 !apps/web/.env.example
 
-# local tooling agent files — local only, never commit
-local-notes.md
-local-notes/
-.worktrees/
+# local tooling — exclude large/local-only subdirectories
+local-notes/skills/
