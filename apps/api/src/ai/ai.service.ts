@@ -5,7 +5,7 @@ import { RoleResponseService } from './role-response.service';
 import { CatalogSearchService } from './catalog-search.service';
 import { LearningPathService } from './learning-path.service';
 import { ResearchAssistantService } from './research-assistant.service';
-import { GroqService } from './groq.service';
+import { OpenRouterProvider, OPENROUTER_MODELS } from './providers/openrouter.provider';
 import { UsersService } from '../users/users.service';
 
 export interface ChatResponse {
@@ -26,7 +26,7 @@ export class AiService {
     private readonly catalogSearch: CatalogSearchService,
     private readonly learningPath: LearningPathService,
     private readonly researchAssistant: ResearchAssistantService,
-    private readonly groq: GroqService,
+    private readonly openRouter: OpenRouterProvider,
     private readonly usersService: UsersService,
   ) {}
 
@@ -83,23 +83,39 @@ export class AiService {
     return undefined;
   }
 
+  private selectModel(userRole: Role, queryType?: 'deep-reasoning' | 'simple'): string {
+    // Use more capable model for complex reasoning, cheaper model for simple queries
+    if (queryType === 'deep-reasoning') {
+      return OPENROUTER_MODELS.SMART;
+    }
+    if (queryType === 'simple') {
+      return OPENROUTER_MODELS.CHEAP;
+    }
+    // Default to cheap tier for general queries
+    return OPENROUTER_MODELS.CHEAP;
+  }
+
   private async ollamaChat(userId: string, ctx: AiContext, message: string, image?: string): Promise<ChatResponse> {
     const queryType = image ? undefined : this.classifyQuery(message);
-    const model = this.groq.getModel(ctx.user.role, queryType);
+    // Select OpenRouter model based on query complexity
+    const model = this.selectModel(ctx.user.role, queryType);
     const system = this.buildSystemPrompt(ctx);
 
     // Build per-user message history
     const history = this.sessions.get(userId) ?? [];
     const userMessage = { role: 'user' as const, content: message };
-    const messages: { role: 'user' | 'assistant' | 'system'; content: string }[] = [
-      { role: 'system', content: system },
-      ...(history as { role: 'user' | 'assistant' | 'system'; content: string }[]),
+    const messages = [
+      ...history,
       userMessage,
-    ];
+    ] as { role: 'user' | 'assistant' | 'system'; content: string }[];
 
     try {
-      const result = await this.groq.chat(model, messages);
-      const reply = result.message.content;
+      const result = await this.openRouter.chat({
+        model,
+        system,
+        messages: messages.map(m => ({ role: m.role, content: m.content })),
+      });
+      const reply = result.text;
 
       // Update session history (user turn + assistant turn)
       const updated = [...history, { role: 'user' as const, content: message }, { role: 'assistant' as const, content: reply }];
