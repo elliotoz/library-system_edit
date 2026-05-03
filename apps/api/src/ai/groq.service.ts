@@ -103,7 +103,67 @@ export class GroqService implements OnModuleInit {
   }
 
   async scanBookCover(base64: string): Promise<BookScanResult> {
-    this.logger.warn('Book cover scanning requires a vision model — configure with OpenRouter if needed');
-    return {};
+    if (!this.available) {
+      this.logger.warn('OpenRouter API not available — cannot scan book cover');
+      return {};
+    }
+
+    const visionModel = 'google/gemini-2.0-flash-lite';
+    const prompt =
+      'Look at this book cover image. Extract the following information and return ONLY a valid JSON object with these exact keys: ' +
+      '{"title": "...", "authors": "...", "isbn": "...", "publisher": "...", "publicationYear": 0}. ' +
+      'For authors, join multiple authors with a comma. For publicationYear use a 4-digit number or 0 if unknown. ' +
+      'If a field is not visible, use an empty string or 0. Return ONLY the JSON, no other text.';
+
+    try {
+      const res = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: this.openRouterHeaders,
+        body: JSON.stringify({
+          model: visionModel,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: prompt },
+                { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
+              ],
+            },
+          ],
+          max_tokens: 256,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.text();
+        this.logger.warn(`Book cover scan failed: ${res.status} ${err}`);
+        return {};
+      }
+
+      const data = await res.json() as { choices: Array<{ message: { content: string | null } }> };
+      const raw = data.choices[0]?.message?.content ?? '';
+      return this.parseBookScanResult(raw);
+    } catch (err) {
+      this.logger.warn(`Book cover scan error: ${String(err)}`);
+      return {};
+    }
+  }
+
+  private parseBookScanResult(raw: string): BookScanResult {
+    try {
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) return {};
+      const parsed = JSON.parse(match[0]) as Record<string, unknown>;
+      const result: BookScanResult = {};
+      if (typeof parsed.title === 'string' && parsed.title) result.title = parsed.title;
+      if (typeof parsed.authors === 'string' && parsed.authors) result.authors = parsed.authors;
+      if (typeof parsed.isbn === 'string' && parsed.isbn) result.isbn = parsed.isbn;
+      if (typeof parsed.publisher === 'string' && parsed.publisher) result.publisher = parsed.publisher;
+      const year = Number(parsed.publicationYear);
+      if (year > 0) result.publicationYear = year;
+      return result;
+    } catch {
+      return {};
+    }
   }
 }
