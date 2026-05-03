@@ -22,7 +22,7 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
     private readonly mailService: MailService,
-    private readonly ollamaService: GroqService,
+    private readonly aiService: GroqService,
   ) {
     const corsOrigin = this.configService.get<string>('CORS_ORIGIN') || 'http://localhost:3000';
     this.frontendUrl = this.configService.get<string>('FRONTEND_URL') || corsOrigin.split(',')[0].trim();
@@ -225,7 +225,7 @@ export class AuthController {
     return {
       googleOAuthEnabled: !!(googleClientId && googleClientSecret),
       smtpEnabled: this.mailService.isConfigured(),
-      ollamaEnabled: this.ollamaService.isAvailable(),
+      aiEnabled: this.aiService.isAvailable(),
     };
   }
 

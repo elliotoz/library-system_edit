@@ -62,7 +62,7 @@ export class LearningPathService {
     try {
       return await this.enhanceWithLLM(ctx, topic, stages);
     } catch (err) {
-      this.logger.warn(`Ollama unavailable for learning path, using rule-based: ${err}`);
+      this.logger.warn(`OpenRouter unavailable for learning path, using rule-based: ${err}`);
     }
 
     return this.formatRuleBased(topic, stages, ctx);

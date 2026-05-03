@@ -53,7 +53,7 @@ export class ResearchAssistantService {
     try {
       return await this.enhanceWithLLM(ctx, topic, books, readingLists);
     } catch (err) {
-      this.logger.warn(`Ollama unavailable for research assist, using rule-based: ${err}`);
+      this.logger.warn(`OpenRouter unavailable for research assist, using rule-based: ${err}`);
     }
 
     return this.formatRuleBased(ctx, topic, books, readingLists);

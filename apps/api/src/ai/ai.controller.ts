@@ -29,7 +29,7 @@ export class AiController {
   @Get('status')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get Ollama availability and model list' })
+  @ApiOperation({ summary: 'Get OpenRouter AI availability status' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getStatus() {
     return this.agentService.getStatus();

@@ -37,28 +37,9 @@ export class HealthController {
       allUp = false;
     }
 
-    // Ollama check (optional)
-    const monitorOllama = this.config.get("MONITOR_OLLAMA") === "true";
-    if (monitorOllama) {
-      const ollamaUrl = this.config.get("OLLAMA_BASE_URL");
-      if (!ollamaUrl) {
-        checks.ollama = "skipped";
-      } else {
-        try {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 3000);
-          const response = await fetch(`${ollamaUrl}/api/tags`, {
-            signal: controller.signal,
-          });
-          clearTimeout(timeout);
-          checks.ollama = response.ok ? "up" : "down";
-        } catch {
-          checks.ollama = "down";
-        }
-      }
-    } else {
-      checks.ollama = "skipped";
-    }
+    // OpenRouter AI check
+    const hasOpenRouterKey = !!this.config.get("OPENROUTER_API_KEY");
+    checks.ai = hasOpenRouterKey ? "configured" : "not configured";
 
     const status = allUp ? "ready" : "degraded";
     const httpStatus = allUp ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE;

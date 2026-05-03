@@ -34,7 +34,7 @@ export class AiService {
     const ctx = await this.contextBuilder.build(userId, userRole);
 
     if (image) {
-      return this.ollamaChat(userId, ctx, message, image);
+      return this.openRouterChat(userId, ctx, message, image);
     }
 
     // Staff interest bootstrap: check before anything else
@@ -71,7 +71,7 @@ export class AiService {
       return this.researchAssistant.assist(ctx, message);
     }
 
-    return this.ollamaChat(userId, ctx, message);
+    return this.openRouterChat(userId, ctx, message);
   }
 
   private classifyQuery(message: string): 'deep-reasoning' | 'simple' | undefined {
@@ -95,7 +95,7 @@ export class AiService {
     return OPENROUTER_MODELS.CHEAP;
   }
 
-  private async ollamaChat(userId: string, ctx: AiContext, message: string, image?: string): Promise<ChatResponse> {
+  private async openRouterChat(userId: string, ctx: AiContext, message: string, image?: string): Promise<ChatResponse> {
     const queryType = image ? undefined : this.classifyQuery(message);
     // Select OpenRouter model based on query complexity
     const model = this.selectModel(ctx.user.role, queryType);
