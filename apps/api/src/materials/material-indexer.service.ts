@@ -5,14 +5,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as mammoth from 'mammoth';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const pdfjsLib = require('pdfjs-dist/legacy/build/pdf');
-
-// Set up worker path for pdfjs in Node.js environment
-if (typeof window === 'undefined') {
-  const workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.min.js');
-  pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath;
-}
+let pdfjsLib: any = null;
 
 /** Target chunk size in words (~500 tokens at ~1.25 words/token) */
 const CHUNK_WORDS = 400;
@@ -39,6 +32,23 @@ export class MaterialIndexerService {
   private readonly inFlight = new Set<string>();
 
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Lazy-load pdfjs-dist on first use.
+   * Required because pdfjs-dist is an ES module and needs async import.
+   */
+  private async getPdfjsLib(): Promise<any> {
+    if (pdfjsLib === null) {
+      pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+      // Set up worker path for pdfjs in Node.js environment
+      const workerPath = path.join(
+        path.dirname(require.resolve('pdfjs-dist/legacy/build/pdf.mjs')),
+        'pdf.worker.min.mjs',
+      );
+      pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath;
+    }
+    return pdfjsLib;
+  }
 
   /**
    * Public entry point — call fire-and-forget from the approval flow.
@@ -162,7 +172,8 @@ export class MaterialIndexerService {
    * Uses pdfjs-dist to parse PDF and extract text page-by-page.
    */
   private async extractPdfParagraphs(buffer: Buffer): Promise<Paragraph[]> {
-    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+    const pdfjs = await this.getPdfjsLib();
+    const pdf = await pdfjs.getDocument({ data: buffer }).promise;
     const paragraphs: Paragraph[] = [];
 
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
