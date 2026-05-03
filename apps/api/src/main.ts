@@ -12,14 +12,14 @@ const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 
 async function bootstrap() {
-  const logLevel = process.env.LOG_LEVEL || "log";
+  const logLevel = process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'log' : 'verbose');
   const validLevels = ["error", "warn", "log", "debug", "verbose"] as const;
   type LogLevel = (typeof validLevels)[number];
   const levelIndex = validLevels.indexOf(logLevel as LogLevel);
   const enabledLevels =
     levelIndex >= 0
       ? (validLevels.slice(0, levelIndex + 1) as unknown as LogLevel[])
-      : (["error", "warn", "log"] as LogLevel[]);
+      : (["error", "warn", "log", "debug", "verbose"] as LogLevel[]);
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: enabledLevels,

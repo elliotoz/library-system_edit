@@ -1,11 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogSearchService } from './catalog-search.service';
-import { BorrowStatus, BookCopyStatus } from '@prisma/client';
+import { BorrowStatus, BookCopyStatus, IndexStatus } from '@prisma/client';
 import { buildSystemPrompt as buildSystemPromptFromModule, PromptContext } from './prompts/system-prompt-builder';
 import { ToolHookService } from './tools/tool-hook.service';
 import { ToolExecutionContext } from './tools/tool-hooks';
 import { TokenTrackerService } from './session/token-tracker.service';
+import { MaterialSearchService } from '../materials/material-search.service';
 import { OPENROUTER_MODELS } from './providers/openrouter.provider';
 
 export interface BookCitation {
@@ -29,6 +30,7 @@ export class AgentService {
     private readonly catalogSearch: CatalogSearchService,
     private readonly toolHookService: ToolHookService,
     private readonly tokenTrackerService: TokenTrackerService,
+    private readonly materialSearch: MaterialSearchService,
   ) {}
 
   // ── Status ─────────────────────────────────────────────────────

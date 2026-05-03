@@ -1,5 +1,5 @@
 // src/auth/auth.service.ts
-import { Injectable, UnauthorizedException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
@@ -10,6 +10,8 @@ import { LoginDto, AuthResponseDto, TokenPayloadDto, RegisterDto, VerifyEmailDto
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger('AuthService');
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -21,6 +23,8 @@ export class AuthService {
    * Validate user credentials
    */
   async validateUser(email: string, password: string) {
+    this.logger.debug(`[validateUser] Validating user: ${email}`);
+
     const user = await this.prisma.user.findUnique({
       where: { email: email.toLowerCase() },
       include: {
@@ -29,22 +33,30 @@ export class AuthService {
     });
 
     if (!user) {
+      this.logger.warn(`[validateUser] User not found: ${email}`);
       return null;
     }
+
+    this.logger.debug(`[validateUser] User found: ${user.id} (${user.name}), isActive=${user.isActive}`);
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
+      this.logger.warn(`[validateUser] Invalid password for user: ${email}`);
       return null;
     }
 
+    this.logger.debug(`[validateUser] Password valid for user: ${email}`);
+
     // Check if user is active
     if (!user.isActive) {
+      this.logger.warn(`[validateUser] User account deactivated: ${email}`);
       throw new BadRequestException('Your account has been deactivated. Please contact the administrator.');
     }
 
     // Check if email is verified
     if (!user.emailVerifiedAt) {
+      this.logger.warn(`[validateUser] Email not verified: ${email}`);
       throw new BadRequestException('Please verify your email address before logging in.');
     }
 
@@ -53,6 +65,8 @@ export class AuthService {
       where: { id: user.id },
       data: { lastLogin: new Date() },
     });
+
+    this.logger.log(`[validateUser] ✅ User validated successfully: ${email}`);
 
     // Remove password from response
     const { password: _, ...result } = user;
@@ -65,11 +79,16 @@ export class AuthService {
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
     const { email, password } = loginDto;
 
+    this.logger.log(`[login] 🔐 Login attempt: ${email}`);
+
     const user = await this.validateUser(email, password);
 
     if (!user) {
+      this.logger.warn(`[login] ❌ Login failed: Invalid credentials for ${email}`);
       throw new UnauthorizedException('Invalid email or password');
     }
+
+    this.logger.debug(`[login] User validation passed: ${user.id}`);
 
     // Create JWT payload
     const payload: TokenPayloadDto = {
@@ -80,6 +99,7 @@ export class AuthService {
 
     // Generate token
     const accessToken = this.jwtService.sign(payload);
+    this.logger.debug(`[login] JWT token generated for user: ${user.id}`);
 
     return {
       accessToken,

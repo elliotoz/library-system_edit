@@ -17,9 +17,10 @@ import { ToolHookService } from './tools/tool-hook.service';
 import { TokenTrackerService } from './session/token-tracker.service';
 import { UsersModule } from '../users/users.module';
 import { PrismaModule } from '../prisma/prisma.module';
+import { MaterialsModule } from '../materials/materials.module';
 
 @Module({
-  imports: [UsersModule, PrismaModule],
+  imports: [UsersModule, PrismaModule, MaterialsModule],
   controllers: [AiController],
   providers: [
     AiService,

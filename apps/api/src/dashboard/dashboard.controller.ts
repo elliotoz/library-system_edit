@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -46,5 +46,21 @@ export class DashboardController {
   @ApiOperation({ summary: 'Get recent activity' })
   async getRecentActivity() {
     return this.dashboardService.getRecentActivity();
+  }
+
+  @Get('admin/user-distribution')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Get active user counts by role' })
+  async getUserDistribution() {
+    return this.dashboardService.getUserDistribution();
+  }
+
+  @Get('admin/ai-metrics')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Get AI usage metrics for a period' })
+  async getAiMetrics(@Query('period') period: 'week' | 'month' | 'year' = 'week') {
+    return this.dashboardService.getAiMetrics(period);
   }
 }

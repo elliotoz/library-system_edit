@@ -2,22 +2,27 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { MaterialIndexerService } from "./material-indexer.service";
 import {
   CreateMaterialDto,
   UpdateMaterialDto,
   MaterialQueryDto,
   ApproveMaterialDto,
 } from "./dto/materials.dto";
-import { Role, MaterialType, AccessLevel } from "@prisma/client";
+import { Role, MaterialType, AccessLevel, IndexStatus } from "@prisma/client";
 
 @Injectable()
 export class MaterialsService {
+  private readonly logger = new Logger(MaterialsService.name);
+
   constructor(
     private prisma: PrismaService,
-    private notificationsService: NotificationsService
+    private notificationsService: NotificationsService,
+    private readonly materialIndexer: MaterialIndexerService,
   ) {}
 
   // Get all published & approved materials (public view)
@@ -285,6 +290,13 @@ export class MaterialsService {
         : `Your material "${material.title}" was rejected. ${dto.rejectionReason || ""}`,
     });
 
+    // Trigger indexing for newly approved materials that have a file
+    if (dto.approved && updated.fileUrl) {
+      this.materialIndexer.indexMaterial(updated.id).catch((err) =>
+        this.logger.error(`Background index failed for ${updated.id}: ${String(err)}`),
+      );
+    }
+
     return updated;
   }
 
@@ -327,5 +339,39 @@ export class MaterialsService {
       approved,
       byType: byType.map((t) => ({ type: t.type, count: t._count.type })),
     };
+  }
+
+  // Re-trigger indexing for a single material
+  async reindexMaterial(materialId: string): Promise<{ message: string }> {
+    await this.findById(materialId); // throws 404 if missing
+
+    this.materialIndexer.indexMaterial(materialId).catch((err) =>
+      this.logger.error(`Re-index failed for ${materialId}: ${String(err)}`),
+    );
+
+    return { message: "Re-indexing started. Refresh in a few seconds." };
+  }
+
+  // Batch re-trigger indexing for all PENDING and FAILED materials
+  async reindexPending(): Promise<{ queued: number }> {
+    const materials = await this.prisma.material.findMany({
+      where: {
+        isApproved: true,
+        isPublished: true,
+        indexStatus: { in: [IndexStatus.PENDING, IndexStatus.FAILED] },
+        fileUrl: { not: null },
+      },
+      select: { id: true },
+    });
+
+    // Fire all in parallel — each one runs asynchronously
+    for (const m of materials) {
+      this.materialIndexer.indexMaterial(m.id).catch((err) =>
+        this.logger.error(`Batch re-index failed for ${m.id}: ${String(err)}`),
+      );
+    }
+
+    this.logger.log(`Batch re-index queued ${materials.length} materials`);
+    return { queued: materials.length };
   }
 }

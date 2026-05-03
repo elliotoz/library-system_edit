@@ -11,6 +11,8 @@ import {
   Request,
   UseInterceptors,
   UploadedFile,
+  HttpCode,
+  HttpStatus,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import {
@@ -182,6 +184,26 @@ export class MaterialsController {
   @ApiOperation({ summary: "Approve or reject material submission" })
   async approve(@Param("id") id: string, @Body() dto: ApproveMaterialDto) {
     return this.materialsService.approve(id, dto);
+  }
+
+  // Admin: Re-index a single material for OZ AI
+  @Post(":id/reindex")
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: "Re-trigger AI text indexing for a single material" })
+  async reindex(@Param("id") id: string) {
+    return this.materialsService.reindexMaterial(id);
+  }
+
+  // Admin: Re-index all PENDING and FAILED materials in one batch
+  @Post("admin/reindex-pending")
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: "Batch re-index all PENDING and FAILED materials" })
+  async reindexPending() {
+    return this.materialsService.reindexPending();
   }
 
   // Delete material

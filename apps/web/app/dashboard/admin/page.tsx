@@ -1,25 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
-  BookOpen,
-  Users,
-  BookMarked,
-  Clock,
-  AlertTriangle,
-  UserPlus,
-  BarChart3,
-  ChevronRight,
-  Activity,
-  ArrowUpRight,
-  BellRing,
-  ShieldAlert,
-  GraduationCap,
-  Briefcase,
-  Shield,
-  Brain,
+  BookOpen, Users, BookMarked, Clock, AlertTriangle, UserPlus,
+  BarChart3, ChevronRight, Activity, ArrowUpRight, BellRing,
+  ShieldAlert, GraduationCap, Briefcase, Shield, Brain,
+  BookCheck, CalendarClock,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import api from '@/lib/api';
@@ -30,6 +18,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
+
+// ── Types ──────────────────────────────────────────────────────────────────────
 
 interface AdminStats {
   totalBooks: number;
@@ -46,6 +36,26 @@ interface ActivityItem {
   time: string;
 }
 
+interface UserDistributionRow {
+  role: 'STUDENT' | 'INSTRUCTOR' | 'STAFF';
+  count: number;
+  pct: number;
+}
+
+interface AiMetrics {
+  period: string;
+  totalConversations: number;
+  totalMessages: number;
+  uniqueUsers: number;
+  responseRate: number;
+  avgMessagesPerSession: number;
+  activeAiUsersPct: number;
+}
+
+type AiPeriod = 'week' | 'month' | 'year';
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
 const CONTAINER_MOTION = {
   initial: { opacity: 0, y: 18 },
   animate: { opacity: 1, y: 0 },
@@ -55,147 +65,107 @@ const CONTAINER_MOTION = {
 function getOpsStatus(pendingReservations: number, overdueBooks: number) {
   const critical = pendingReservations + overdueBooks;
   if (critical >= 20) return { label: 'High attention', tone: 'text-rose-700 dark:text-rose-100 bg-rose-50 dark:bg-rose-400/15 border-rose-300 dark:border-rose-300/20' };
-  if (critical >= 8) return { label: 'Watch closely', tone: 'text-amber-700 dark:text-amber-100 bg-amber-50 dark:bg-amber-400/15 border-amber-300 dark:border-amber-300/20' };
+  if (critical >= 8)  return { label: 'Watch closely', tone: 'text-amber-700 dark:text-amber-100 bg-amber-50 dark:bg-amber-400/15 border-amber-300 dark:border-amber-300/20' };
   return { label: 'Stable flow', tone: 'text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-500/20 border-teal-400 dark:border-teal-500' };
 }
 
-const AI_TABS = [
-  {
-    key: 'week',
-    label: 'Week',
-    metrics: [
-      { label: 'Query Success Rate', value: 94 },
-      { label: 'User Satisfaction', value: 88 },
-      { label: 'Book Recommendations', value: 78 },
-    ],
-  },
-  {
-    key: 'month',
-    label: 'Month',
-    metrics: [
-      { label: 'Query Success Rate', value: 92 },
-      { label: 'User Satisfaction', value: 86 },
-      { label: 'Book Recommendations', value: 82 },
-    ],
-  },
-  {
-    key: 'year',
-    label: 'Year',
-    metrics: [
-      { label: 'Query Success Rate', value: 91 },
-      { label: 'User Satisfaction', value: 89 },
-      { label: 'Book Recommendations', value: 85 },
-    ],
-  },
-];
+const ROLE_META: Record<string, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
+  STUDENT:    { label: 'Students',    icon: GraduationCap, color: 'text-sky-500' },
+  INSTRUCTOR: { label: 'Instructors', icon: Briefcase,     color: 'text-violet-500' },
+  STAFF:      { label: 'Staff',       icon: Shield,        color: 'text-emerald-500' },
+};
 
-const USER_DISTRIBUTION = [
-  { label: 'Students', count: 892, pct: 71.5, icon: GraduationCap, color: 'text-sky-500' },
-  { label: 'Instructors', count: 156, pct: 12.5, icon: Briefcase, color: 'text-violet-500' },
-  { label: 'Staff', count: 199, pct: 16, icon: Shield, color: 'text-emerald-500' },
-];
+const ACTIVITY_TONE: Record<string, { bg: string; initial: string }> = {
+  borrow:      { bg: 'bg-sky-100 text-sky-600 dark:bg-sky-400/15 dark:text-sky-300',       initial: 'B' },
+  return:      { bg: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-300', initial: 'R' },
+  user:        { bg: 'bg-teal-100 text-teal-600 dark:bg-teal-400/15 dark:text-teal-300',   initial: 'U' },
+  book:        { bg: 'bg-violet-100 text-violet-600 dark:bg-violet-400/15 dark:text-violet-300', initial: 'A' },
+  reservation: { bg: 'bg-amber-100 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300', initial: 'RS' },
+};
+
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
   const { user } = useAuth();
-  const [stats, setStats] = useState<AdminStats | null>(null);
-  const [activities, setActivities] = useState<ActivityItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
+  const [stats, setStats]                   = useState<AdminStats | null>(null);
+  const [activities, setActivities]         = useState<ActivityItem[]>([]);
+  const [userDist, setUserDist]             = useState<UserDistributionRow[]>([]);
+  const [aiMetrics, setAiMetrics]           = useState<AiMetrics | null>(null);
+  const [aiPeriod, setAiPeriod]             = useState<AiPeriod>('week');
+  const [isLoading, setIsLoading]           = useState(true);
+  const [aiLoading, setAiLoading]           = useState(false);
+
+  // Initial load — stats, activity, user distribution, AI metrics (week)
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchAll = async () => {
       try {
-        const [statsRes, activityRes] = await Promise.all([
+        const [statsRes, activityRes, distRes, aiRes] = await Promise.all([
           api.get('/dashboard/admin').catch(() => null),
           api.get('/dashboard/activity').catch(() => null),
+          api.get('/dashboard/admin/user-distribution').catch(() => null),
+          api.get('/dashboard/admin/ai-metrics?period=week').catch(() => null),
         ]);
-        if (statsRes?.data) setStats(statsRes.data);
+        if (statsRes?.data)    setStats(statsRes.data);
         if (activityRes?.data) setActivities(activityRes.data);
+        if (distRes?.data)     setUserDist(distRes.data);
+        if (aiRes?.data)       setAiMetrics(aiRes.data);
       } catch (e) {
         console.error(e);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchData();
+    fetchAll();
   }, []);
 
-  const greeting = () => {
-    const h = new Date().getHours();
-    if (h < 12) return 'Good morning';
-    if (h < 18) return 'Good afternoon';
-    return 'Good evening';
+  // Refetch AI metrics when period tab changes
+  const fetchAiMetrics = useCallback(async (period: AiPeriod) => {
+    setAiLoading(true);
+    try {
+      const res = await api.get(`/dashboard/admin/ai-metrics?period=${period}`);
+      if (res?.data) setAiMetrics(res.data);
+    } catch { /* keep previous data */ }
+    finally { setAiLoading(false); }
+  }, []);
+
+  const handlePeriodChange = (period: string) => {
+    const p = period as AiPeriod;
+    setAiPeriod(p);
+    fetchAiMetrics(p);
   };
 
   if (isLoading) {
     return (
       <div className="space-y-6 animate-pulse">
-        <div className="h-40 rounded-[28px] bg-gray-200 dark:bg-gray-700" />
+        <div className="h-36 rounded-2xl bg-gray-200 dark:bg-gray-700" />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-28 rounded-2xl bg-gray-200 dark:bg-gray-700" />
-          ))}
+          {[...Array(6)].map((_, i) => <div key={i} className="h-28 rounded-2xl bg-gray-200 dark:bg-gray-700" />)}
         </div>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="h-72 rounded-[28px] bg-gray-200 dark:bg-gray-700" />
-          <div className="h-72 rounded-[28px] bg-gray-200 dark:bg-gray-700" />
-          <div className="h-72 rounded-[28px] bg-gray-200 dark:bg-gray-700" />
+          {[...Array(3)].map((_, i) => <div key={i} className="h-72 rounded-2xl bg-gray-200 dark:bg-gray-700" />)}
         </div>
+        <div className="h-64 rounded-2xl bg-gray-200 dark:bg-gray-700" />
       </div>
     );
   }
 
+  const opsStatus = getOpsStatus(stats?.pendingReservations ?? 0, stats?.overdueBooks ?? 0);
+
   const kpiCards = [
-    {
-      label: 'Total Books',
-      value: stats?.totalBooks ?? 0,
-      icon: BookOpen,
-      iconBg: 'bg-sky-400/15',
-      iconColor: 'text-sky-600 dark:text-sky-300',
-      meta: 'Catalog inventory',
-    },
-    {
-      label: 'Active Users',
-      value: stats?.activeUsers ?? 0,
-      icon: Users,
-      iconBg: 'bg-emerald-400/15',
-      iconColor: 'text-emerald-600 dark:text-emerald-300',
-      meta: 'Currently using the system',
-    },
-    {
-      label: 'Currently Borrowed',
-      value: stats?.currentlyBorrowed ?? 0,
-      icon: BookMarked,
-      iconBg: 'bg-violet-400/15',
-      iconColor: 'text-violet-600 dark:text-violet-300',
-      meta: 'Active circulation load',
-    },
-    {
-      label: 'Pending Reservations',
-      value: stats?.pendingReservations ?? 0,
-      icon: Clock,
-      href: '/dashboard/admin/reservations',
-      iconBg: 'bg-amber-400/15',
-      iconColor: 'text-amber-600 dark:text-amber-300',
-      meta: 'Needs review',
-    },
-    {
-      label: 'Overdue Books',
-      value: stats?.overdueBooks ?? 0,
-      icon: AlertTriangle,
-      href: '/dashboard/admin/books',
-      iconBg: 'bg-rose-400/15',
-      iconColor: 'text-rose-600 dark:text-rose-300',
-      meta: 'Requires follow-up',
-    },
-    {
-      label: 'New Users This Week',
-      value: stats?.newUsersThisWeek ?? 0,
-      icon: UserPlus,
-      href: '/dashboard/admin/users',
-      iconBg: 'bg-teal-400/15',
-      iconColor: 'text-teal-600 dark:text-teal-300',
-      meta: 'Recent signups',
-    },
+    { label: 'Total Books',            value: stats?.totalBooks ?? 0,            icon: BookOpen,     iconBg: 'bg-sky-400/15',    iconColor: 'text-sky-600 dark:text-sky-300',       meta: 'Catalog inventory' },
+    { label: 'Active Users',           value: stats?.activeUsers ?? 0,           icon: Users,        iconBg: 'bg-emerald-400/15', iconColor: 'text-emerald-600 dark:text-emerald-300', meta: 'Currently using the system' },
+    { label: 'Currently Borrowed',     value: stats?.currentlyBorrowed ?? 0,     icon: BookMarked,   iconBg: 'bg-violet-400/15', iconColor: 'text-violet-600 dark:text-violet-300', meta: 'Active circulation load' },
+    { label: 'Pending Reservations',   value: stats?.pendingReservations ?? 0,   icon: Clock,        iconBg: 'bg-amber-400/15',  iconColor: 'text-amber-600 dark:text-amber-300',   meta: 'Needs review',         href: '/dashboard/admin/reservations' },
+    { label: 'Overdue Books',          value: stats?.overdueBooks ?? 0,          icon: AlertTriangle, iconBg: 'bg-rose-400/15',  iconColor: 'text-rose-600 dark:text-rose-300',     meta: 'Requires follow-up',  href: '/dashboard/admin/borrows' },
+    { label: 'New Users This Week',    value: stats?.newUsersThisWeek ?? 0,      icon: UserPlus,     iconBg: 'bg-teal-400/15',   iconColor: 'text-teal-600 dark:text-teal-300',     meta: 'Recent signups',      href: '/dashboard/admin/users' },
   ];
 
   const focusActions = [
@@ -203,28 +173,45 @@ export default function AdminDashboard() {
       label: 'Manage Reservations',
       description: `${stats?.pendingReservations ?? 0} pending requests waiting for admin review.`,
       href: '/dashboard/admin/reservations',
-      icon: BellRing,
-      badge: 'Immediate',
+      icon: BellRing, badge: 'Immediate',
       badgeClass: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-400/15 dark:text-amber-300 dark:border-amber-400/20',
-      iconBg: 'bg-amber-400/15',
-      iconColor: 'text-amber-600 dark:text-amber-300',
+      iconBg: 'bg-amber-400/15', iconColor: 'text-amber-600 dark:text-amber-300',
     },
     {
       label: 'Review Overdue Loans',
       description: `${stats?.overdueBooks ?? 0} overdue items need outreach or enforcement.`,
       href: '/dashboard/admin/borrows',
-      icon: ShieldAlert,
-      badge: 'Attention',
+      icon: ShieldAlert, badge: 'Attention',
       badgeClass: 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-400/15 dark:text-rose-300 dark:border-rose-400/20',
-      iconBg: 'bg-rose-400/15',
-      iconColor: 'text-rose-600 dark:text-rose-300',
+      iconBg: 'bg-rose-400/15', iconColor: 'text-rose-600 dark:text-rose-300',
     },
   ];
 
-  const opsStatus = getOpsStatus(stats?.pendingReservations ?? 0, stats?.overdueBooks ?? 0);
+  // AI metrics display rows — all derived from real API data
+  const aiRows = aiMetrics ? [
+    {
+      label: 'Response Rate',
+      value: aiMetrics.responseRate,
+      display: `${aiMetrics.responseRate}%`,
+      progress: aiMetrics.responseRate,
+    },
+    {
+      label: 'Avg Messages / Session',
+      value: aiMetrics.avgMessagesPerSession,
+      display: aiMetrics.avgMessagesPerSession.toFixed(1),
+      progress: Math.min(aiMetrics.avgMessagesPerSession * 10, 100),
+    },
+    {
+      label: 'Active AI Users',
+      value: aiMetrics.activeAiUsersPct,
+      display: `${aiMetrics.activeAiUsersPct}%`,
+      progress: aiMetrics.activeAiUsersPct,
+    },
+  ] : [];
 
   return (
     <div className="space-y-6">
+
       {/* 1 — Hero banner */}
       <motion.section {...CONTAINER_MOTION}>
         <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
@@ -248,40 +235,15 @@ export default function AdminDashboard() {
         </div>
       </motion.section>
 
-      {/* Quick actions row */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.04, duration: 0.35 }}
-        className="flex flex-wrap gap-3"
-      >
-        <Button asChild variant="outline" size="sm">
-          <Link href="/dashboard/admin/users">
-            <UserPlus className="h-4 w-4" />
-            Manage Users
-          </Link>
-        </Button>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/dashboard/admin/books">
-            <BookOpen className="h-4 w-4" />
-            Manage Books
-          </Link>
-        </Button>
-        <Button asChild size="sm">
-          <Link href="/dashboard/admin/reports">
-            <BarChart3 className="h-4 w-4" />
-            Reports
-          </Link>
-        </Button>
+      {/* Quick actions */}
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04, duration: 0.35 }} className="flex flex-wrap gap-3">
+        <Button asChild variant="outline" size="sm"><Link href="/dashboard/admin/users"><UserPlus className="h-4 w-4" />Manage Users</Link></Button>
+        <Button asChild variant="outline" size="sm"><Link href="/dashboard/admin/books"><BookOpen className="h-4 w-4" />Manage Books</Link></Button>
+        <Button asChild size="sm"><Link href="/dashboard/admin/reports"><BarChart3 className="h-4 w-4" />Reports</Link></Button>
       </motion.div>
 
-      {/* 2 — KPI stat cards */}
-      <motion.section
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.06, duration: 0.35 }}
-        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
-      >
+      {/* 2 — KPI cards */}
+      <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06, duration: 0.35 }} className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {kpiCards.map((card, index) => {
           const cardEl = (
             <Card className="group hover:-translate-y-0.5 transition-transform duration-200 cursor-pointer">
@@ -298,33 +260,23 @@ export default function AdminDashboard() {
                 </div>
                 {card.href && (
                   <div className="mt-4 flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                    <span>View details</span>
-                    <ChevronRight className="h-3.5 w-3.5" />
+                    <span>View details</span><ChevronRight className="h-3.5 w-3.5" />
                   </div>
                 )}
               </CardContent>
             </Card>
           );
-
-          return card.href ? (
-            <Link key={`${card.label}-${index}`} href={card.href} className="block">
-              {cardEl}
-            </Link>
-          ) : (
-            <div key={`${card.label}-${index}`}>{cardEl}</div>
-          );
+          return card.href
+            ? <Link key={`${card.label}-${index}`} href={card.href} className="block">{cardEl}</Link>
+            : <div key={`${card.label}-${index}`}>{cardEl}</div>;
         })}
       </motion.section>
 
-      {/* 3 — Bottom section: 3-column grid */}
+      {/* 3 — Three-column section */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Column 1 — Priority Actions */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.12, duration: 0.35 }}
-          className="lg:col-span-1"
-        >
+
+        {/* Priority Actions */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12, duration: 0.35 }} className="lg:col-span-1">
           <Card className="h-full">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Priority Actions</CardTitle>
@@ -346,9 +298,7 @@ export default function AdminDashboard() {
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground leading-5">{action.description}</p>
                         <div className="mt-2">
-                          <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                            {action.badge}
-                          </Badge>
+                          <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">{action.badge}</Badge>
                         </div>
                       </div>
                     </div>
@@ -359,90 +309,114 @@ export default function AdminDashboard() {
           </Card>
         </motion.div>
 
-        {/* Column 2 — User Distribution */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.18, duration: 0.35 }}
-          className="lg:col-span-1"
-        >
+        {/* User Distribution — real data */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18, duration: 0.35 }} className="lg:col-span-1">
           <Card className="h-full">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">User Distribution</CardTitle>
-              <CardDescription>Active users by category</CardDescription>
+              <CardDescription>
+                {userDist.length > 0
+                  ? `${userDist.reduce((s, r) => s + r.count, 0).toLocaleString()} active users across all roles`
+                  : 'Active users by role'}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              {USER_DISTRIBUTION.map((row) => {
-                const Icon = row.icon;
-                return (
-                  <div key={row.label} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Icon className={cn('h-4 w-4', row.color)} />
-                        <span className="text-sm font-medium">{row.label}</span>
+              {userDist.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No user data available</p>
+              ) : (
+                userDist.map((row) => {
+                  const meta = ROLE_META[row.role];
+                  if (!meta) return null;
+                  const Icon = meta.icon;
+                  return (
+                    <div key={row.role} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Icon className={cn('h-4 w-4', meta.color)} />
+                          <span className="text-sm font-medium">{meta.label}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold">{row.count.toLocaleString()}</span>
+                          <span className="text-xs text-muted-foreground">{row.pct}%</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold">{row.count.toLocaleString()}</span>
-                        <span className="text-xs text-muted-foreground">{row.pct}%</span>
-                      </div>
+                      <Progress value={row.pct} className="h-2" />
                     </div>
-                    <Progress value={row.pct} className="h-2" />
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Column 3 — AI Performance */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.24, duration: 0.35 }}
-          className="lg:col-span-1"
-        >
+        {/* AI Performance — real data */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24, duration: 0.35 }} className="lg:col-span-1">
           <Card className="h-full">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
                 <Brain className="h-4 w-4 text-primary" />
                 <CardTitle className="text-lg">AI Performance</CardTitle>
               </div>
-              <CardDescription>Assistant metrics over time</CardDescription>
+              <CardDescription>Real OZ AI usage metrics</CardDescription>
             </CardHeader>
             <CardContent>
-              <Tabs defaultValue="week">
+              <Tabs value={aiPeriod} onValueChange={handlePeriodChange}>
                 <TabsList className="w-full mb-4">
-                  {AI_TABS.map((tab) => (
-                    <TabsTrigger key={tab.key} value={tab.key} className="flex-1">
-                      {tab.label}
-                    </TabsTrigger>
+                  {(['week', 'month', 'year'] as const).map((p) => (
+                    <TabsTrigger key={p} value={p} className="flex-1 capitalize">{p}</TabsTrigger>
                   ))}
                 </TabsList>
-                {AI_TABS.map((tab) => (
-                  <TabsContent key={tab.key} value={tab.key} className="space-y-4 mt-0">
-                    {tab.metrics.map((metric) => (
-                      <div key={metric.label} className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">{metric.label}</span>
-                          <span className="text-sm font-semibold">{metric.value}%</span>
+
+                <TabsContent value={aiPeriod} className="mt-0">
+                  {aiLoading ? (
+                    <div className="space-y-4 animate-pulse">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="space-y-1.5">
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
+                          <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded" />
                         </div>
-                        <Progress value={metric.value} className="h-2" />
-                      </div>
-                    ))}
-                  </TabsContent>
-                ))}
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {aiRows.map((row) => (
+                        <div key={row.label} className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">{row.label}</span>
+                            <span className="text-sm font-semibold">{row.display}</span>
+                          </div>
+                          <Progress value={row.progress} className="h-2" />
+                        </div>
+                      ))}
+
+                      {/* Summary stats */}
+                      {aiMetrics && (
+                        <div className="pt-3 mt-3 border-t grid grid-cols-3 gap-2 text-center">
+                          <div>
+                            <p className="text-lg font-bold">{aiMetrics.totalConversations}</p>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Chats</p>
+                          </div>
+                          <div>
+                            <p className="text-lg font-bold">{aiMetrics.totalMessages}</p>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Messages</p>
+                          </div>
+                          <div>
+                            <p className="text-lg font-bold">{aiMetrics.uniqueUsers}</p>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Users</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </TabsContent>
               </Tabs>
             </CardContent>
           </Card>
         </motion.div>
       </div>
 
-      {/* 4 — Activity feed */}
-      <motion.section
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.30, duration: 0.35 }}
-      >
+      {/* 4 — Activity feed — real data with all event types */}
+      <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.30, duration: 0.35 }}>
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -450,7 +424,7 @@ export default function AdminDashboard() {
                 <CardTitle className="text-lg">Activity Feed</CardTitle>
                 <CardDescription className="mt-1">
                   {activities.length > 0
-                    ? `${activities.length} recent event${activities.length === 1 ? '' : 's'} across circulation and admin activity`
+                    ? `${activities.length} recent event${activities.length === 1 ? '' : 's'} across borrows, reservations, and user registrations`
                     : 'No recent activity recorded'}
                 </CardDescription>
               </div>
@@ -467,36 +441,25 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <div className="space-y-4">
-                {activities.slice(0, 6).map((item, index) => {
-                  const tone =
-                    item.type === 'borrow'
-                      ? 'bg-sky-100 text-sky-600 dark:bg-sky-400/15 dark:text-sky-300'
-                      : item.type === 'user'
-                        ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-300'
-                        : 'bg-violet-100 text-violet-600 dark:bg-violet-400/15 dark:text-violet-300';
-
+                {activities.slice(0, 8).map((item, index) => {
+                  const tone = ACTIVITY_TONE[item.type] ?? ACTIVITY_TONE.book;
                   return (
                     <motion.div
                       key={`${item.time}-${index}`}
                       initial={{ opacity: 0, y: 16 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.06 * index }}
+                      transition={{ delay: 0.05 * index }}
                       className="flex items-start gap-3"
                     >
                       <Avatar className="size-8 shrink-0">
-                        <AvatarFallback className={cn('text-xs', tone)}>
-                          {item.type === 'borrow' ? 'B' : item.type === 'user' ? 'U' : 'A'}
+                        <AvatarFallback className={cn('text-xs font-semibold', tone.bg)}>
+                          {tone.initial}
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0 flex-1 rounded-xl border px-4 py-3">
                         <p className="text-sm leading-6 text-foreground">{item.message}</p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {new Date(item.time).toLocaleString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                          {new Date(item.time).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
                     </motion.div>

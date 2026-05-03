@@ -58,6 +58,14 @@ enum AccessLevel {
   COURSE_STUDENTS
 }
 
+enum IndexStatus {
+  PENDING
+  PROCESSING
+  INDEXED
+  FAILED
+  NOT_APPLICABLE
+}
+
 enum AuthProvider {
   LOCAL
   GOOGLE
@@ -443,13 +451,33 @@ model Material {
   isPublished Boolean @default(false)
   isApproved  Boolean @default(false)
 
+  // AI indexing
+  indexStatus IndexStatus @default(PENDING)
+  chunks      MaterialChunk[]
+
   // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([type])
   @@index([facultyCode])
+  @@index([indexStatus])
   @@map("materials")
+}
+
+model MaterialChunk {
+  id         String   @id @default(cuid())
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  chunkIndex Int
+  content    String
+  tokenCount Int
+  pageNumber Int?
+  createdAt  DateTime @default(now())
+
+  @@unique([materialId, chunkIndex])
+  @@index([materialId])
+  @@map("material_chunks")
 }
 
 // ============================================

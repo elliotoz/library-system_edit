@@ -88,20 +88,93 @@ export class DashboardService {
   }
 
   async getRecentActivity() {
-    const [recentBorrows, recentBooks] = await Promise.all([
+    const [recentBorrows, recentBooks, recentUsers, recentReturns, recentReservations] = await Promise.all([
       this.prisma.borrow.findMany({
         take: 5,
         orderBy: { borrowedAt: 'desc' },
         include: { user: { select: { name: true } }, bookCopy: { include: { book: { select: { title: true } } } } },
       }),
       this.prisma.book.findMany({ take: 3, orderBy: { createdAt: 'desc' }, select: { title: true, createdAt: true } }),
+      this.prisma.user.findMany({ take: 3, orderBy: { createdAt: 'desc' }, select: { name: true, role: true, createdAt: true } }),
+      this.prisma.borrow.findMany({
+        take: 3,
+        where: { status: BorrowStatus.RETURNED, returnedAt: { not: null } },
+        orderBy: { returnedAt: 'desc' },
+        include: { user: { select: { name: true } }, bookCopy: { include: { book: { select: { title: true } } } } },
+      }),
+      this.prisma.reservation.findMany({
+        take: 3,
+        orderBy: { createdAt: 'desc' },
+        include: { user: { select: { name: true } }, bookCopy: { include: { book: { select: { title: true } } } } },
+      }),
     ]);
 
     const activities = [
       ...recentBorrows.map((b) => ({ type: 'borrow', message: `${b.user.name} borrowed "${b.bookCopy.book.title}"`, time: b.borrowedAt })),
       ...recentBooks.map((b) => ({ type: 'book', message: `New book added: "${b.title}"`, time: b.createdAt })),
+      ...recentUsers.map((u) => ({ type: 'user', message: `${u.name} joined as ${u.role.charAt(0) + u.role.slice(1).toLowerCase()}`, time: u.createdAt })),
+      ...recentReturns.map((b) => ({ type: 'return', message: `${b.user.name} returned "${b.bookCopy.book.title}"`, time: b.returnedAt! })),
+      ...recentReservations.map((r) => ({ type: 'reservation', message: `${r.user.name} reserved "${r.bookCopy.book.title}"`, time: r.createdAt })),
     ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 10);
 
     return activities;
+  }
+
+  async getUserDistribution() {
+    const [roleCounts, total] = await Promise.all([
+      this.prisma.user.groupBy({
+        by: ['role'],
+        where: { isActive: true },
+        _count: { id: true },
+      }),
+      this.prisma.user.count({ where: { isActive: true, role: { not: Role.ADMIN } } }),
+    ]);
+
+    const order: Role[] = [Role.STUDENT, Role.INSTRUCTOR, Role.STAFF];
+    return order.map((role) => {
+      const count = roleCounts.find((r) => r.role === role)?._count.id ?? 0;
+      const pct = total > 0 ? Math.round((count / total) * 1000) / 10 : 0;
+      return { role, count, pct };
+    });
+  }
+
+  async getAiMetrics(period: 'week' | 'month' | 'year') {
+    const msMap = { week: 7, month: 30, year: 365 };
+    const since = new Date(Date.now() - msMap[period] * 24 * 60 * 60 * 1000);
+
+    const [conversations, totalUsers] = await Promise.all([
+      this.prisma.aiConversation.findMany({
+        where: { createdAt: { gte: since } },
+        include: { messages: { select: { role: true } } },
+      }),
+      this.prisma.user.count({ where: { isActive: true } }),
+    ]);
+
+    const totalConversations = conversations.length;
+    const totalMessages = conversations.reduce((sum, c) => sum + c.messages.length, 0);
+    const conversationsWithReply = conversations.filter((c) =>
+      c.messages.some((m) => m.role === 'assistant'),
+    ).length;
+    const uniqueUsers = new Set(conversations.map((c) => c.userId)).size;
+
+    const responseRate = totalConversations > 0
+      ? Math.round((conversationsWithReply / totalConversations) * 100)
+      : 0;
+    const avgMessagesPerSession = totalConversations > 0
+      ? Math.round((totalMessages / totalConversations) * 10) / 10
+      : 0;
+    const activeAiUsersPct = totalUsers > 0
+      ? Math.round((uniqueUsers / totalUsers) * 100)
+      : 0;
+
+    return {
+      period,
+      totalConversations,
+      totalMessages,
+      uniqueUsers,
+      responseRate,
+      avgMessagesPerSession,
+      activeAiUsersPct,
+    };
   }
 }
