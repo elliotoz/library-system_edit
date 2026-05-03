@@ -8,6 +8,7 @@ import { CatalogSearchService } from './catalog-search.service';
 import { SemanticSearchService } from './semantic-search.service';
 import { LearningPathService } from './learning-path.service';
 import { ResearchAssistantService } from './research-assistant.service';
+import { GroqService } from './groq.service';
 import { OpenRouterProvider } from './providers/openrouter.provider';
 import { ProviderFactory } from './providers/provider-factory';
 import { ToolHookService } from './tools/tool-hook.service';
@@ -28,6 +29,7 @@ import { MaterialsModule } from '../materials/materials.module';
     SemanticSearchService,
     LearningPathService,
     ResearchAssistantService,
+    GroqService,
     OpenRouterProvider,
     ProviderFactory,
     ToolHookService,
