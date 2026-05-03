@@ -8,9 +8,6 @@ import { CatalogSearchService } from './catalog-search.service';
 import { SemanticSearchService } from './semantic-search.service';
 import { LearningPathService } from './learning-path.service';
 import { ResearchAssistantService } from './research-assistant.service';
-import { GroqService } from './groq.service';
-import { GroqProvider } from './providers/groq.provider';
-import { GeminiProvider } from './providers/gemini.provider';
 import { OpenRouterProvider } from './providers/openrouter.provider';
 import { ProviderFactory } from './providers/provider-factory';
 import { ToolHookService } from './tools/tool-hook.service';
@@ -31,14 +28,11 @@ import { MaterialsModule } from '../materials/materials.module';
     SemanticSearchService,
     LearningPathService,
     ResearchAssistantService,
-    GroqService,
-    GroqProvider,
-    GeminiProvider,
     OpenRouterProvider,
     ProviderFactory,
     ToolHookService,
     TokenTrackerService,
   ],
-  exports: [GroqService, AgentService, ProviderFactory],
+  exports: [AgentService, ProviderFactory],
 })
 export class AiModule {}

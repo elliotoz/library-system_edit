@@ -9,6 +9,7 @@ export class RequestLoggingMiddleware implements NestMiddleware {
     const start = Date.now();
     const { method, originalUrl, body, query, params, user } = req;
     const userId = (user as any)?.id || 'anonymous';
+    const logger = this.logger;
 
     // Log incoming request
     const incomingLog = {
@@ -21,8 +22,8 @@ export class RequestLoggingMiddleware implements NestMiddleware {
       bodySize: JSON.stringify(body).length,
     };
 
-    this.logger.log(`${method} ${originalUrl} [${userId}]`);
-    this.logger.debug(JSON.stringify(incomingLog, null, 2));
+    logger.log(`${method} ${originalUrl} [${userId}]`);
+    logger.debug(JSON.stringify(incomingLog, null, 2));
 
     // Capture response
     const originalSend = res.send;
@@ -42,10 +43,10 @@ export class RequestLoggingMiddleware implements NestMiddleware {
         responseSize: typeof data === 'string' ? data.length : JSON.stringify(data).length,
       };
 
-      this.logger.log(
+      logger.log(
         `${statusColor} ${method} ${originalUrl} [${statusCode}] (${duration}ms)`,
       );
-      this.logger.debug(JSON.stringify(responseLog, null, 2));
+      logger.debug(JSON.stringify(responseLog, null, 2));
 
       return originalSend.call(this, data);
     };
