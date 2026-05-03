@@ -5,6 +5,10 @@ import { Request, Response, NextFunction } from "express";
 export class RequestLoggerMiddleware implements NestMiddleware {
   private readonly logger = new Logger("RequestLogger");
 
+  private getUserId(req: Request): string {
+    return (req.user as { id?: string } | undefined)?.id || "anonymous";
+  }
+
   use(req: Request, res: Response, next: NextFunction) {
     if (process.env.ENABLE_REQUEST_LOGGING === "false") {
       return next();
@@ -22,9 +26,10 @@ export class RequestLoggerMiddleware implements NestMiddleware {
       const { method, originalUrl } = req;
       const { statusCode } = res;
       const requestId = req.requestId || "-";
+      const userId = this.getUserId(req);
 
       this.logger.log(
-        `${method} ${originalUrl} ${statusCode} ${duration}ms [req=${requestId}]`,
+        `${method} ${originalUrl} ${statusCode} ${duration}ms [user=${userId}] [req=${requestId}]`,
       );
     });
 

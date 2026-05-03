@@ -54,6 +54,13 @@ interface AiMetrics {
 
 type AiPeriod = 'week' | 'month' | 'year';
 
+interface AdminBootstrapData {
+  stats: AdminStats | null;
+  activities: ActivityItem[];
+  userDist: UserDistributionRow[];
+  aiMetrics: AiMetrics | null;
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 const CONTAINER_MOTION = {
@@ -83,6 +90,45 @@ const ACTIVITY_TONE: Record<string, { bg: string; initial: string }> = {
   reservation: { bg: 'bg-amber-100 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300', initial: 'RS' },
 };
 
+let adminBootstrapCache: AdminBootstrapData | null = null;
+let adminBootstrapCacheAt = 0;
+let adminBootstrapRequest: Promise<AdminBootstrapData> | null = null;
+
+async function loadAdminBootstrapData(): Promise<AdminBootstrapData> {
+  const now = Date.now();
+  if (adminBootstrapCache && now - adminBootstrapCacheAt < 5000) {
+    return adminBootstrapCache;
+  }
+
+  if (adminBootstrapRequest) {
+    return adminBootstrapRequest;
+  }
+
+  adminBootstrapRequest = Promise.all([
+    api.get('/dashboard/admin').catch(() => null),
+    api.get('/dashboard/activity').catch(() => null),
+    api.get('/dashboard/admin/user-distribution').catch(() => null),
+    api.get('/dashboard/admin/ai-metrics?period=week').catch(() => null),
+  ])
+    .then(([statsRes, activityRes, distRes, aiRes]) => {
+      const result: AdminBootstrapData = {
+        stats: statsRes?.data ?? null,
+        activities: activityRes?.data ?? [],
+        userDist: distRes?.data ?? [],
+        aiMetrics: aiRes?.data ?? null,
+      };
+
+      adminBootstrapCache = result;
+      adminBootstrapCacheAt = Date.now();
+      return result;
+    })
+    .finally(() => {
+      adminBootstrapRequest = null;
+    });
+
+  return adminBootstrapRequest;
+}
+
 function greeting(): string {
   const h = new Date().getHours();
   if (h < 12) return 'Good morning';
@@ -105,25 +151,31 @@ export default function AdminDashboard() {
 
   // Initial load — stats, activity, user distribution, AI metrics (week)
   useEffect(() => {
+    let isMounted = true;
+
     const fetchAll = async () => {
       try {
-        const [statsRes, activityRes, distRes, aiRes] = await Promise.all([
-          api.get('/dashboard/admin').catch(() => null),
-          api.get('/dashboard/activity').catch(() => null),
-          api.get('/dashboard/admin/user-distribution').catch(() => null),
-          api.get('/dashboard/admin/ai-metrics?period=week').catch(() => null),
-        ]);
-        if (statsRes?.data)    setStats(statsRes.data);
-        if (activityRes?.data) setActivities(activityRes.data);
-        if (distRes?.data)     setUserDist(distRes.data);
-        if (aiRes?.data)       setAiMetrics(aiRes.data);
+        const data = await loadAdminBootstrapData();
+        if (!isMounted) return;
+
+        setStats(data.stats);
+        setActivities(data.activities);
+        setUserDist(data.userDist);
+        setAiMetrics(data.aiMetrics);
       } catch (e) {
         console.error(e);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
-    fetchAll();
+
+    void fetchAll();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Refetch AI metrics when period tab changes

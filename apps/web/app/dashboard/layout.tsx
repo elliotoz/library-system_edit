@@ -60,6 +60,44 @@ interface NavSection {
   items: { label: string; href: string; icon: React.ComponentType<{ className?: string }> }[];
 }
 
+let notificationsCache: Notification[] | null = null;
+let notificationsCacheAt = 0;
+let notificationsRequest: Promise<Notification[]> | null = null;
+
+async function loadNotifications(force = false): Promise<Notification[]> {
+  const now = Date.now();
+  if (!force && notificationsCache && now - notificationsCacheAt < 5000) {
+    return notificationsCache;
+  }
+
+  if (notificationsRequest) {
+    return notificationsRequest;
+  }
+
+  notificationsRequest = fetch('/api/notifications?limit=10', {
+    credentials: 'include',
+  })
+    .then(async (res) => {
+      if (!res.ok) {
+        throw new Error(`Notifications request failed with ${res.status}`);
+      }
+
+      const data = await res.json();
+      const nextNotifications = Array.isArray(data.notifications)
+        ? (data.notifications as Notification[])
+        : [];
+
+      notificationsCache = nextNotifications;
+      notificationsCacheAt = Date.now();
+      return nextNotifications;
+    })
+    .finally(() => {
+      notificationsRequest = null;
+    });
+
+  return notificationsRequest;
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -107,21 +145,26 @@ export default function DashboardLayout({
   useEffect(() => {
     if (!user) return;
 
-    const fetchNotifications = async () => {
+    let isMounted = true;
+
+    const syncNotifications = async (force = false) => {
       try {
-        const res = await fetch('/api/notifications?limit=10', {
-          credentials: 'include',
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setNotifications(data.notifications);
+        const nextNotifications = await loadNotifications(force);
+        if (isMounted) {
+          setNotifications(nextNotifications);
         }
       } catch {}
     };
 
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
+    void syncNotifications();
+    const interval = setInterval(() => {
+      void syncNotifications(true);
+    }, 30000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [user]);
 
   useEffect(() => {
