@@ -16,6 +16,8 @@ import {
   Clock,
   CheckCircle,
   XCircle,
+  Brain,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -28,6 +30,7 @@ interface Material {
   facultyCode: string | null;
   isPublished: boolean;
   isApproved: boolean;
+  indexStatus: 'PENDING' | 'PROCESSING' | 'INDEXED' | 'FAILED' | 'NOT_APPLICABLE';
   createdAt: string;
   uploadedBy: {
     id: string;
@@ -51,6 +54,40 @@ const materialTypeLabels: Record<string, string> = {
   THESIS: 'Thesis',
 };
 
+const indexStatusConfig: Record<
+  string,
+  { label: string; className: string; title: string }
+> = {
+  PENDING: {
+    label: 'Pending',
+    className: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+    title: 'Waiting to be indexed by AI',
+  },
+  PROCESSING: {
+    label: 'Processing',
+    className:
+      'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+    title: 'Currently indexing...',
+  },
+  INDEXED: {
+    label: 'Indexed',
+    className:
+      'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+    title: 'Available for AI search',
+  },
+  FAILED: {
+    label: 'Failed',
+    className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    title: 'Indexing failed, click Re-index to retry',
+  },
+  NOT_APPLICABLE: {
+    label: 'N/A',
+    className:
+      'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
+    title: 'No file to index',
+  },
+};
+
 export default function AdminMaterialsPage() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -61,6 +98,8 @@ export default function AdminMaterialsPage() {
   >('all');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [reindexingId, setReindexingId] = useState<string | null>(null);
+  const [batchReindexing, setBatchReindexing] = useState(false);
 
   const fetchMaterials = async () => {
     setIsLoading(true);
@@ -161,6 +200,50 @@ export default function AdminMaterialsPage() {
     }
   };
 
+  const handleReindex = async (id: string) => {
+    setReindexingId(id);
+    try {
+      const response = await fetch(`/api/materials/${id}/reindex`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        toast.success('Reindexing started');
+        fetchMaterials();
+        fetchStats();
+      } else {
+        toast.error('Failed to start reindexing');
+      }
+    } catch (error) {
+      toast.error('Failed to start reindexing');
+    } finally {
+      setReindexingId(null);
+    }
+  };
+
+  const handleBatchReindex = async () => {
+    setBatchReindexing(true);
+    try {
+      const response = await fetch('/api/materials/admin/reindex-pending', {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        toast.success('Batch reindexing started');
+        fetchMaterials();
+        fetchStats();
+      } else {
+        toast.error('Failed to start batch reindexing');
+      }
+    } catch (error) {
+      toast.error('Failed to start batch reindexing');
+    } finally {
+      setBatchReindexing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -173,13 +256,23 @@ export default function AdminMaterialsPage() {
             Review, approve, and manage uploaded materials
           </p>
         </div>
-        <Link
-          href="/dashboard/admin/upload"
-          className="flex items-center gap-2 rounded-lg bg-primary-500 px-4 py-2 text-white hover:bg-primary-600"
-        >
-          <Plus className="h-4 w-4" />
-          Upload Material
-        </Link>
+        <div className="flex gap-2">
+          <button
+            onClick={handleBatchReindex}
+            disabled={batchReindexing}
+            className="flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:opacity-50"
+          >
+            <Brain className="h-4 w-4" />
+            {batchReindexing ? 'Reindexing...' : 'Re-index All'}
+          </button>
+          <Link
+            href="/dashboard/admin/upload"
+            className="flex items-center gap-2 rounded-lg bg-primary-500 px-4 py-2 text-white hover:bg-primary-600"
+          >
+            <Plus className="h-4 w-4" />
+            Upload Material
+          </Link>
+        </div>
       </div>
 
       {/* Stats */}
@@ -283,6 +376,9 @@ export default function AdminMaterialsPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
                     Status
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
+                    AI Index
+                  </th>
                   <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
                     Actions
                   </th>
@@ -329,6 +425,30 @@ export default function AdminMaterialsPage() {
                       )}
                     </td>
                     <td className="px-6 py-4">
+                      <span
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium',
+                          indexStatusConfig[material.indexStatus]?.className ||
+                            'bg-gray-100'
+                        )}
+                        title={indexStatusConfig[material.indexStatus]?.title}
+                      >
+                        {material.indexStatus === 'PROCESSING' ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : material.indexStatus === 'INDEXED' ? (
+                          <CheckCircle className="h-3.5 w-3.5" />
+                        ) : material.indexStatus === 'FAILED' ? (
+                          <XCircle className="h-3.5 w-3.5" />
+                        ) : material.indexStatus === 'PENDING' ? (
+                          <Clock className="h-3.5 w-3.5" />
+                        ) : (
+                          <X className="h-3.5 w-3.5" />
+                        )}
+                        {indexStatusConfig[material.indexStatus]?.label ||
+                          material.indexStatus}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
                         {!material.isApproved && (
                           <>
@@ -347,6 +467,22 @@ export default function AdminMaterialsPage() {
                               <X className="h-4 w-4" />
                             </button>
                           </>
+                        )}
+                        {(material.indexStatus === 'PENDING' ||
+                          material.indexStatus === 'FAILED') && (
+                          <button
+                            onClick={() => handleReindex(material.id)}
+                            disabled={reindexingId === material.id}
+                            className="rounded-lg p-2 text-blue-600 hover:bg-blue-50 disabled:opacity-50 dark:hover:bg-blue-900/20"
+                            title="Re-index for AI search"
+                          >
+                            <RefreshCw
+                              className={cn(
+                                'h-4 w-4',
+                                reindexingId === material.id && 'animate-spin'
+                              )}
+                            />
+                          </button>
                         )}
                         <button
                           onClick={() => handleDelete(material.id)}
