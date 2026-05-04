@@ -37,7 +37,6 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { Role } from "@prisma/client";
 
-// Configure multer storage
 const storage = diskStorage({
   destination: "./uploads/materials",
   filename: (
@@ -60,21 +59,21 @@ export class MaterialsController {
     private readonly storageService: StorageService,
   ) {}
 
-  // Public: Get all published materials
   @Get()
-  @ApiOperation({ summary: "Get all published materials" })
-  async findAll(@Query() query: MaterialQueryDto) {
-    return this.materialsService.findAllPublic(query);
+  @ApiOperation({ summary: "Get all published materials visible to the current user" })
+  async findAll(
+    @Query() query: MaterialQueryDto,
+    @Request() req: { user: { id: string; role: Role } },
+  ) {
+    return this.materialsService.findAllPublic(query, req.user.id, req.user.role);
   }
 
-  // Get material types for dropdown
   @Get("types")
   @ApiOperation({ summary: "Get all material types" })
   async getTypes() {
     return this.materialsService.getTypes();
   }
 
-  // Get my submissions
   @Get("my")
   @ApiOperation({ summary: "Get my material submissions" })
   async findMy(
@@ -84,7 +83,6 @@ export class MaterialsController {
     return this.materialsService.findMyMaterials(req.user.id, query);
   }
 
-  // Admin: Get all materials including pending
   @Get("admin")
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
@@ -96,7 +94,6 @@ export class MaterialsController {
     return this.materialsService.findAllAdmin(query);
   }
 
-  // Admin: Get stats
   @Get("admin/stats")
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
@@ -105,14 +102,15 @@ export class MaterialsController {
     return this.materialsService.getStats();
   }
 
-  // Get single material
   @Get(":id")
-  @ApiOperation({ summary: "Get material by ID" })
-  async findById(@Param("id") id: string) {
-    return this.materialsService.findById(id);
+  @ApiOperation({ summary: "Get material by ID if accessible" })
+  async findById(
+    @Param("id") id: string,
+    @Request() req: { user: { id: string; role: Role } },
+  ) {
+    return this.materialsService.findById(id, req.user.id, req.user.role);
   }
 
-  // Create material (with optional file upload)
   @Post()
   @UseGuards(RolesGuard)
   @Roles(Role.INSTRUCTOR, Role.ADMIN)
@@ -124,7 +122,6 @@ export class MaterialsController {
     return this.materialsService.create(dto, req.user.id, req.user.role);
   }
 
-  // Upload file
   @Post("upload")
   @UseGuards(RolesGuard)
   @Roles(Role.INSTRUCTOR, Role.ADMIN)
@@ -133,7 +130,7 @@ export class MaterialsController {
   @UseInterceptors(
     FileInterceptor("file", {
       storage,
-      limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+      limits: { fileSize: 50 * 1024 * 1024 },
       fileFilter: (
         req: Express.Request,
         file: Express.Multer.File,
@@ -147,6 +144,7 @@ export class MaterialsController {
           "application/vnd.openxmlformats-officedocument.presentationml.presentation",
           "video/mp4",
           "video/webm",
+          "text/plain",
         ];
         if (allowedTypes.includes(file.mimetype)) {
           callback(null, true);
@@ -170,7 +168,6 @@ export class MaterialsController {
     };
   }
 
-  // Update material
   @Patch(":id")
   @ApiOperation({ summary: "Update material" })
   async update(
@@ -181,7 +178,6 @@ export class MaterialsController {
     return this.materialsService.update(id, dto, req.user.id, req.user.role);
   }
 
-  // Admin: Approve or reject material
   @Patch(":id/approve")
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
@@ -190,7 +186,6 @@ export class MaterialsController {
     return this.materialsService.approve(id, dto);
   }
 
-  // Admin: Re-index a single material for OZ AI
   @Post(":id/reindex")
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
@@ -200,7 +195,6 @@ export class MaterialsController {
     return this.materialsService.reindexMaterial(id);
   }
 
-  // Admin: Re-index all PENDING and FAILED materials in one batch
   @Post("admin/reindex-pending")
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
@@ -210,7 +204,6 @@ export class MaterialsController {
     return this.materialsService.reindexPending();
   }
 
-  // Delete material
   @Delete(":id")
   @ApiOperation({ summary: "Delete material" })
   async delete(

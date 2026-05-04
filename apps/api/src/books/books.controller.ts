@@ -112,6 +112,14 @@ export class BooksController {
     return this.booksService.addCopies(id, body.branchId, body.numberOfCopies);
   }
 
+  @Post("admin/reindex-pending-pdfs")
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: "Queue pending book PDF indexing (admin only)" })
+  async reindexPendingPdfs(@Query("limit") limit?: string) {
+    return this.booksService.queuePendingPdfIndexing(limit);
+  }
+
   @Post(":id/pdf")
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)

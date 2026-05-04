@@ -2,17 +2,25 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService } from "../storage/storage.service";
 import { BookQueryDto, CreateBookDto, UpdateBookDto } from "./dto/books.dto";
-import { BookCopyStatus } from "@prisma/client";
+import { BookCopyStatus, IndexStatus } from "@prisma/client";
+import { BookDocumentService } from "./book-document.service";
+
+const DEFAULT_PDF_BACKFILL_LIMIT = 25;
+const MAX_PDF_BACKFILL_LIMIT = 200;
 
 @Injectable()
 export class BooksService {
+  private readonly logger = new Logger(BooksService.name);
+
   constructor(
     private prisma: PrismaService,
     private storage: StorageService,
+    private bookDocumentService: BookDocumentService,
   ) {}
 
   async findAll(query: BookQueryDto) {
@@ -45,14 +53,12 @@ export class BooksService {
       where.category = category;
     }
 
-    // Availability filter — applied at DB level so pagination is correct
     if (availability === "available") {
       where.copies = { some: { status: BookCopyStatus.AVAILABLE } };
     } else if (availability === "ebook-only") {
       where.isEbookAvailable = true;
       where.copies = { none: {} };
     } else if (availability === "unavailable") {
-      // Has at least one physical copy but none are available
       where.AND = [
         { copies: { some: {} } },
         { NOT: { copies: { some: { status: BookCopyStatus.AVAILABLE } } } },
@@ -61,7 +67,6 @@ export class BooksService {
 
     const orderBy: any = {};
     if (sortBy === "author") {
-      // authors is a String[] — Prisma cannot order by array fields; fall back to createdAt
       orderBy.createdAt = sortOrder;
     } else if (sortBy === "year") {
       orderBy.publicationYear = sortOrder;
@@ -171,7 +176,6 @@ export class BooksService {
   }
 
   async create(dto: CreateBookDto) {
-    // Check for duplicate ISBN if provided
     if (dto.isbn) {
       const existingBook = await this.prisma.book.findUnique({
         where: { isbn: dto.isbn },
@@ -183,18 +187,15 @@ export class BooksService {
       }
     }
 
-    // Calculate total copies
     const totalCopies =
       dto.branches?.reduce((sum, b) => sum + b.numberOfCopies, 0) || 0;
 
-    // Must have either physical copies or e-book
     if (totalCopies === 0 && !dto.isEbookAvailable) {
       throw new BadRequestException(
         "At least one physical copy or e-book is required"
       );
     }
 
-    // Validate branches exist only if there are copies
     if (totalCopies > 0) {
       const branchIds = dto.branches
         .filter((b) => b.numberOfCopies > 0)
@@ -208,9 +209,7 @@ export class BooksService {
       }
     }
 
-    // Create book and copies in a transaction
     const result = await this.prisma.$transaction(async (tx) => {
-      // Create the book
       const book = await tx.book.create({
         data: {
           title: dto.title,
@@ -230,10 +229,10 @@ export class BooksService {
           ebookUrl: dto.ebookUrl,
           source: "Manual",
           isActive: true,
+          pdfIndexStatus: IndexStatus.NOT_APPLICABLE,
         },
       });
 
-      // Generate and create book copies (only if there are copies to create)
       if (totalCopies > 0) {
         const copyData: any[] = [];
         let copyCounter = 1;
@@ -262,7 +261,6 @@ export class BooksService {
       return book;
     });
 
-    // Return the created book with copies
     return this.findById(result.id);
   }
 
@@ -273,7 +271,6 @@ export class BooksService {
       throw new NotFoundException(`Book with ID ${id} not found`);
     }
 
-    // Check for duplicate ISBN if changing ISBN
     if (dto.isbn && dto.isbn !== book.isbn) {
       const existingBook = await this.prisma.book.findUnique({
         where: { isbn: dto.isbn },
@@ -329,14 +326,12 @@ export class BooksService {
       throw new NotFoundException(`Book with ID ${id} not found`);
     }
 
-    // Check if any copies are borrowed or reserved
     if (book.copies.length > 0) {
       throw new BadRequestException(
         "Cannot delete book with borrowed or reserved copies. Please wait for all copies to be returned."
       );
     }
 
-    // Soft delete - just mark as inactive
     await this.prisma.book.update({
       where: { id },
       data: { isActive: false },
@@ -358,7 +353,6 @@ export class BooksService {
       throw new NotFoundException(`Branch with ID ${branchId} not found`);
     }
 
-    // Get current max copy number
     const existingCopies = await this.prisma.bookCopy.count({
       where: { bookId },
     });
@@ -379,6 +373,41 @@ export class BooksService {
     await this.prisma.bookCopy.createMany({ data: copyData });
 
     return this.findById(bookId);
+  }
+
+  async queuePendingPdfIndexing(limitInput?: string | number) {
+    const parsedLimit =
+      typeof limitInput === "number" ? limitInput : Number(limitInput);
+    const limit = Number.isFinite(parsedLimit) && parsedLimit > 0
+      ? Math.min(Math.floor(parsedLimit), MAX_PDF_BACKFILL_LIMIT)
+      : DEFAULT_PDF_BACKFILL_LIMIT;
+
+    const pendingBooks = await this.prisma.book.findMany({
+      where: {
+        pdfUrl: { not: null },
+        pdfIndexStatus: IndexStatus.PENDING,
+      },
+      select: {
+        id: true,
+        title: true,
+      },
+      orderBy: { updatedAt: "asc" },
+      take: limit,
+    });
+
+    for (const book of pendingBooks) {
+      this.bookDocumentService.indexBookPdf(book.id).catch((error) => {
+        this.logger.error(
+          `Queued PDF indexing failed for ${book.id} (${book.title}): ${String(error)}`
+        );
+      });
+    }
+
+    return {
+      queued: pendingBooks.length,
+      limit,
+      bookIds: pendingBooks.map((book) => book.id),
+    };
   }
 
   async getCategories() {
@@ -426,8 +455,16 @@ export class BooksService {
 
     await this.prisma.book.update({
       where: { id: bookId },
-      data: { pdfUrl },
+      data: {
+        pdfUrl,
+        pdfExtractedText: null,
+        pdfIndexStatus: IndexStatus.PENDING,
+        pdfIndexedAt: null,
+        pdfPageCount: null,
+      },
     });
+
+    this.bookDocumentService.indexBookPdf(bookId).catch(() => undefined);
 
     return { pdfUrl };
   }

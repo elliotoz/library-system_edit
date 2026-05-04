@@ -15,9 +15,10 @@ import { TokenTrackerService } from './session/token-tracker.service';
 import { UsersModule } from '../users/users.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { MaterialsModule } from '../materials/materials.module';
+import { BooksModule } from '../books/books.module';
 
 @Module({
-  imports: [UsersModule, PrismaModule, MaterialsModule],
+  imports: [UsersModule, PrismaModule, MaterialsModule, BooksModule],
   controllers: [AiController],
   providers: [
     AiService,

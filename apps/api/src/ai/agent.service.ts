@@ -1,12 +1,13 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogSearchService } from './catalog-search.service';
-import { BorrowStatus, BookCopyStatus, IndexStatus } from '@prisma/client';
+import { BorrowStatus, BookCopyStatus, IndexStatus, Role } from '@prisma/client';
 import { buildSystemPrompt as buildSystemPromptFromModule, PromptContext } from './prompts/system-prompt-builder';
 import { ToolHookService } from './tools/tool-hook.service';
 import { ToolExecutionContext } from './tools/tool-hooks';
 import { TokenTrackerService } from './session/token-tracker.service';
 import { MaterialSearchService } from '../materials/material-search.service';
+import { BookDocumentService, BookPdfContent } from '../books/book-document.service';
 import { OPENROUTER_MODELS } from './providers/openrouter.provider';
 
 export interface BookCitation {
@@ -31,6 +32,7 @@ export class AgentService {
     private readonly toolHookService: ToolHookService,
     private readonly tokenTrackerService: TokenTrackerService,
     private readonly materialSearch: MaterialSearchService,
+    private readonly bookDocumentService: BookDocumentService,
   ) {}
 
   // ── Status ─────────────────────────────────────────────────────
@@ -423,7 +425,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     name: string,
     args: Record<string, unknown>,
     userId: string,
-    userRole: string,
+    userRole: Role,
     cookieHeader: string,
   ): Promise<{ result: string; citations: BookCitation[] }> {
     const headers: Record<string, string> = {
@@ -478,11 +480,87 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     }
   }
 
+
+  private isPdfLikeUrl(url: string): boolean {
+    return url.split('?')[0].toLowerCase().endsWith('.pdf');
+  }
+
+  private tokenizeExcerptTerms(question: string): string[] {
+    const stopWords = new Set([
+      'about', 'book', 'does', 'from', 'have', 'into', 'that', 'this', 'what', 'when',
+      'where', 'which', 'with', 'would', 'could', 'should', 'there', 'their', 'them',
+      'your', 'please', 'explain', 'summarize', 'summary', 'topic', 'requested',
+    ]);
+
+    return Array.from(
+      new Set((question.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []).filter((term) => !stopWords.has(term))),
+    ).slice(0, 10);
+  }
+
+  private buildRelevantExcerpt(text: string, question: string, maxChars = 4000): string {
+    const normalized = text.replace(/\f/g, '\n\n').replace(/\r/g, '').trim();
+    if (!normalized) return '';
+    if (normalized.length <= maxChars) return normalized;
+
+    const blocks = normalized
+      .split(/\n{2,}/)
+      .map((block) => block.trim())
+      .filter((block) => block.length > 0);
+
+    if (blocks.length === 0) {
+      return normalized.slice(0, maxChars) + '\n\n[Excerpt from a longer document]';
+    }
+
+    const terms = this.tokenizeExcerptTerms(question);
+    const scored = blocks.map((block, index) => {
+      const lower = block.toLowerCase();
+      const score = terms.reduce((sum, term) => sum + Math.max(lower.split(term).length - 1, 0), 0) + (index < 2 ? 0.25 : 0);
+      return { block, index, score };
+    });
+
+    const ranked = scored.some((entry) => entry.score > 0)
+      ? scored.filter((entry) => entry.score > 0).sort((a, b) => b.score - a.score || a.index - b.index)
+      : scored.slice(0, 3);
+
+    const chosen = ranked.slice(0, 3).sort((a, b) => a.index - b.index);
+    let excerpt = '';
+
+    for (const item of chosen) {
+      const candidate = excerpt ? `${excerpt}\n\n${item.block}` : item.block;
+      if (candidate.length > maxChars) {
+        break;
+      }
+      excerpt = candidate;
+    }
+
+    if (!excerpt) {
+      excerpt = normalized.slice(0, maxChars);
+    }
+
+    return excerpt.length < normalized.length
+      ? `${excerpt}\n\n[Excerpt from a longer document]`
+      : excerpt;
+  }
+
+  private formatReadableBookContent(content: BookPdfContent, question: string): string {
+    const metadata = [
+      content.title ? `Title: ${content.title}` : null,
+      content.authors.length > 0 ? `Authors: ${content.authors.join(', ')}` : null,
+      content.category ? `Category: ${content.category}` : null,
+      content.publicationYear ? `Year: ${content.publicationYear}` : null,
+      content.publisher ? `Publisher: ${content.publisher}` : null,
+      content.pageCount ? `Pages: ${content.pageCount}` : null,
+      content.description ? `Description: ${content.description}` : null,
+    ].filter((line): line is string => Boolean(line));
+
+    const excerpt = this.buildRelevantExcerpt(content.text, question, 4000);
+    return `E-BOOK CONTENT (for: ${question}):\n\n${metadata.join('\n')}${metadata.length > 0 ? '\n\n' : ''}${excerpt}`;
+  }
   private async executeToolInner(
     name: string,
     args: Record<string, unknown>,
     userId: string,
-    userRole: string,
+    userRole: Role,
     cookieHeader: string,
     headers: Record<string, string>,
   ): Promise<{ result: string; citations: BookCitation[] }> {
@@ -518,6 +596,8 @@ Be concise, practical, and encouraging. Base everything on the book details prov
               year: book.publicationYear, pages: book.pageCount,
               isbn: book.isbn, language: book.language,
               isEbook: book.isEbookAvailable, ebookUrl: book.ebookUrl ?? null,
+              pdfUrl: book.pdfUrl ?? null,
+              readUrl: (book.pdfUrl ?? book.ebookUrl) ?? null,
               availableCopies: book.availableCopies, totalCopies: book.totalCopies,
               isAvailable: book.isAvailable, subjects: book.subjectTags,
               catalogLink: `/dashboard/catalog/${book.id}`,
@@ -528,40 +608,37 @@ Be concise, practical, and encouraging. Base everything on the book details prov
 
         case 'read_ebook': {
           const url = args.url as string;
-          this.assertSafeUrl(url);
+          const question = (args.question as string) || 'the requested topic';
 
-          // PDF URLs cannot be HTML-stripped — look up the book in DB for structured context
-          if (url.toLowerCase().endsWith('.pdf')) {
-            const book = await this.prisma.book.findFirst({
-              where: { pdfUrl: url },
-              select: {
-                title: true, authors: true, description: true,
-                category: true, subjectTags: true,
-                publicationYear: true, publisher: true, pageCount: true,
-              },
-            });
-            if (book) {
-              const summary = [
-                `Title: ${book.title}`,
-                `Authors: ${(book.authors as string[]).join(', ')}`,
-                book.category ? `Category: ${book.category}` : null,
-                book.publicationYear ? `Year: ${book.publicationYear}` : null,
-                book.publisher ? `Publisher: ${book.publisher}` : null,
-                book.pageCount ? `Pages: ${book.pageCount}` : null,
-                book.subjectTags && (book.subjectTags as string[]).length > 0
-                  ? `Topics: ${(book.subjectTags as string[]).join(', ')}` : null,
-                '',
-                book.description ?? 'No description available.',
-              ].filter((l) => l !== null).join('\n');
-              return { result: `E-BOOK SUMMARY (PDF — ${args.question as string}):\n\n${summary}`, citations: [] };
+          if (url.startsWith('/uploads/') || this.isPdfLikeUrl(url)) {
+            if (!url.startsWith('/uploads/')) {
+              this.assertSafeUrl(url);
             }
+
+            const pdfContent = await this.bookDocumentService.getPdfDocumentContent(url);
+            if (pdfContent?.text) {
+              return {
+                result: this.formatReadableBookContent(pdfContent, question),
+                citations: [],
+              };
+            }
+
+            if (this.isPdfLikeUrl(url)) {
+              return {
+                result: 'I could not extract readable text from that PDF document.',
+                citations: [],
+              };
+            }
+          }
+
+          if (!url.startsWith('http://') && !url.startsWith('https://')) {
             return {
-              result: 'This is a PDF file and cannot be read as plain text by this tool. Try using search_study_material to search for content by topic instead.',
+              result: 'This document URL is not supported by read_ebook.',
               citations: [],
             };
           }
 
-          // HTML ebook — fetch and strip tags as before
+          this.assertSafeUrl(url);
           const res = await fetch(url, {
             headers: { 'User-Agent': 'LibraryBotAI/1.0' },
             signal: AbortSignal.timeout(15000),
@@ -573,10 +650,16 @@ Be concise, practical, and encouraging. Base everything on the book details prov
             .replace(/<[^>]+>/g, ' ')
             .replace(/\s+/g, ' ')
             .trim();
-          const excerpt = text.length > 4000
-            ? text.substring(0, 4000) + '\n\n[Excerpt — full book available at original URL]'
-            : text;
-          return { result: `E-BOOK CONTENT (for: ${args.question as string}):\n\n${excerpt}`, citations: [] };
+
+          if (!text) {
+            return {
+              result: 'I could not extract readable text from that e-book URL.',
+              citations: [],
+            };
+          }
+
+          const excerpt = this.buildRelevantExcerpt(text, question, 4000);
+          return { result: `E-BOOK CONTENT (for: ${question}):\n\n${excerpt}`, citations: [] };
         }
 
         case 'fetch_webpage': {
@@ -774,7 +857,8 @@ Be concise, practical, and encouraging. Base everything on the book details prov
 
         case 'search_study_material': {
           const limit = Math.min(Math.max((args.limit as number) || 5, 1), 10);
-          const chunks = await this.materialSearch.searchChunks(args.query as string, { limit });
+          const accessContext = await this.materialSearch.getAccessContextForUser(userId, userRole);
+          const chunks = await this.materialSearch.searchChunks(args.query as string, accessContext, { limit });
           if (!chunks.length) return { result: 'No study materials found matching that query.', citations: [] };
           const merged = this.materialSearch.mergeAdjacentChunks(chunks);
           const formatted = merged.map((c, i) => [
@@ -785,7 +869,8 @@ Be concise, practical, and encouraging. Base everything on the book details prov
         }
 
         case 'list_study_materials': {
-          const materials = await this.materialSearch.listIndexedMaterials();
+          const accessContext = await this.materialSearch.getAccessContextForUser(userId, userRole);
+          const materials = await this.materialSearch.listIndexedMaterials(accessContext);
           if (!materials.length) return { result: 'No indexed study materials are available yet.', citations: [] };
           const formatted = materials.map((m) =>
             `• "${m.title}" by ${m.authorName} (${m.type}) — ${m.chunkCount} chunk${m.chunkCount !== 1 ? 's' : ''} — ID: ${m.id}`,
@@ -794,11 +879,14 @@ Be concise, practical, and encouraging. Base everything on the book details prov
         }
 
         case 'get_chunk_context': {
-          const targetChunk = await this.prisma.materialChunk.findFirst({
-            where: { materialId: args.materialId as string, chunkIndex: args.chunkIndex as number },
-          });
-          if (!targetChunk) return { result: 'No context found for that chunk.', citations: [] };
-          const neighbors = await this.materialSearch.getChunkNeighbors(targetChunk.id);
+          const accessContext = await this.materialSearch.getAccessContextForUser(userId, userRole);
+          const targetChunkId = await this.materialSearch.getAccessibleChunkId(
+            args.materialId as string,
+            args.chunkIndex as number,
+            accessContext,
+          );
+          if (!targetChunkId) return { result: 'No context found for that chunk.', citations: [] };
+          const neighbors = await this.materialSearch.getChunkNeighbors(targetChunkId, accessContext);
           if (!neighbors.length) return { result: 'No context found for that chunk.', citations: [] };
           const formatted = neighbors.map((c) =>
             `[Chunk ${c.chunkIndex}${c.pageNumber != null ? `, page ${c.pageNumber}` : ''}]\n${c.content}`,
@@ -807,7 +895,8 @@ Be concise, practical, and encouraging. Base everything on the book details prov
         }
 
         case 'get_material_outline': {
-          const outline = await this.materialSearch.getMaterialOutline(args.materialId as string);
+          const accessContext = await this.materialSearch.getAccessContextForUser(userId, userRole);
+          const outline = await this.materialSearch.getMaterialOutline(args.materialId as string, accessContext);
           if (!outline.length) return { result: 'No outline available for that material.', citations: [] };
           const formatted = outline.map((c) =>
             `[Chunk ${c.chunkIndex}${c.pageNumber != null ? `, page ${c.pageNumber}` : ''}]\n${c.content}`,
@@ -853,11 +942,18 @@ Be concise, practical, and encouraging. Base everything on the book details prov
 
     const policy = await this.prisma.borrowPolicy.findUnique({ where: { role: user.role } });
 
+    const materialAccessContext = {
+      userId: user.id,
+      role: user.role,
+      facultyCode: user.faculty?.code ?? null,
+      courseCodes: user.courses ?? [],
+    };
+
     const [catalogTotalBooks, catalogAvailableCopies, publishedReadingLists, indexedMaterialCount] = await Promise.all([
       this.prisma.book.count({ where: { isActive: true } }),
       this.prisma.bookCopy.count({ where: { status: BookCopyStatus.AVAILABLE } }),
       this.prisma.readingList.count({ where: { status: 'PUBLISHED', isActive: true } }),
-      this.prisma.material.count({ where: { indexStatus: IndexStatus.INDEXED, isApproved: true, isPublished: true } }),
+      this.materialSearch.countAccessibleIndexedMaterials(materialAccessContext),
     ]);
 
     const promptContext: PromptContext = {
@@ -1043,3 +1139,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     await this.saveMessage(userId, 'assistant', fallback, conversationId);
   }
 }
+
+
+
+

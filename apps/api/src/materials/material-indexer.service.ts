@@ -1,12 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { IndexStatus } from '@prisma/client';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import * as mammoth from 'mammoth';
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require('pdf-parse') as (buffer: Buffer) => Promise<{ text: string; numpages: number }>;
+import { DocumentContentService } from '../storage/document-content.service';
 
 /** Target chunk size in words (~500 tokens at ~1.25 words/token) */
 const CHUNK_WORDS = 400;
@@ -17,7 +12,7 @@ const MIN_CHUNK_CHARS = 30;
 
 interface Paragraph {
   text: string;
-  /** 1-based page number from PDF; null for DOCX (no page data available) */
+  /** 1-based page number from PDF; null for Word/text documents */
   pageNumber: number | null;
 }
 
@@ -32,7 +27,10 @@ export class MaterialIndexerService {
   /** Prevents concurrent indexing of the same material from causing unique constraint violations */
   private readonly inFlight = new Set<string>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly documentContent: DocumentContentService,
+  ) {}
 
   /**
    * Public entry point — call fire-and-forget from the approval flow.
@@ -61,11 +59,10 @@ export class MaterialIndexerService {
         return;
       }
 
-      const ext = path.extname(material.fileUrl).toLowerCase();
-      const supported = ['.pdf', '.docx', '.doc'];
+      const ext = this.documentContent.getExtension(material.fileUrl);
+      const supported = ['.pdf', '.docx', '.doc', '.txt'];
 
       if (!supported.includes(ext)) {
-        // Videos, PowerPoints, etc. — not text-indexable
         await this.setStatus(materialId, IndexStatus.NOT_APPLICABLE);
         return;
       }
@@ -73,14 +70,8 @@ export class MaterialIndexerService {
       await this.setStatus(materialId, IndexStatus.PROCESSING);
 
       try {
-        const buffer = await this.fetchFile(material.fileUrl);
-
-        const paragraphs =
-          ext === '.pdf'
-            ? await this.extractPdfParagraphs(buffer)
-            : await this.extractDocxParagraphs(buffer);
-
-        const chunks = this.buildChunks(paragraphs);
+        const extracted = await this.documentContent.extractFromFileUrl(material.fileUrl);
+        const chunks = this.buildChunks(extracted.paragraphs as Paragraph[]);
 
         if (chunks.length === 0) {
           this.logger.warn(
@@ -94,11 +85,10 @@ export class MaterialIndexerService {
           materialId,
           chunkIndex,
           content: chunk.content,
-          tokenCount: Math.ceil(chunk.content.length / 4), // ~4 chars per token
+          tokenCount: Math.ceil(chunk.content.length / 4),
           pageNumber: chunk.pageNumber,
         }));
 
-        // Atomic delete-then-insert: prevents duplicate chunks under concurrent access
         await this.prisma.$transaction([
           this.prisma.materialChunk.deleteMany({ where: { materialId } }),
           this.prisma.materialChunk.createMany({ data: chunkData }),
@@ -106,11 +96,11 @@ export class MaterialIndexerService {
 
         await this.setStatus(materialId, IndexStatus.INDEXED);
         this.logger.log(
-          `✅ Indexed "${material.title}" (${materialId}): ${chunks.length} chunks`,
+          `Indexed "${material.title}" (${materialId}): ${chunks.length} chunks`,
         );
       } catch (err) {
         this.logger.error(
-          `❌ Index failed for material ${materialId}: ${String(err)}`,
+          `Index failed for material ${materialId}: ${String(err)}`,
         );
         await this.setStatus(materialId, IndexStatus.FAILED);
       }
@@ -118,8 +108,6 @@ export class MaterialIndexerService {
       this.inFlight.delete(materialId);
     }
   }
-
-  // ── Private helpers ────────────────────────────────────────────
 
   private async setStatus(
     materialId: string,
@@ -129,64 +117,6 @@ export class MaterialIndexerService {
       where: { id: materialId },
       data: { indexStatus: status },
     });
-  }
-
-  /**
-   * Download the file as a Buffer.
-   * Handles both S3/CDN public URLs (https://…) and local Multer disk paths (/uploads/…).
-   */
-  private async fetchFile(fileUrl: string): Promise<Buffer> {
-    if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
-      const res = await fetch(fileUrl, {
-        signal: AbortSignal.timeout(30_000),
-        headers: { 'User-Agent': 'LibrarySystem-Indexer/1.0' },
-      });
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status} fetching ${fileUrl}`);
-      }
-      return Buffer.from(await res.arrayBuffer());
-    }
-    // Local disk — fileUrl is like /uploads/materials/uuid.pdf
-    const localPath = path.join(process.cwd(), fileUrl);
-    return fs.readFile(localPath);
-  }
-
-  /**
-   * Extract paragraphs from a PDF with 1-based page numbers.
-   * Uses pdf-parse to extract text, then splits on form-feed characters for per-page content.
-   */
-  private async extractPdfParagraphs(buffer: Buffer): Promise<Paragraph[]> {
-    const { text, numpages } = await pdfParse(buffer);
-    const pages = text.split('\f');
-    const paragraphs: Paragraph[] = [];
-
-    for (let i = 0; i < numpages; i++) {
-      const pageText = pages[i] ?? '';
-      const rawParagraphs = pageText.split(/\n{2,}/);
-
-      for (const raw of rawParagraphs) {
-        const cleanText = raw.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-        if (cleanText.length >= MIN_CHUNK_CHARS) {
-          paragraphs.push({ text: cleanText, pageNumber: i + 1 });
-        }
-      }
-    }
-
-    return paragraphs;
-  }
-
-  /**
-   * Extract paragraphs from a DOCX.
-   * mammoth does not expose page numbers, so pageNumber is null for all DOCX paragraphs.
-   */
-  private async extractDocxParagraphs(buffer: Buffer): Promise<Paragraph[]> {
-    const result = await mammoth.extractRawText({ buffer });
-    const rawParagraphs = result.value.split(/\n{2,}/);
-
-    return rawParagraphs
-      .map((raw) => raw.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim())
-      .filter((text) => text.length >= MIN_CHUNK_CHARS)
-      .map((text) => ({ text, pageNumber: null }));
   }
 
   /**
@@ -206,26 +136,22 @@ export class MaterialIndexerService {
         currentWords.length > 0 &&
         currentWords.length + words.length > CHUNK_WORDS
       ) {
-        // Flush the current chunk
         chunks.push({
           content: currentWords.join(' '),
           pageNumber: currentPage,
         });
 
-        // Carry CHUNK_OVERLAP_WORDS into the next chunk for continuity
         const overlap = currentWords.slice(-CHUNK_OVERLAP_WORDS);
         currentWords = [...overlap, ...words];
-        currentPage = para.pageNumber; // new chunk starts on this paragraph's page
+        currentPage = para.pageNumber;
       } else {
         if (currentWords.length === 0) {
-          // First paragraph of a new chunk — record its page
           currentPage = para.pageNumber;
         }
         currentWords.push(...words);
       }
     }
 
-    // Flush the final chunk
     if (currentWords.length > 0) {
       chunks.push({ content: currentWords.join(' '), pageNumber: currentPage });
     }

@@ -265,7 +265,11 @@ model Book {
   coverImageUrl String?
 
   // PDF (for RAG ingestion)
-  pdfUrl String?
+  pdfUrl           String?
+  pdfExtractedText String? @db.Text
+  pdfIndexStatus   IndexStatus @default(NOT_APPLICABLE)
+  pdfIndexedAt     DateTime?
+  pdfPageCount     Int?
 
   // Source tracking
   source String @default("Manual") // Gutendex, OpenLibrary, Manual, etc.
@@ -288,6 +292,7 @@ model Book {
 
   @@index([title])
   @@index([mainFacultyId])
+  @@index([pdfIndexStatus])
   @@map("books")
 }
 
@@ -648,3 +653,4 @@ model AiMessage {
   @@index([conversationId, createdAt])
   @@map("ai_messages")
 }
+

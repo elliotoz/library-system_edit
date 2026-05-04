@@ -1,7 +1,13 @@
 import { Injectable } from '@nestjs/common';
+import { IndexStatus, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { IndexStatus } from '@prisma/client';
 import { CHUNK_OVERLAP_WORDS } from './material-indexer.service';
+import {
+  MaterialAccessContext,
+  buildMaterialAccessSql,
+  buildMaterialAccessWhere,
+  canAccessMaterial,
+} from './material-access.util';
 
 export interface ChunkSearchResult {
   id: string;
@@ -33,16 +39,49 @@ export interface IndexedMaterialSummary {
 export class MaterialSearchService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async getAccessContextForUser(
+    userId: string,
+    role: Role,
+  ): Promise<MaterialAccessContext> {
+    if (role === Role.ADMIN || role === Role.STAFF) {
+      return { userId, role, facultyCode: null, courseCodes: [] };
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        courses: true,
+        faculty: { select: { code: true } },
+      },
+    });
+
+    return {
+      userId,
+      role,
+      facultyCode: user?.faculty?.code ?? null,
+      courseCodes: user?.courses ?? [],
+    };
+  }
+
+  async countAccessibleIndexedMaterials(
+    accessContext: MaterialAccessContext,
+  ): Promise<number> {
+    return this.prisma.material.count({
+      where: {
+        isApproved: true,
+        isPublished: true,
+        indexStatus: IndexStatus.INDEXED,
+        ...buildMaterialAccessWhere(accessContext),
+      },
+    });
+  }
+
   /**
    * Full-text search across all indexed, published, approved material chunks.
-   *
-   * Uses:
-   * - `'simple'` tsvector dictionary: language-agnostic, correct for Turkish + English
-   * - `websearch_to_tsquery`: supports OR, quoted phrases, and exclusions from natural language
-   * - GIN index on to_tsvector('simple', content): O(log n) lookups
    */
   async searchChunks(
     query: string,
+    accessContext: MaterialAccessContext,
     options: {
       materialId?: string;
       facultyCode?: string;
@@ -69,6 +108,13 @@ export class MaterialSearchService {
     if (options.facultyCode) {
       conditions.push(`m."facultyCode" = $${paramIdx++}`);
       params.push(options.facultyCode);
+    }
+
+    const access = buildMaterialAccessSql(accessContext, paramIdx);
+    if (access.clause) {
+      conditions.push(access.clause);
+      params.push(...access.params);
+      paramIdx = access.nextParamIndex;
     }
 
     const sql = `
@@ -128,11 +174,35 @@ export class MaterialSearchService {
     }));
   }
 
+  async getAccessibleChunkId(
+    materialId: string,
+    chunkIndex: number,
+    accessContext: MaterialAccessContext,
+  ): Promise<string | null> {
+    const chunk = await this.prisma.materialChunk.findFirst({
+      where: {
+        materialId,
+        chunkIndex,
+        material: {
+          isApproved: true,
+          isPublished: true,
+          indexStatus: IndexStatus.INDEXED,
+          ...buildMaterialAccessWhere(accessContext),
+        },
+      },
+      select: { id: true },
+    });
+
+    return chunk?.id ?? null;
+  }
+
   /**
    * Context expansion: given a chunkId, return that chunk plus the one before and after.
-   * Only returns chunks from materials that are still approved and published.
    */
-  async getChunkNeighbors(chunkId: string): Promise<ChunkSearchResult[]> {
+  async getChunkNeighbors(
+    chunkId: string,
+    accessContext: MaterialAccessContext,
+  ): Promise<ChunkSearchResult[]> {
     const target = await this.prisma.materialChunk.findUnique({
       where: { id: chunkId },
       include: {
@@ -143,6 +213,8 @@ export class MaterialSearchService {
             authorName: true,
             facultyCode: true,
             courseCode: true,
+            accessLevel: true,
+            uploadedById: true,
             isApproved: true,
             isPublished: true,
           },
@@ -152,6 +224,7 @@ export class MaterialSearchService {
 
     if (!target) return [];
     if (!target.material.isApproved || !target.material.isPublished) return [];
+    if (!canAccessMaterial(target.material, accessContext)) return [];
 
     const neighbors = await this.prisma.materialChunk.findMany({
       where: {
@@ -187,9 +260,18 @@ export class MaterialSearchService {
   /**
    * Document outline: return the first 3 chunks of a specific material.
    */
-  async getMaterialOutline(materialId: string): Promise<ChunkSearchResult[]> {
+  async getMaterialOutline(
+    materialId: string,
+    accessContext: MaterialAccessContext,
+  ): Promise<ChunkSearchResult[]> {
     const material = await this.prisma.material.findFirst({
-      where: { id: materialId, isApproved: true, isPublished: true },
+      where: {
+        id: materialId,
+        isApproved: true,
+        isPublished: true,
+        indexStatus: IndexStatus.INDEXED,
+        ...buildMaterialAccessWhere(accessContext),
+      },
       select: {
         title: true,
         type: true,
@@ -225,18 +307,22 @@ export class MaterialSearchService {
   }
 
   /**
-   * List all indexed, approved, published materials.
+   * List all indexed, approved, published materials visible to this user.
    */
-  async listIndexedMaterials(options: {
-    facultyCode?: string;
-    limit?: number;
-  } = {}): Promise<IndexedMaterialSummary[]> {
+  async listIndexedMaterials(
+    accessContext: MaterialAccessContext,
+    options: {
+      facultyCode?: string;
+      limit?: number;
+    } = {},
+  ): Promise<IndexedMaterialSummary[]> {
     const materials = await this.prisma.material.findMany({
       where: {
         isApproved: true,
         isPublished: true,
         indexStatus: IndexStatus.INDEXED,
         ...(options.facultyCode ? { facultyCode: options.facultyCode } : {}),
+        ...buildMaterialAccessWhere(accessContext),
       },
       select: {
         id: true,
@@ -264,8 +350,6 @@ export class MaterialSearchService {
 
   /**
    * Merge consecutive chunks from the same material into a single result.
-   * Prevents OZ from receiving chunks 5, 6, 7 as three separate excerpts when
-   * they are sequential text.
    */
   mergeAdjacentChunks(results: ChunkSearchResult[]): ChunkSearchResult[] {
     if (results.length === 0) return [];
@@ -287,7 +371,6 @@ export class MaterialSearchService {
         chunk.chunkIndex === last.chunkIndex + 1;
 
       if (isConsecutive) {
-        // Strip the overlapping prefix so the 40-word overlap isn't duplicated in merged output
         const continuationWords = chunk.content.split(/\s+/).slice(CHUNK_OVERLAP_WORDS);
         last.content = last.content.trimEnd() + ' ' + continuationWords.join(' ');
         last.chunkIndex = chunk.chunkIndex;
