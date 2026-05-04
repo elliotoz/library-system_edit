@@ -99,22 +99,22 @@ export class AiController {
   @ApiOperation({ summary: 'Create a dedicated study session for a book' })
   async createStudySession(
     @CurrentUser('id') userId: string,
-    @Body() body: { bookId: string; mode?: string },
+    @Body() body: { bookId: string; mode?: string; manualModes?: string[] },
   ) {
-    return this.agentService.createStudySession(userId, body.bookId, body.mode);
+    return this.agentService.createStudySession(userId, body.bookId, body.manualModes ?? body.mode);
   }
 
   @Patch('conversations/:id/mode')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(204)
-  @ApiOperation({ summary: 'Update the response mode for a conversation' })
+  @ApiOperation({ summary: 'Update the manual response modes for a conversation' })
   async updateConversationMode(
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
-    @Body() body: { mode: string },
+    @Body() body: { mode?: string; manualModes?: string[] },
   ) {
-    await this.agentService.updateConversationMode(id, userId, body.mode);
+    await this.agentService.updateConversationMode(id, userId, body.manualModes ?? body.mode);
   }
 
   @Post('chat')
@@ -133,6 +133,7 @@ export class AiController {
       conversationId?: string;
       model?: string;
       mode?: string;
+      manualModes?: string[];
     },
     @Req() req: Request,
     @Res() res: Response,
@@ -154,11 +155,13 @@ export class AiController {
         cookieHeader,
         body.conversationId,
         body.model,
-        body.mode,
+        body.manualModes ?? body.mode,
       );
 
       for await (const chunk of stream) {
-        if (chunk.type === 'text') {
+        if (chunk.type === 'mode_state') {
+          res.write(`data: ${JSON.stringify({ modeState: chunk.modeState })}\n\n`);
+        } else if (chunk.type === 'text') {
           res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
         } else {
           res.write(`data: ${JSON.stringify({ books: chunk.books })}\n\n`);
@@ -210,3 +213,6 @@ export class AiController {
     return this.openRouter.scanBookCover(dto.image);
   }
 }
+
+
+

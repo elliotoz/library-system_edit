@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { renderMessage } from '@/lib/renderMessage';
 import { BookCitationCards } from '@/components/BookCitationCards';
 import { AssistantChatInput, type ChatSendPayload } from '@/components/ui/assistant-chat-input';
+import { type AiMode, type DisplayAiMode, normalizeAiModes, resolveAiModes } from '@/lib/ai-modes';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -26,21 +27,29 @@ interface ChatMessage {
   citations?: BookCitation[];
 }
 
-interface Conversation {
+interface ConversationModeState {
+  manualModes: AiMode[];
+  lastAutoModes: AiMode[];
+  activeModes: AiMode[];
+  isStudySession: boolean;
+}
+
+interface Conversation extends ConversationModeState {
   id: string;
   title: string;
   createdAt: string;
   updatedAt: string;
+  studyBookId?: string | null;
 }
 
-const STUDY_MODES = [
-  { value: 'normal',      label: 'Normal' },
-  { value: 'learning',    label: 'Learning' },
+const CHAT_MODES: Array<{ value: DisplayAiMode; label: string }> = [
+  { value: 'normal', label: 'Normal' },
+  { value: 'learning', label: 'Learning' },
   { value: 'explanatory', label: 'Explanatory' },
-  { value: 'planning',    label: 'Planning' },
-  { value: 'formal',      label: 'Formal' },
-  { value: 'concise',     label: 'Concise' },
-] as const;
+  { value: 'planning', label: 'Planning' },
+  { value: 'formal', label: 'Formal' },
+  { value: 'concise', label: 'Concise' },
+];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -128,7 +137,8 @@ export default function AIAssistantPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [aiOnline, setAiOnline] = useState<boolean | null>(null);
-  const [activeMode, setActiveMode] = useState('normal');
+  const [manualModes, setManualModes] = useState<AiMode[]>([]);
+  const [autoModes, setAutoModes] = useState<AiMode[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -139,12 +149,28 @@ export default function AIAssistantPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<ChatMessage[]>([]);
   const activeConvRef = useRef<string | null>(null);
+  const conversationsRef = useRef<Conversation[]>([]);
 
   useEffect(() => { messagesRef.current = messages; }, [messages]);
+  useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
   useEffect(() => {
     activeConvRef.current = activeConversationId;
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeConversationId, messages]);
+
+  const applyModeState = useCallback((modeState?: Partial<ConversationModeState> | null) => {
+    setManualModes(normalizeAiModes(modeState?.manualModes));
+    setAutoModes(normalizeAiModes(modeState?.lastAutoModes));
+  }, []);
+
+  const syncConversationModes = useCallback((conversation?: Conversation | null) => {
+    if (!conversation) {
+      applyModeState(null);
+      return;
+    }
+
+    applyModeState(conversation);
+  }, [applyModeState]);
 
   // ── Conversations ────────────────────────────────────────────────────────────
 
@@ -154,7 +180,9 @@ export default function AIAssistantPage() {
       const data: Conversation[] = res.ok ? await res.json() : [];
       setConversations(data);
       return data;
-    } catch { return []; }
+    } catch {
+      return [];
+    }
   }, []);
 
   const loadConversationMessages = useCallback(async (convId: string) => {
@@ -162,17 +190,20 @@ export default function AIAssistantPage() {
       const res = await fetch(`/api/ai/history?conversationId=${convId}`, { credentials: 'include' });
       const history: { id: string; role: string; content: string }[] = res.ok ? await res.json() : [];
       setMessages(history.map(m => ({ id: m.id, role: m.role as 'user' | 'assistant', content: m.content })));
-    } catch { setMessages([]); }
+    } catch {
+      setMessages([]);
+    }
     setHistoryLoaded(true);
   }, []);
 
-  const switchConversation = useCallback(async (convId: string) => {
+  const switchConversation = useCallback(async (convId: string, knownConversation?: Conversation) => {
     setActiveConversationId(convId);
     setSidebarOpen(false);
     setMessages([]);
     setHistoryLoaded(false);
+    syncConversationModes(knownConversation ?? conversationsRef.current.find(conv => conv.id === convId) ?? null);
     await loadConversationMessages(convId);
-  }, [loadConversationMessages]);
+  }, [loadConversationMessages, syncConversationModes]);
 
   const createNewChat = useCallback(async () => {
     try {
@@ -181,11 +212,12 @@ export default function AIAssistantPage() {
       const conv: Conversation = await res.json();
       setConversations(prev => [conv, ...prev]);
       setActiveConversationId(conv.id);
+      syncConversationModes(conv);
       setMessages([]);
       setHistoryLoaded(true);
       setSidebarOpen(false);
     } catch { /* ignore */ }
-  }, []);
+  }, [syncConversationModes]);
 
   const handleDeleteConversation = useCallback(async (convId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -195,17 +227,23 @@ export default function AIAssistantPage() {
       setConversations(prev => {
         const remaining = prev.filter(c => c.id !== convId);
         if (activeConvRef.current === convId) {
-          if (remaining.length > 0) switchConversation(remaining[0].id);
-          else { setActiveConversationId(null); setMessages([]); setHistoryLoaded(true); }
+          if (remaining.length > 0) {
+            void switchConversation(remaining[0].id, remaining[0]);
+          } else {
+            setActiveConversationId(null);
+            setMessages([]);
+            setHistoryLoaded(true);
+            syncConversationModes(null);
+          }
         }
         return remaining;
       });
     } catch { /* ignore */ }
     setDeletingId(null);
-  }, [switchConversation]);
+  }, [switchConversation, syncConversationModes]);
 
-  const handleModeChange = useCallback(async (mode: string) => {
-    setActiveMode(mode);
+  const persistManualModes = useCallback(async (nextManualModes: AiMode[]) => {
+    setManualModes(nextManualModes);
     const convId = activeConvRef.current;
     if (!convId) return;
     try {
@@ -213,10 +251,23 @@ export default function AIAssistantPage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ mode }),
+        body: JSON.stringify({ manualModes: nextManualModes }),
       });
     } catch { /* non-critical */ }
   }, []);
+
+  const handleModeToggle = useCallback(async (mode: DisplayAiMode) => {
+    if (mode === 'normal') {
+      await persistManualModes([]);
+      return;
+    }
+
+    const nextManualModes = manualModes.includes(mode)
+      ? manualModes.filter((entry) => entry !== mode)
+      : [...manualModes, mode];
+
+    await persistManualModes(nextManualModes);
+  }, [manualModes, persistManualModes]);
 
   // ── Bootstrap ────────────────────────────────────────────────────────────────
 
@@ -232,14 +283,16 @@ export default function AIAssistantPage() {
       const convs = await loadConversations();
 
       if (conversationIdFromUrl) {
-        // Direct load — study session or shared link
+        const conversation = convs.find(conv => conv.id === conversationIdFromUrl) ?? null;
         setActiveConversationId(conversationIdFromUrl);
+        syncConversationModes(conversation);
         await loadConversationMessages(conversationIdFromUrl);
         return;
       }
 
       if (convs.length > 0) {
         setActiveConversationId(convs[0].id);
+        syncConversationModes(convs[0]);
         await loadConversationMessages(convs[0].id);
       } else {
         try {
@@ -248,13 +301,13 @@ export default function AIAssistantPage() {
             const conv: Conversation = await res.json();
             setConversations([conv]);
             setActiveConversationId(conv.id);
+            syncConversationModes(conv);
           }
         } catch { /* ignore */ }
         setHistoryLoaded(true);
       }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [conversationIdFromUrl, loadConversationMessages, loadConversations, syncConversationModes]);
 
   // ── Send ─────────────────────────────────────────────────────────────────────
 
@@ -283,7 +336,15 @@ export default function AIAssistantPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ message: userMessage, history, hasImage: !!imgBase64, imageBase64: imgBase64 ?? null, conversationId: convId, model: modelOverride, mode: activeMode }),
+        body: JSON.stringify({
+          message: userMessage,
+          history,
+          hasImage: !!imgBase64,
+          imageBase64: imgBase64 ?? null,
+          conversationId: convId,
+          model: modelOverride,
+          manualModes,
+        }),
       });
 
       if (response.status === 429) {
@@ -309,7 +370,13 @@ export default function AIAssistantPage() {
           const raw = line.slice(6).trim();
           if (raw === '[DONE]') break;
           try {
-            const parsed = JSON.parse(raw) as { text?: string; books?: BookCitation[]; error?: string };
+            const parsed = JSON.parse(raw) as {
+              text?: string;
+              books?: BookCitation[];
+              error?: string;
+              modeState?: ConversationModeState;
+            };
+            if (parsed.modeState) applyModeState(parsed.modeState);
             if (parsed.text) setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: m.content + parsed.text } : m));
             if (parsed.books) setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, citations: parsed.books } : m));
             if (parsed.error) setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: `Error: ${parsed.error}` } : m));
@@ -321,8 +388,10 @@ export default function AIAssistantPage() {
     }
 
     setIsStreaming(false);
-    loadConversations().then(updated => setConversations(updated));
-  }, [isStreaming, activeMode, loadConversations]);
+    const updatedConversations = await loadConversations();
+    const activeConversation = updatedConversations.find(conv => conv.id === activeConvRef.current) ?? null;
+    syncConversationModes(activeConversation);
+  }, [applyModeState, isStreaming, loadConversations, manualModes, syncConversationModes]);
 
   // Bridge AssistantChatInput → sendMessage
   const handleChatSend = useCallback(async (payload: ChatSendPayload) => {
@@ -337,8 +406,11 @@ export default function AIAssistantPage() {
     await sendMessage(text, imgBase64, payload.model);
   }, [sendMessage]);
 
+  const activeModes = resolveAiModes(manualModes, autoModes);
+  const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId) ?? null;
+  const currentIsStudySession = isStudySession || !!activeConversation?.studyBookId;
   const suggestions = getSuggestions(user?.role, user?.facultyName);
-  const showSuggestions = historyLoaded && messages.length === 0 && !isStudySession;
+  const showSuggestions = historyLoaded && messages.length === 0 && !currentIsStudySession;
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -452,26 +524,44 @@ export default function AIAssistantPage() {
       </div>
 
       {/* Mode selector */}
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <span className="text-xs text-gray-500 dark:text-gray-400 mr-0.5 flex-shrink-0">Mode:</span>
-        {STUDY_MODES.map(m => (
-          <button
-            key={m.value}
-            onClick={() => handleModeChange(m.value)}
-            className={cn(
-              'px-3 py-1 rounded-full text-xs font-medium transition-colors border',
-              activeMode === m.value
-                ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/40'
-                : 'text-gray-500 dark:text-gray-400 border-gray-200 dark:border-white/10 hover:border-purple-500/30 hover:text-purple-500 dark:hover:text-purple-400',
-            )}
-          >
-            {m.label}
-          </button>
-        ))}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs text-gray-500 dark:text-gray-400 mr-0.5 flex-shrink-0">Modes:</span>
+          {CHAT_MODES.map((mode) => {
+            const isNormal = mode.value === 'normal';
+            const aiMode = mode.value as AiMode;
+            const isManual = !isNormal && manualModes.includes(aiMode);
+            const isAuto = !isNormal && autoModes.includes(aiMode);
+            const isActive = isNormal ? activeModes.length === 0 : activeModes.includes(aiMode);
+
+            return (
+              <button
+                key={mode.value}
+                onClick={() => void handleModeToggle(mode.value)}
+                title={isManual ? 'Pinned manually' : isAuto ? 'Auto-selected by OZ' : 'Inactive'}
+                className={cn(
+                  'px-3 py-1 rounded-full text-xs font-medium transition-colors border inline-flex items-center gap-1.5',
+                  isManual
+                    ? 'bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/50 shadow-sm shadow-purple-500/15'
+                    : isActive
+                      ? 'bg-purple-500/12 text-purple-600 dark:text-purple-400 border-purple-500/35'
+                      : 'text-gray-500 dark:text-gray-400 border-gray-200 dark:border-white/10 hover:border-purple-500/30 hover:text-purple-500 dark:hover:text-purple-400',
+                )}
+              >
+                <span>{mode.label}</span>
+                {isManual && <span className="text-[10px] uppercase tracking-wide opacity-80">Pin</span>}
+                {!isManual && isAuto && <span className="text-[10px] uppercase tracking-wide opacity-70">Auto</span>}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-gray-500 dark:text-gray-400">
+          OZ can activate modes automatically while you chat. Click a mode to pin or unpin it manually.
+        </p>
       </div>
 
       {/* Study session banner */}
-      {isStudySession && (
+      {currentIsStudySession && (
         <div className="flex items-center gap-2.5 px-4 py-2.5 bg-purple-500/10 border border-purple-500/30 rounded-xl">
           <BookOpen className="w-4 h-4 text-purple-500 flex-shrink-0" />
           <span className="text-sm font-medium text-purple-600 dark:text-purple-400">Study Session</span>
@@ -579,10 +669,21 @@ export default function AIAssistantPage() {
           <AssistantChatInput
             onSendMessage={handleChatSend}
             disabled={isStreaming}
-            placeholder={isStudySession ? 'Ask about this book…' : 'Ask me anything about books…'}
+            placeholder={currentIsStudySession ? 'Ask about this book…' : 'Ask me anything about books…'}
           />
         </div>
       </div>
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+

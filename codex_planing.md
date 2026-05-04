@@ -45,7 +45,7 @@ Copy this block for new work:
 
 - Date Opened: YYYY-MM-DD
 - Owner: Codex
-- Status: TODO | IN_PROGRESS | GOOD | BLOCKED | CANCELLED
+- Status: GOOD | IN_PROGRESS | GOOD | BLOCKED | CANCELLED
 - Related Files:
   - `path/to/file`
 - Goal:
@@ -104,14 +104,16 @@ These entries were completed before this ledger was created and are recorded her
 
 - Date Opened: 2026-05-05
 - Owner: Codex
-- Status: TODO
+- Status: GOOD
 - Related Files:
   - `apps/api/prisma/schema.prisma`
   - `apps/api/src/ai/agent.service.ts`
   - `apps/api/src/ai/ai.controller.ts`
   - `apps/api/src/ai/prompts/system-prompt-builder.ts`
   - `apps/web/app/dashboard/ai-assistant/page.tsx`
-  - `apps/web/lib/api.ts`
+  - `apps/api/src/ai/ai-modes.ts`
+  - `apps/api/src/ai/ai-modes.spec.ts`
+  - `apps/web/lib/ai-modes.ts`
 - Goal:
   - Replace the current single-mode chat setting with a production-grade multi-mode system that can auto-select and combine response modes per turn, while still allowing user-pinned manual modes.
   - Make study sessions start in the right teaching posture automatically.
@@ -217,25 +219,25 @@ These entries were completed before this ledger was created and are recorded her
 
 | Phase | Status | Scope | Validation |
 |---|---|---|---|
-| 1 | TODO | Finalize mode model, prompt-composition rules, and DB/API contract | Review schema/API diffs and confirm all current UI flows still map cleanly |
-| 2 | TODO | Implement backend structured mode state, inference, persistence, and prompt composition | `npm run typecheck:api` plus targeted agent/mode tests |
-| 3 | TODO | Upgrade AI chat UI to multi-mode chips with auto/manual state and conversation rehydration | `npm run typecheck:web` and live UI behavior check |
-| 4 | TODO | Integrate study-session defaults and mid-conversation auto-mode transitions | End-to-end manual chat/session smoke check |
-| 5 | TODO | Document final behavior in README and close the plan with validation + commit log | README review and final commit record |
+| 1 | GOOD | Finalize mode model, prompt-composition rules, and DB/API contract | Schema/API/UI contract updated and typechecked |
+| 2 | GOOD | Implement backend structured mode state, inference, persistence, and prompt composition | `npm run typecheck:api` and `npx jest --runInBand src/ai/ai-modes.spec.ts src/ai/agent.service.spec.ts` |
+| 3 | GOOD | Upgrade AI chat UI to multi-mode chips with auto/manual state and conversation rehydration | `npm run typecheck:web` |
+| 4 | GOOD | Integrate study-session defaults and mid-conversation auto-mode transitions | Backend inference + study-session defaults typechecked and covered by helper tests |
+| 5 | GOOD | Document final behavior in README and close the plan with validation + commit log | README updated; commit recorded in implementation summary |
 
 ### Task Checklist
-- [ ] Confirm whether `AiConversation.mode` should be migrated to arrays or JSON.
-- [ ] Define `AiMode` enum or equivalent validated type for shared API use.
-- [ ] Implement `inferAutoModes(...)` in the backend.
-- [ ] Implement `resolveModes(...)` with deterministic conflict rules.
-- [ ] Replace single prompt prefix logic with composable mode fragments.
-- [ ] Return mode state from conversation fetch APIs.
-- [ ] Update chat send flow to support multiple manual modes.
-- [ ] Rehydrate mode state when a conversation is reopened.
-- [ ] Add auto/manual visual distinction to the mode chips.
-- [ ] Add study-session default mode behavior.
-- [ ] Add backend and frontend regression coverage.
-- [ ] Update README after delivery.
+- [x] Confirm whether `AiConversation.mode` should be migrated to arrays or JSON.
+- [x] Define `AiMode` enum or equivalent validated type for shared API use.
+- [x] Implement `inferAutoModes(...)` in the backend.
+- [x] Implement `resolveModes(...)` with deterministic conflict rules.
+- [x] Replace single prompt prefix logic with composable mode fragments.
+- [x] Return mode state from conversation fetch APIs.
+- [x] Update chat send flow to support multiple manual modes.
+- [x] Rehydrate mode state when a conversation is reopened.
+- [x] Add auto/manual visual distinction to the mode chips.
+- [x] Add study-session default mode behavior.
+- [x] Add backend and frontend regression coverage.
+- [x] Update README after delivery.
 
 ### Implementation Notes
 - Keep automatic mode inference conservative; avoid rapid oscillation between modes from one turn to the next without a clear user signal.
@@ -246,8 +248,14 @@ These entries were completed before this ledger was created and are recorded her
 
 ### Completion Record
 - Validation:
-  - Pending
+  - `cd apps/api && npm run prisma:generate:clean`
+  - `npm run typecheck:api`
+  - `npm run typecheck:web`
+  - `cd apps/api && npx jest --runInBand src/ai/ai-modes.spec.ts src/ai/agent.service.spec.ts`
 - Commit:
-  - Pending
+  - Pending — recorded by the implementation commit for this delivery.
 - Notes:
-  - This plan is intentionally opened before implementation so the full delivery can be traced phase-by-phase.
+  - Delivered with `String[]` mode-state fields (`manualModes`, `lastAutoModes`) plus validated `AiMode` helpers instead of a Prisma enum or JSON field.
+  - Study sessions now auto-start in `learning + explanatory`; regular chat remains `normal` until OZ infers stronger modes or the user pins them.
+
+

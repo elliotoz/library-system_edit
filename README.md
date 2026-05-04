@@ -683,6 +683,23 @@ Each conversation is persisted in the `AiConversation` database model. Users can
 - Switch between past conversations from the sidebar
 - Each conversation maintains its own full message history for multi-turn context
 
+### Response Modes
+
+OZ now supports **composable response modes** instead of a single static chat mode.
+
+- `normal` is the fallback when no special mode is active.
+- Study sessions automatically begin in `learning + explanatory` mode.
+- OZ can auto-activate additional modes mid-conversation based on the user's intent.
+- Users can manually pin extra modes on top of the auto-selected set.
+- The chat UI shows active auto/manual modes in purple so the user can see the current response posture.
+
+Available modes:
+- `learning` — coaching and comprehension checks
+- `explanatory` — step-by-step teaching and concrete examples
+- `planning` — study plans, milestones, sequencing, prioritisation
+- `formal` — academic tone and structured writing
+- `concise` — compact, low-padding answers
+
 ### Book Cover Scanning
 
 Administrators can scan a physical book cover image to auto-fill the add-book form:
@@ -1079,3 +1096,4 @@ This project is developed as a graduation project for Üsküdar University, Facu
 **Built with ❤️ for Üsküdar University**
 
 [⬆ Back to Top](#-ai-integrated-university-library-management-system)
+

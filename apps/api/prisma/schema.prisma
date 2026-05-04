@@ -625,15 +625,16 @@ model FinePayment {
 }
 
 model AiConversation {
-  id          String      @id @default(cuid())
-  userId      String
-  title       String      @default("New Chat")
-  studyBookId String?
-  mode        String      @default("normal")
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages    AiMessage[]
+  id            String      @id @default(cuid())
+  userId        String
+  title         String      @default("New Chat")
+  studyBookId   String?
+  manualModes   String[]    @default([])
+  lastAutoModes String[]    @default([])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages      AiMessage[]
 
   @@index([userId, updatedAt])
   @@map("ai_conversations")
@@ -653,4 +654,5 @@ model AiMessage {
   @@index([conversationId, createdAt])
   @@map("ai_messages")
 }
+
 

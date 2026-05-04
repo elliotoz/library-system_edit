@@ -9,6 +9,7 @@ import { TokenTrackerService } from './session/token-tracker.service';
 import { MaterialSearchService } from '../materials/material-search.service';
 import { BookDocumentService, BookPdfContent } from '../books/book-document.service';
 import { OPENROUTER_MODELS } from './providers/openrouter.provider';
+import { AiModeState, buildAiModeState, buildModeInstructionBlock, getDefaultAutoModes, inferAutoModes, normalizeAiModes } from './ai-modes';
 
 export interface BookCitation {
   title: string;
@@ -18,6 +19,7 @@ export interface BookCitation {
 }
 
 export type ChatChunk =
+  | { type: 'mode_state'; modeState: AiModeState }
   | { type: 'text'; text: string }
   | { type: 'books'; books: BookCitation[] };
 
@@ -87,19 +89,70 @@ export class AgentService {
 
   // ── Conversations ──────────────────────────────────────────────
 
-  async getConversations(userId: string) {
-    return this.prisma.aiConversation.findMany({
-      where: { userId },
-      orderBy: { updatedAt: 'desc' },
-      select: { id: true, title: true, createdAt: true, updatedAt: true },
+  private buildConversationModeState(conversation: {
+    studyBookId?: string | null;
+    manualModes?: string[];
+    lastAutoModes?: string[];
+  }): AiModeState {
+    return buildAiModeState({
+      manualModes: conversation.manualModes ?? [],
+      lastAutoModes: conversation.lastAutoModes ?? [],
+      isStudySession: !!conversation.studyBookId,
     });
   }
 
-  async createConversation(userId: string) {
-    return this.prisma.aiConversation.create({
-      data: { userId, title: 'New Chat' },
-      select: { id: true, title: true, createdAt: true, updatedAt: true },
+  private serializeConversation(conversation: {
+    id: string;
+    title: string;
+    createdAt: Date;
+    updatedAt: Date;
+    studyBookId?: string | null;
+    manualModes?: string[];
+    lastAutoModes?: string[];
+  }) {
+    return {
+      id: conversation.id,
+      title: conversation.title,
+      createdAt: conversation.createdAt,
+      updatedAt: conversation.updatedAt,
+      studyBookId: conversation.studyBookId ?? null,
+      ...this.buildConversationModeState(conversation),
+    };
+  }
+
+  async getConversations(userId: string) {
+    const conversations = await this.prisma.aiConversation.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        updatedAt: true,
+        studyBookId: true,
+        manualModes: true,
+        lastAutoModes: true,
+      },
     });
+
+    return conversations.map((conversation) => this.serializeConversation(conversation));
+  }
+
+  async createConversation(userId: string) {
+    const conversation = await this.prisma.aiConversation.create({
+      data: { userId, title: 'New Chat' },
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        updatedAt: true,
+        studyBookId: true,
+        manualModes: true,
+        lastAutoModes: true,
+      },
+    });
+
+    return this.serializeConversation(conversation);
   }
 
   async deleteConversation(id: string, userId: string) {
@@ -133,7 +186,7 @@ export class AgentService {
   async createStudySession(
     userId: string,
     bookId: string,
-    mode: string = 'normal',
+    requestedManualModes?: string[] | string,
   ): Promise<{ conversationId: string; openingMessage: string }> {
     const book = await this.prisma.book.findUnique({
       where: { id: bookId },
@@ -159,7 +212,8 @@ export class AgentService {
         userId,
         title: `Study: ${book.title.slice(0, 50)}`,
         studyBookId: bookId,
-        mode,
+        manualModes: normalizeAiModes(requestedManualModes),
+        lastAutoModes: getDefaultAutoModes(true),
       },
     });
 
@@ -231,13 +285,12 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     return { conversationId: conv.id, openingMessage: studyGuide };
   }
 
-  async updateConversationMode(id: string, userId: string, mode: string): Promise<void> {
+  async updateConversationMode(id: string, userId: string, requestedManualModes?: string[] | string): Promise<void> {
     await this.prisma.aiConversation.updateMany({
       where: { id, userId },
-      data: { mode },
+      data: { manualModes: normalizeAiModes(requestedManualModes) },
     });
   }
-
   // ── Tools ──────────────────────────────────────────────────────
 
   private getTools(): Array<{ type: 'function'; function: { name: string; description: string; parameters: Record<string, unknown> } }> {
@@ -920,7 +973,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     cookieHeader: string,
     conversationId?: string,
     modelOverride?: string,
-    mode?: string,
+    manualModesInput?: string[] | string,
   ): AsyncGenerator<ChatChunk> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -974,25 +1027,60 @@ Be concise, practical, and encouraging. Base everything on the book details prov
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
       }),
     };
-    const MODE_PREFIXES: Record<string, string> = {
-      learning: 'STUDY MODE — LEARNING: Use the Socratic method. Ask questions to test the student\'s understanding. Guide them to the answer rather than stating it directly. After each answer you give, pose a follow-up question.\n\n',
-      planning: 'STUDY MODE — PLANNING: Focus on creating structured study plans, schedules, and milestones. Break topics into phases. Help the student prioritise and organise their study time.\n\n',
-      explanatory: 'STUDY MODE — EXPLANATORY: Prioritise step-by-step breakdowns. Use real-world analogies and concrete examples before introducing theory. Assume the student is encountering this topic for the first time.\n\n',
-      formal: 'STUDY MODE — FORMAL: Use an academic, precise tone. Structure responses with clear headings. Reference the book\'s content and concepts by name. Avoid casual language.\n\n',
-      concise: 'STUDY MODE — CONCISE: Be maximally brief. Use bullet points. Maximum 3 sentences per point. No padding or preamble.\n\n',
-    };
-    const modePrefix = (mode && MODE_PREFIXES[mode]) ? MODE_PREFIXES[mode] : '';
-    const systemPrompt = modePrefix + buildSystemPromptFromModule(promptContext);
 
-    // Auto-title conversation
-    if (conversationId) {
-      const msgCount = await this.prisma.aiMessage.count({ where: { conversationId } });
-      if (msgCount === 0) {
-        const title = message.trim().substring(0, 60) || 'New Chat';
-        await this.prisma.aiConversation.update({ where: { id: conversationId }, data: { title } });
-      }
-      await this.prisma.aiConversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
+    const hasManualModeOverride = typeof manualModesInput === 'string' || Array.isArray(manualModesInput);
+    const conversation = conversationId
+      ? await this.prisma.aiConversation.findFirst({
+          where: { id: conversationId, userId },
+          select: { id: true, studyBookId: true, manualModes: true, lastAutoModes: true },
+        })
+      : null;
+
+    if (conversationId && !conversation) {
+      yield { type: 'text', text: 'Conversation not found.' };
+      return;
     }
+
+    let messageCount = 0;
+    if (conversationId) {
+      messageCount = await this.prisma.aiMessage.count({ where: { conversationId } });
+    }
+
+    const storedModeState = this.buildConversationModeState(conversation ?? {});
+    const manualModes = hasManualModeOverride
+      ? normalizeAiModes(manualModesInput)
+      : storedModeState.manualModes;
+    const autoModes = inferAutoModes({
+      message,
+      history,
+      isStudySession: !!conversation?.studyBookId,
+    });
+    const modeState = buildAiModeState({
+      manualModes,
+      lastAutoModes: autoModes,
+      isStudySession: !!conversation?.studyBookId,
+    });
+
+    const systemPrompt = `${buildModeInstructionBlock(modeState.activeModes)}${buildSystemPromptFromModule(promptContext)}`;
+
+    if (conversationId) {
+      const updateData: Record<string, unknown> = {
+        updatedAt: new Date(),
+        lastAutoModes: modeState.lastAutoModes,
+      };
+
+      if (messageCount === 0) {
+        updateData.title = message.trim().substring(0, 60) || 'New Chat';
+      }
+
+      if (hasManualModeOverride) {
+        updateData.manualModes = modeState.manualModes;
+      }
+
+      await this.prisma.aiConversation.update({ where: { id: conversationId }, data: updateData });
+    }
+
+    yield { type: 'mode_state', modeState };
 
     // Build messages — OpenRouter uses OpenAI-compatible message format
     type ChatMessage = Record<string, unknown>;
@@ -1139,6 +1227,10 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     await this.saveMessage(userId, 'assistant', fallback, conversationId);
   }
 }
+
+
+
+
 
 
 
