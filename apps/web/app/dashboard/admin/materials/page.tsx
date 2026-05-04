@@ -59,31 +59,32 @@ const indexStatusConfig: Record<
   { label: string; className: string; title: string }
 > = {
   PENDING: {
-    label: 'Pending',
-    className: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+    label: 'pending',
+    className:
+      'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
     title: 'Waiting to be indexed by AI',
   },
   PROCESSING: {
-    label: 'Processing',
+    label: 'processing',
     className:
-      'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
     title: 'Currently indexing...',
   },
   INDEXED: {
-    label: 'Indexed',
+    label: 'indexed',
     className:
-      'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
     title: 'Available for AI search',
   },
   FAILED: {
-    label: 'Failed',
-    className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    label: 'failed',
+    className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
     title: 'Indexing failed, click Re-index to retry',
   },
   NOT_APPLICABLE: {
-    label: 'N/A',
+    label: 'n/a',
     className:
-      'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
+      'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
     title: 'No file to index',
   },
 };
@@ -469,6 +470,7 @@ export default function AdminMaterialsPage() {
                           </>
                         )}
                         {(material.indexStatus === 'PENDING' ||
+                          material.indexStatus === 'PROCESSING' ||
                           material.indexStatus === 'FAILED') && (
                           <button
                             onClick={() => handleReindex(material.id)}

@@ -388,6 +388,18 @@ export const fineApi = {
     (await api.get<MyFine[]>('/fine-payments/my')).data,
 };
 
+// Materials API
+export const materialsApi = {
+  reindexMaterial: async (id: string): Promise<{ message: string }> => {
+    const response = await api.post(`/materials/${id}/reindex`);
+    return response.data;
+  },
+  reindexPending: async (): Promise<{ queued: number }> => {
+    const response = await api.post('/materials/admin/reindex-pending');
+    return response.data;
+  },
+};
+
 // AI Assistant API
 export const aiApi = {
   chat: async (data: { message: string; image?: string }): Promise<{ reply: string; modelUsed: string; sources?: string[] }> =>
