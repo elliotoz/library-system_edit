@@ -44,3 +44,57 @@ describe('AgentService read_ebook', () => {
     expect(result.result).toContain('Architecture matters');
   });
 });
+describe('AgentService read_ebook structure questions', () => {
+  it('returns a focused table-of-contents excerpt for chapter questions', async () => {
+    const prisma = {};
+    const catalogSearch = {};
+    const toolHooks = {};
+    const tokenTracker = {};
+    const materialSearch = {};
+    const bookDocumentService = {
+      getPdfDocumentContent: jest.fn().mockResolvedValue({
+        title: 'The Linux Command Line',
+        authors: ['William Shotts'],
+        description: 'A complete Linux CLI guide',
+        category: 'Operating Systems',
+        publicationYear: 2019,
+        publisher: 'No Starch Press',
+        pageCount: 555,
+        text: [
+          'Front Matter',
+          'Table of Contents',
+          'Part 1 Getting Started',
+          'Chapter 1 What Is the Shell?',
+          'Chapter 2 Navigation',
+          'Chapter 3 Exploring the System',
+          'Part 2 Configuration and the Environment',
+          'Chapter 4 Manipulating Files and Directories',
+        ].join('\n'),
+      }),
+    };
+
+    const service = new AgentService(
+      prisma as never,
+      catalogSearch as never,
+      toolHooks as never,
+      tokenTracker as never,
+      materialSearch as never,
+      bookDocumentService as never,
+    );
+
+    const result = await service['executeToolInner'](
+      'read_ebook',
+      { url: 'https://example.com/linux-command-line.pdf', question: 'What are the chapters in this book? Show the table of contents.' },
+      'user-1',
+      'STUDENT',
+      '',
+      {},
+    );
+
+    expect(result.result).toContain('BOOK STRUCTURE');
+    expect(result.result).toContain('Table of Contents');
+    expect(result.result).toContain('Chapter 1 What Is the Shell?');
+    expect(result.result).toContain('Part 2 Configuration and the Environment');
+  });
+});
+

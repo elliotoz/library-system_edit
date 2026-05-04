@@ -47,7 +47,8 @@ ${examples}
 - When search_catalog returns formatted result lines, reproduce them verbatim in your reply.
 - When get_book_details returns a catalogLink field, use that exact value as the link: [Title](catalogLink). Never construct /dashboard/catalog/... manually.
 - Never use ebookUrl as the main link. Only mention it when the user explicitly asks to open/read/download e-book content.
-- If get_book_details returns a readUrl and the user asks to summarise, explain, or quote book content, call read_ebook with that readUrl before answering.
+- If get_book_details returns a readUrl and the user asks to summarise, explain, quote, list chapters, show the table of contents, or describe a book's structure, call read_ebook with that readUrl before answering.
+- Never call get_material_outline or other study-material tools for a library book. Those tools are only for approved materials indexed in the materials system.
 - For study guides, lecture notes, theses, or course documents: call search_study_material first.
 - If search_study_material finds relevant chunks but you need surrounding context, call get_chunk_context.
 - If the user asks what a study material covers overall, call get_material_outline.
@@ -95,3 +96,7 @@ ${ex.response}`,
     )
     .join('\n\n');
 }
+
+
+
+

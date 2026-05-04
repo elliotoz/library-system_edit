@@ -357,7 +357,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
         type: 'function',
         function: {
           name: 'read_ebook',
-          description: 'Fetch and read an e-book from its URL.',
+          description: 'Read a managed e-book or uploaded book PDF from its URL. Use this for summaries, explanations, quotes, chapter lists, table of contents, or book structure questions.',
           parameters: {
             type: 'object',
             properties: {
@@ -490,7 +490,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
         type: 'function',
         function: {
           name: 'get_material_outline',
-          description: 'Get the opening outline (first few chunks) of a study material to understand its structure and main topics.',
+          description: 'Get the opening outline (first few chunks) of a study material to understand its structure and main topics. Only use this for indexed study materials, never for library books.',
           parameters: {
             type: 'object',
             properties: {
@@ -626,6 +626,32 @@ Be concise, practical, and encouraging. Base everything on the book details prov
       : excerpt;
   }
 
+  private isStructureQuestion(question: string): boolean {
+    return /(table of contents|contents|chapter|chapters|part\b|parts\b|outline|structure|section|sections)/i.test(question);
+  }
+
+  private buildStructureExcerpt(text: string, maxChars = 5000): string {
+    const normalized = text.replace(/\r/g, '').replace(/\f/g, '\n');
+    const tableOfContentsMatch = normalized.match(/(?:^|\n)(table of contents|contents)(?:\n|\s)/i);
+
+    if (tableOfContentsMatch?.index != null) {
+      const start = tableOfContentsMatch.index;
+      return normalized.slice(start, start + maxChars).trim();
+    }
+
+    const lines = normalized
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+    const structureLines = lines.filter((line) => /^(part|chapter)\b/i.test(line) || /\bchapter\b/i.test(line));
+    if (structureLines.length > 0) {
+      return structureLines.slice(0, 80).join('\n');
+    }
+
+    return normalized.slice(0, maxChars).trim();
+  }
+
   private formatReadableBookContent(content: BookPdfContent, question: string): string {
     const metadata = [
       content.title ? `Title: ${content.title}` : null,
@@ -637,8 +663,12 @@ Be concise, practical, and encouraging. Base everything on the book details prov
       content.description ? `Description: ${content.description}` : null,
     ].filter((line): line is string => Boolean(line));
 
-    const excerpt = this.buildRelevantExcerpt(content.text, question, 4000);
-    return `E-BOOK CONTENT (for: ${question}):\n\n${metadata.join('\n')}${metadata.length > 0 ? '\n\n' : ''}${excerpt}`;
+    const excerpt = this.isStructureQuestion(question)
+      ? this.buildStructureExcerpt(content.text, 5000)
+      : this.buildRelevantExcerpt(content.text, question, 4000);
+
+    const heading = this.isStructureQuestion(question) ? 'BOOK STRUCTURE' : 'E-BOOK CONTENT';
+    return `${heading} (for: ${question}):\n\n${metadata.join('\n')}${metadata.length > 0 ? '\n\n' : ''}${excerpt}`;
   }
   private async executeToolInner(
     name: string,
@@ -1252,12 +1282,70 @@ Be concise, practical, and encouraging. Base everything on the book details prov
       return;
     }
 
+    const hasToolResults = messages.some((entry) => entry.role === 'tool');
+    if (hasToolResults) {
+      const synthesisRes = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: this.openRouterHeaders,
+        body: JSON.stringify({
+          model,
+          messages: [
+            ...messages,
+            {
+              role: 'user',
+              content: 'Answer the user now using only the tool results already gathered. Do not call any tools. If the question is about a book structure, chapters, parts, or table of contents, answer directly from the book content you already read.',
+            },
+          ],
+          stream: false,
+          max_tokens: this.chatMaxTokens,
+        }),
+      });
+
+      if (synthesisRes.ok) {
+        const synthesisData = await synthesisRes.json() as {
+          choices: Array<{ message: { content: string | null } }>;
+          usage?: { prompt_tokens: number; completion_tokens: number };
+        };
+
+        this.tokenTrackerService.record(userId, conversationId, {
+          provider: 'openrouter',
+          model,
+          inputTokens: synthesisData.usage?.prompt_tokens ?? 0,
+          outputTokens: synthesisData.usage?.completion_tokens ?? 0,
+        });
+
+        const synthesisText = synthesisData.choices[0]?.message?.content?.trim() ?? '';
+        if (synthesisText) {
+          yield { type: 'text', text: synthesisText };
+
+          const uniqueCitations = Array.from(
+            new Map(allCitations.map((c) => [c.catalogLink, c])).values(),
+          );
+          if (uniqueCitations.length > 0) {
+            yield { type: 'books', books: uniqueCitations };
+          }
+
+          await this.saveMessage(userId, 'user', message, conversationId);
+          await this.saveMessage(userId, 'assistant', synthesisText, conversationId);
+          return;
+        }
+      } else {
+        const synthesisErr = await synthesisRes.text();
+        this.logger.warn(`Final synthesis failed (${synthesisRes.status}): ${synthesisErr}`);
+      }
+    }
+
     const fallback = 'I was unable to complete the request after multiple attempts. Please try again.';
     yield { type: 'text', text: fallback };
     await this.saveMessage(userId, 'user', message, conversationId);
     await this.saveMessage(userId, 'assistant', fallback, conversationId);
   }
 }
+
+
+
+
+
 
 
 

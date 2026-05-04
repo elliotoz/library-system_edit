@@ -97,6 +97,7 @@ These entries were completed before this ledger was created and are recorded her
 | 2026-05-05 | Startup logging, config validation, safe S3 logging, request logging cleanup | `GOOD` | `0e34db1` | Added JWT/S3 startup validation, structured startup logs, Prisma SQL toggle, consolidated request logs |
 | 2026-05-05 | Windows-safe Prisma generate cleanup script | `GOOD` | `e4b4e7c` | Added `npm run prisma:generate:clean` for local Windows DLL lock recovery |
 | 2026-05-05 | Staff dashboard metrics and role wording correction | `GOOD` | `3a04204` | Replaced fake staff dashboard values, fixed `University Staff` wording, updated README |
+| 2026-05-05 | AI book chapter and table-of-contents question recovery | GOOD | <pending> | Fixed Linux Command Line chapter-question failures by improving book structure extraction, strengthening book-vs-material tool guidance, and adding a final synthesis pass after repeated tool calls |
 
 ---
 
@@ -257,6 +258,7 @@ These entries were completed before this ledger was created and are recorded her
 - Notes:
   - Delivered with `String[]` mode-state fields (`manualModes`, `lastAutoModes`) plus validated `AiMode` helpers instead of a Prisma enum or JSON field.
   - Study sessions now auto-start in `learning + explanatory`; regular chat remains `normal` until OZ infers stronger modes or the user pins them.
+
 
 
 
