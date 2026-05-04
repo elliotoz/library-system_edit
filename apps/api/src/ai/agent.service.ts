@@ -358,6 +358,62 @@ Be concise, practical, and encouraging. Base everything on the book details prov
           parameters: { type: 'object', properties: {} },
         },
       },
+      {
+        type: 'function',
+        function: {
+          name: 'search_study_material',
+          description: 'Full-text search across all indexed study materials (research papers, lecture notes, theses, etc.) uploaded by instructors. Use when the user asks about a topic covered in course materials.',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: { type: 'string', description: 'Search query — keywords, concepts, or phrases' },
+              limit: { type: 'number', description: 'Max results to return (1–10, default 5)' },
+            },
+            required: ['query'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'list_study_materials',
+          description: 'List all study materials that have been indexed and are available for AI reading. Returns titles, types, authors, and chunk counts.',
+          parameters: {
+            type: 'object',
+            properties: {},
+            required: [],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'get_chunk_context',
+          description: 'Retrieve surrounding context (neighbouring chunks) for a specific chunk to get more complete information on a topic.',
+          parameters: {
+            type: 'object',
+            properties: {
+              materialId: { type: 'string', description: 'The material ID' },
+              chunkIndex: { type: 'number', description: 'The chunk index to expand context around' },
+            },
+            required: ['materialId', 'chunkIndex'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'get_material_outline',
+          description: 'Get the opening outline (first few chunks) of a study material to understand its structure and main topics.',
+          parameters: {
+            type: 'object',
+            properties: {
+              materialId: { type: 'string', description: 'The material ID' },
+            },
+            required: ['materialId'],
+          },
+        },
+      },
     ];
   }
 
@@ -682,6 +738,49 @@ Be concise, practical, and encouraging. Base everything on the book details prov
           return { result: JSON.stringify(formatted), citations: [] };
         }
 
+        case 'search_study_material': {
+          const limit = Math.min(Math.max((args.limit as number) || 5, 1), 10);
+          const chunks = await this.materialSearch.searchChunks(args.query as string, { limit });
+          if (!chunks.length) return { result: 'No study materials found matching that query.', citations: [] };
+          const merged = this.materialSearch.mergeAdjacentChunks(chunks);
+          const formatted = merged.map((c, i) => [
+            `[${i + 1}] "${c.material.title}" by ${c.material.authorName} (${c.material.type})${c.pageNumber != null ? ` — page ${c.pageNumber}` : ''}`,
+            c.content,
+          ].join('\n')).join('\n\n---\n\n');
+          return { result: `STUDY MATERIAL SEARCH RESULTS (query: "${args.query as string}"):\n\n${formatted}`, citations: [] };
+        }
+
+        case 'list_study_materials': {
+          const materials = await this.materialSearch.listIndexedMaterials();
+          if (!materials.length) return { result: 'No indexed study materials are available yet.', citations: [] };
+          const formatted = materials.map((m) =>
+            `• "${m.title}" by ${m.authorName} (${m.type}) — ${m.chunkCount} chunk${m.chunkCount !== 1 ? 's' : ''} — ID: ${m.id}`,
+          ).join('\n');
+          return { result: `INDEXED STUDY MATERIALS (${materials.length} total):\n\n${formatted}`, citations: [] };
+        }
+
+        case 'get_chunk_context': {
+          const targetChunk = await this.prisma.materialChunk.findFirst({
+            where: { materialId: args.materialId as string, chunkIndex: args.chunkIndex as number },
+          });
+          if (!targetChunk) return { result: 'No context found for that chunk.', citations: [] };
+          const neighbors = await this.materialSearch.getChunkNeighbors(targetChunk.id);
+          if (!neighbors.length) return { result: 'No context found for that chunk.', citations: [] };
+          const formatted = neighbors.map((c) =>
+            `[Chunk ${c.chunkIndex}${c.pageNumber != null ? `, page ${c.pageNumber}` : ''}]\n${c.content}`,
+          ).join('\n\n---\n\n');
+          return { result: `CHUNK CONTEXT:\n\n${formatted}`, citations: [] };
+        }
+
+        case 'get_material_outline': {
+          const outline = await this.materialSearch.getMaterialOutline(args.materialId as string);
+          if (!outline.length) return { result: 'No outline available for that material.', citations: [] };
+          const formatted = outline.map((c) =>
+            `[Chunk ${c.chunkIndex}${c.pageNumber != null ? `, page ${c.pageNumber}` : ''}]\n${c.content}`,
+          ).join('\n\n---\n\n');
+          return { result: `MATERIAL OUTLINE:\n\n${formatted}`, citations: [] };
+        }
+
         default:
           return { result: 'Unknown tool.', citations: [] };
       }
@@ -720,10 +819,11 @@ Be concise, practical, and encouraging. Base everything on the book details prov
 
     const policy = await this.prisma.borrowPolicy.findUnique({ where: { role: user.role } });
 
-    const [catalogTotalBooks, catalogAvailableCopies, publishedReadingLists] = await Promise.all([
+    const [catalogTotalBooks, catalogAvailableCopies, publishedReadingLists, indexedMaterialCount] = await Promise.all([
       this.prisma.book.count({ where: { isActive: true } }),
       this.prisma.bookCopy.count({ where: { status: BookCopyStatus.AVAILABLE } }),
       this.prisma.readingList.count({ where: { status: 'PUBLISHED', isActive: true } }),
+      this.prisma.material.count({ where: { indexStatus: IndexStatus.INDEXED, isApproved: true, isPublished: true } }),
     ]);
 
     const promptContext: PromptContext = {
@@ -739,6 +839,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
       catalogTotalBooks,
       catalogAvailableCopies,
       publishedReadingLists,
+      indexedMaterials: indexedMaterialCount,
       currentDate: new Date().toLocaleDateString('en-GB', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
       }),

@@ -14,6 +14,7 @@ export interface PromptContext {
   catalogTotalBooks: number;
   catalogAvailableCopies: number;
   publishedReadingLists: number;
+  indexedMaterials?: number;
   currentDate: string;
 }
 
@@ -71,7 +72,8 @@ ${examples}
 
 - **Total Books:** ${context.catalogTotalBooks}
 - **Available Copies:** ${context.catalogAvailableCopies}
-- **Published Reading Lists:** ${context.publishedReadingLists}`;
+- **Published Reading Lists:** ${context.publishedReadingLists}
+- Indexed study materials available for AI reading: ${context.indexedMaterials ?? 0}`;
 }
 
 function buildExamples(role: Role): string {
