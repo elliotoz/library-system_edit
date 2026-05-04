@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   FileText,
   Search,
@@ -31,6 +32,7 @@ interface Material {
   courseCode: string | null;
   year: number | null;
   accessLevel: string;
+  indexStatus?: string;
   createdAt: string;
   uploadedBy: {
     id: string;
@@ -65,6 +67,7 @@ const materialTypeColors: Record<string, string> = {
 };
 
 export default function MaterialsPage() {
+  const router = useRouter();
   const [materials, setMaterials] = useState<Material[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -268,26 +271,36 @@ export default function MaterialsPage() {
               </div>
 
               {/* Actions */}
-              {material.fileUrl && (
-                <a
-                  href={material.fileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary-500 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-600"
-                >
-                  {material.fileUrl.includes('.pdf') ? (
-                    <>
-                      <ExternalLink className="h-4 w-4" />
-                      View PDF
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4" />
-                      Download
-                    </>
-                  )}
-                </a>
-              )}
+              <div className="flex flex-col gap-2">
+                {material.fileUrl && (
+                  <a
+                    href={material.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary-500 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-600"
+                  >
+                    {material.fileUrl.includes('.pdf') ? (
+                      <>
+                        <ExternalLink className="h-4 w-4" />
+                        View PDF
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4" />
+                        Download
+                      </>
+                    )}
+                  </a>
+                )}
+                {material.indexStatus === 'INDEXED' && (
+                  <button
+                    onClick={() => router.push(`/dashboard/ai-assistant?q=${encodeURIComponent(`Tell me about "${material.title}"`)}`)}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-200 py-2 text-sm font-medium text-violet-700 transition-colors hover:bg-violet-50 dark:border-violet-700 dark:text-violet-300 dark:hover:bg-violet-900/20"
+                  >
+                    <span>✦</span> Ask OZ
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>
