@@ -16,6 +16,25 @@ function safeDeleteUpload(fileUrl: string): void {
   try { fs.unlinkSync(target); } catch { /* ignore missing */ }
 }
 
+// Removes all files directly inside UPLOADS_MATERIALS_DIR — used in beforeAll
+// to clear leftovers from any prior interrupted run.
+function cleanUploadsMaterialsDir(): void {
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(UPLOADS_MATERIALS_DIR);
+  } catch {
+    return; // directory does not exist yet — nothing to clean
+  }
+  for (const entry of entries) {
+    const target = path.resolve(UPLOADS_MATERIALS_DIR, entry);
+    // Only delete plain files; skip any unexpected subdirectories
+    if (!target.startsWith(UPLOADS_MATERIALS_DIR + path.sep)) continue;
+    try {
+      if (fs.statSync(target).isFile()) fs.unlinkSync(target);
+    } catch { /* ignore */ }
+  }
+}
+
 describe("Security E2E", () => {
   let app: INestApplication;
   let server: any;
@@ -255,6 +274,10 @@ describe("Security E2E", () => {
 
   describe("POST /materials/upload — role enforcement", () => {
     const uploadedFiles: string[] = [];
+
+    beforeAll(() => {
+      cleanUploadsMaterialsDir();
+    });
 
     afterAll(() => {
       uploadedFiles.forEach(safeDeleteUpload);
