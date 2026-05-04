@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
+import useSWR from 'swr';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
@@ -54,13 +55,6 @@ interface AiMetrics {
 
 type AiPeriod = 'week' | 'month' | 'year';
 
-interface AdminBootstrapData {
-  stats: AdminStats | null;
-  activities: ActivityItem[];
-  userDist: UserDistributionRow[];
-  aiMetrics: AiMetrics | null;
-}
-
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 const CONTAINER_MOTION = {
@@ -90,45 +84,6 @@ const ACTIVITY_TONE: Record<string, { bg: string; initial: string }> = {
   reservation: { bg: 'bg-amber-100 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300', initial: 'RS' },
 };
 
-let adminBootstrapCache: AdminBootstrapData | null = null;
-let adminBootstrapCacheAt = 0;
-let adminBootstrapRequest: Promise<AdminBootstrapData> | null = null;
-
-async function loadAdminBootstrapData(): Promise<AdminBootstrapData> {
-  const now = Date.now();
-  if (adminBootstrapCache && now - adminBootstrapCacheAt < 5000) {
-    return adminBootstrapCache;
-  }
-
-  if (adminBootstrapRequest) {
-    return adminBootstrapRequest;
-  }
-
-  adminBootstrapRequest = Promise.all([
-    api.get('/dashboard/admin').catch(() => null),
-    api.get('/dashboard/activity').catch(() => null),
-    api.get('/dashboard/admin/user-distribution').catch(() => null),
-    api.get('/dashboard/admin/ai-metrics?period=week').catch(() => null),
-  ])
-    .then(([statsRes, activityRes, distRes, aiRes]) => {
-      const result: AdminBootstrapData = {
-        stats: statsRes?.data ?? null,
-        activities: activityRes?.data ?? [],
-        userDist: distRes?.data ?? [],
-        aiMetrics: aiRes?.data ?? null,
-      };
-
-      adminBootstrapCache = result;
-      adminBootstrapCacheAt = Date.now();
-      return result;
-    })
-    .finally(() => {
-      adminBootstrapRequest = null;
-    });
-
-  return adminBootstrapRequest;
-}
-
 function greeting(): string {
   const h = new Date().getHours();
   if (h < 12) return 'Good morning';
@@ -141,58 +96,35 @@ function greeting(): string {
 export default function AdminDashboard() {
   const { user } = useAuth();
 
-  const [stats, setStats]                   = useState<AdminStats | null>(null);
-  const [activities, setActivities]         = useState<ActivityItem[]>([]);
-  const [userDist, setUserDist]             = useState<UserDistributionRow[]>([]);
-  const [aiMetrics, setAiMetrics]           = useState<AiMetrics | null>(null);
-  const [aiPeriod, setAiPeriod]             = useState<AiPeriod>('week');
-  const [isLoading, setIsLoading]           = useState(true);
-  const [aiLoading, setAiLoading]           = useState(false);
+  const [aiPeriod, setAiPeriod] = useState<AiPeriod>('week');
 
-  // Initial load — stats, activity, user distribution, AI metrics (week)
-  useEffect(() => {
-    let isMounted = true;
+  const { data: stats, isLoading } = useSWR<AdminStats>(
+    user ? `/dashboard/admin:${user.id}` : null,
+    () => api.get('/dashboard/admin').then(r => r.data as AdminStats),
+    { dedupingInterval: 5_000 },
+  );
 
-    const fetchAll = async () => {
-      try {
-        const data = await loadAdminBootstrapData();
-        if (!isMounted) return;
+  const { data: activities = [] } = useSWR<ActivityItem[]>(
+    user ? `/dashboard/activity:${user.id}` : null,
+    () => api.get('/dashboard/activity').then(r => (r.data ?? []) as ActivityItem[]),
+    { dedupingInterval: 5_000 },
+  );
 
-        setStats(data.stats);
-        setActivities(data.activities);
-        setUserDist(data.userDist);
-        setAiMetrics(data.aiMetrics);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
+  const { data: userDist = [] } = useSWR<UserDistributionRow[]>(
+    user ? `/dashboard/admin/user-distribution:${user.id}` : null,
+    () => api.get('/dashboard/admin/user-distribution').then(r => (r.data ?? []) as UserDistributionRow[]),
+    { dedupingInterval: 5_000 },
+  );
 
-    void fetchAll();
+  const { data: aiMetrics, isLoading: aiLoading } = useSWR<AiMetrics>(
+    user ? `/dashboard/admin/ai-metrics:${user.id}:${aiPeriod}` : null,
+    () => api.get(`/dashboard/admin/ai-metrics?period=${aiPeriod}`).then(r => r.data as AiMetrics),
+    { dedupingInterval: 5_000 },
+  );
 
-    return () => {
-      isMounted = false;
-    };
+  const handlePeriodChange = useCallback((period: string) => {
+    setAiPeriod(period as AiPeriod);
   }, []);
-
-  // Refetch AI metrics when period tab changes
-  const fetchAiMetrics = useCallback(async (period: AiPeriod) => {
-    setAiLoading(true);
-    try {
-      const res = await api.get(`/dashboard/admin/ai-metrics?period=${period}`);
-      if (res?.data) setAiMetrics(res.data);
-    } catch { /* keep previous data */ }
-    finally { setAiLoading(false); }
-  }, []);
-
-  const handlePeriodChange = (period: string) => {
-    const p = period as AiPeriod;
-    setAiPeriod(p);
-    fetchAiMetrics(p);
-  };
 
   if (isLoading) {
     return (

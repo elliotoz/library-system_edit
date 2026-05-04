@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { mutate } from 'swr';
 import { User, LoginCredentials, DASHBOARD_ROUTES, Role } from '@/types';
 import { authApi } from '@/lib/api';
 
@@ -65,6 +66,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Continue with local logout even if API fails
       console.error('Logout API error:', error);
     }
+    // Wipe all SWR cache so the next user never sees stale data
+    await mutate(() => true, undefined, { revalidate: false });
     setUser(null);
     router.push('/login');
   }, [router]);

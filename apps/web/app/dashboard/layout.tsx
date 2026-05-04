@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import useSWR from 'swr';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -60,44 +61,6 @@ interface NavSection {
   items: { label: string; href: string; icon: React.ComponentType<{ className?: string }> }[];
 }
 
-let notificationsCache: Notification[] | null = null;
-let notificationsCacheAt = 0;
-let notificationsRequest: Promise<Notification[]> | null = null;
-
-async function loadNotifications(force = false): Promise<Notification[]> {
-  const now = Date.now();
-  if (!force && notificationsCache && now - notificationsCacheAt < 5000) {
-    return notificationsCache;
-  }
-
-  if (notificationsRequest) {
-    return notificationsRequest;
-  }
-
-  notificationsRequest = fetch('/api/notifications?limit=10', {
-    credentials: 'include',
-  })
-    .then(async (res) => {
-      if (!res.ok) {
-        throw new Error(`Notifications request failed with ${res.status}`);
-      }
-
-      const data = await res.json();
-      const nextNotifications = Array.isArray(data.notifications)
-        ? (data.notifications as Notification[])
-        : [];
-
-      notificationsCache = nextNotifications;
-      notificationsCacheAt = Date.now();
-      return nextNotifications;
-    })
-    .finally(() => {
-      notificationsRequest = null;
-    });
-
-  return notificationsRequest;
-}
-
 export default function DashboardLayout({
   children,
 }: {
@@ -109,8 +72,16 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const notificationRef = useRef<HTMLDivElement>(null);
+
+  const { data: notifications = [], mutate: mutateNotifications } = useSWR<Notification[]>(
+    user ? `/notifications:${user.id}` : null,
+    () =>
+      fetch('/api/notifications?limit=10', { credentials: 'include' })
+        .then(r => r.json())
+        .then(d => (Array.isArray(d.notifications) ? (d.notifications as Notification[]) : [])),
+    { refreshInterval: 30_000, dedupingInterval: 5_000 },
+  );
 
 
   // ── Swipe-to-close sidebar (touch) ──────────────────────────────────
@@ -141,31 +112,6 @@ export default function DashboardLayout({
       document.documentElement.classList.add('dark');
     }
   }, []);
-
-  useEffect(() => {
-    if (!user) return;
-
-    let isMounted = true;
-
-    const syncNotifications = async (force = false) => {
-      try {
-        const nextNotifications = await loadNotifications(force);
-        if (isMounted) {
-          setNotifications(nextNotifications);
-        }
-      } catch {}
-    };
-
-    void syncNotifications();
-    const interval = setInterval(() => {
-      void syncNotifications(true);
-    }, 30000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [user]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -369,7 +315,10 @@ export default function DashboardLayout({
                               method: 'PATCH',
                               credentials: 'include',
                             });
-                            setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+                            await mutateNotifications(
+                              notifications.map(n => ({ ...n, read: true })),
+                              { revalidate: false },
+                            );
                           } catch {}
                         }}
                         className="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400"
@@ -395,8 +344,9 @@ export default function DashboardLayout({
                                   method: 'PATCH',
                                   credentials: 'include',
                                 });
-                                setNotifications((prev) =>
-                                  prev.map((n) => n.id === notification.id ? { ...n, read: true } : n)
+                                await mutateNotifications(
+                                  notifications.map(n => n.id === notification.id ? { ...n, read: true } : n),
+                                  { revalidate: false },
                                 );
                               } catch {}
                             }
