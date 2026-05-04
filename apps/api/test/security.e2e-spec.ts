@@ -192,6 +192,87 @@ describe("Security E2E", () => {
     });
   });
 
+  // ── Materials role enforcement — POST /materials ─────────────────────────
+
+  describe("POST /materials — role enforcement", () => {
+    const validDto = {
+      title: "Test Material",
+      type: "RESEARCH_PAPER",
+      authorName: "Test Author",
+      accessLevel: "PUBLIC",
+    };
+
+    it("returns 403 when a student creates a material", async () => {
+      const { cookie } = await loginAs(app, "student");
+      await request(server)
+        .post("/materials")
+        .set("Cookie", cookie)
+        .send(validDto)
+        .expect(403);
+    });
+
+    it("returns 403 when staff creates a material", async () => {
+      const { cookie } = await loginAs(app, "staff");
+      await request(server)
+        .post("/materials")
+        .set("Cookie", cookie)
+        .send(validDto)
+        .expect(403);
+    });
+
+    it("returns 201 when an instructor creates a material", async () => {
+      const { cookie } = await loginAs(app, "instructor");
+      await request(server)
+        .post("/materials")
+        .set("Cookie", cookie)
+        .send(validDto)
+        .expect(201);
+    });
+
+    it("returns 201 when an admin creates a material", async () => {
+      const { cookie } = await loginAs(app, "admin");
+      await request(server)
+        .post("/materials")
+        .set("Cookie", cookie)
+        .send(validDto)
+        .expect(201);
+    });
+  });
+
+  // ── Materials upload role enforcement — POST /materials/upload ────────────
+
+  describe("POST /materials/upload — role enforcement", () => {
+    it("returns 403 when a student uploads a material file", async () => {
+      const { cookie } = await loginAs(app, "student");
+      await request(server)
+        .post("/materials/upload")
+        .set("Cookie", cookie)
+        .attach("file", Buffer.from("fake pdf"), { filename: "test.pdf", contentType: "application/pdf" })
+        .expect(403);
+    });
+
+    it("returns 403 when staff uploads a material file", async () => {
+      const { cookie } = await loginAs(app, "staff");
+      await request(server)
+        .post("/materials/upload")
+        .set("Cookie", cookie)
+        .attach("file", Buffer.from("fake pdf"), { filename: "test.pdf", contentType: "application/pdf" })
+        .expect(403);
+    });
+  });
+
+  // ── Auth config response shape — GET /auth/config ────────────────────────
+
+  describe("GET /auth/config — response shape", () => {
+    it("returns googleOAuthEnabled, smtpEnabled, and aiEnabled (not ollamaEnabled)", async () => {
+      const res = await request(server).get("/auth/config").expect(200);
+      expect(typeof res.body.googleOAuthEnabled).toBe("boolean");
+      expect(typeof res.body.smtpEnabled).toBe("boolean");
+      expect(typeof res.body.aiEnabled).toBe("boolean");
+      expect(res.body).not.toHaveProperty("ollamaEnabled");
+    });
+  });
+
   // ── reset-password rate limiting ──────────────────────────────────────────
 
   describe("POST /auth/reset-password — rate limiting", () => {

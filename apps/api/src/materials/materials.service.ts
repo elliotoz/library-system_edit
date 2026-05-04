@@ -189,6 +189,9 @@ export class MaterialsService {
 
   // Create material (for instructors - requires approval)
   async create(dto: CreateMaterialDto, userId: string, userRole: Role) {
+    if (userRole !== Role.INSTRUCTOR && userRole !== Role.ADMIN) {
+      throw new ForbiddenException('Only instructors and admins can submit materials');
+    }
     const isAdmin = userRole === Role.ADMIN;
 
     const material = await this.prisma.material.create({

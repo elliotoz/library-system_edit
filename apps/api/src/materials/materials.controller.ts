@@ -114,6 +114,8 @@ export class MaterialsController {
 
   // Create material (with optional file upload)
   @Post()
+  @UseGuards(RolesGuard)
+  @Roles(Role.INSTRUCTOR, Role.ADMIN)
   @ApiOperation({ summary: "Create new material" })
   async create(
     @Body() dto: CreateMaterialDto,
@@ -124,6 +126,8 @@ export class MaterialsController {
 
   // Upload file
   @Post("upload")
+  @UseGuards(RolesGuard)
+  @Roles(Role.INSTRUCTOR, Role.ADMIN)
   @ApiOperation({ summary: "Upload material file" })
   @ApiConsumes("multipart/form-data")
   @UseInterceptors(

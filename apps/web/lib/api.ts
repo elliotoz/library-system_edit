@@ -134,7 +134,7 @@ export const authApi = {
     await api.patch('/auth/change-password', data);
   },
 
-  getConfig: async (): Promise<{ googleOAuthEnabled: boolean; smtpEnabled: boolean; ollamaEnabled: boolean }> => {
+  getConfig: async (): Promise<{ googleOAuthEnabled: boolean; smtpEnabled: boolean; aiEnabled: boolean }> => {
     const response = await api.get('/auth/config');
     return response.data;
   },

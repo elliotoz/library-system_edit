@@ -182,9 +182,8 @@ library-system/
 │   │   │   ├── ai/             # AI assistant module
 │   │   │   │   ├── ai.controller.ts            # REST + SSE endpoints
 │   │   │   │   ├── agent.service.ts            # Agentic loop (tool-calling, SSE)
-│   │   │   │   ├── ai.service.ts               # Legacy orchestrator
-│   │   │   │   ├── groq.service.ts             # Cover scan + OpenRouter fallback
-│   │   │   │   ├── providers/                  # OpenRouter / Gemini / Groq providers
+│   │   │   │   ├── ai.service.ts               # AI orchestrator
+│   │   │   │   ├── providers/                  # OpenRouter provider
 │   │   │   │   └── dto/                        # Request/response DTOs
 │   │   │   ├── auth/           # Authentication (JWT + Google OAuth)
 │   │   │   ├── users/          # User management
@@ -261,7 +260,7 @@ npm install
 ```bash
 # Copy environment templates
 cp apps/api/.env.example apps/api/.env
-cp apps/web/.env.example apps/web/.env
+cp apps/web/.env.example apps/web/.env.local
 ```
 
 ### Step 4: Start the Database
@@ -319,9 +318,6 @@ GOOGLE_CALLBACK_URL="http://localhost:3001/auth/google/callback"
 # OpenRouter (required for AI chat)
 OPENROUTER_API_KEY="sk-or-v1-..."
 
-# Gemini (required for book cover scanning)
-GEMINI_API_KEY="AIza..."
-
 # SMTP Email (optional — falls back to console logging if not configured)
 SMTP_HOST="smtp.example.com"
 SMTP_PORT="587"
@@ -332,7 +328,7 @@ SMTP_FROM="noreply@library.uskudar.edu.tr"
 
 > **SMTP Note:** When `SMTP_HOST` is not set, verification codes and password reset links are logged to the server console instead of emailed. This is the default for local development — no SMTP server required.
 
-### Frontend (`apps/web/.env`)
+### Frontend (`apps/web/.env.local`)
 
 ```env
 # API URL
@@ -353,7 +349,7 @@ JWT_SECRET="change-me-must-match-api"
 |---------|-------------------|----------|
 | **SMTP Email** | `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` | Emails logged to console |
 | **OZ AI Chat** | `OPENROUTER_API_KEY` | AI offline indicator shown |
-| **Book Cover Scan** | `GEMINI_API_KEY` | Scan endpoint unavailable |
+| **Book Cover Scan** | `OPENROUTER_API_KEY` | Scan endpoint unavailable |
 | **Google OAuth** | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Button hidden on login/signup |
 
 The `/auth/config` endpoint returns the current status of each feature:
@@ -693,7 +689,7 @@ Content-Type: application/json
 { "image": "<base64 JPEG>" }
 ```
 
-Uses Google Gemini Flash. Extracts title, authors, ISBN, publisher, and publication year.
+Uses OpenRouter (multimodal model). Extracts title, authors, ISBN, publisher, and publication year.
 
 ### Permission Safety
 
@@ -709,7 +705,6 @@ Requires an OpenRouter API key (free tier available):
 
 ```env
 OPENROUTER_API_KEY="sk-or-v1-..."
-GEMINI_API_KEY="AIza..."   # for book cover scan only
 ```
 
 When `OPENROUTER_API_KEY` is not set, `/ai/status` returns `{ "available": false }` and the frontend shows an "Offline" indicator.

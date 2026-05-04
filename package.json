@@ -29,7 +29,7 @@
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
     "dev:lan": "concurrently \"npm run dev:api\" \"wait-on http://localhost:3001/health/live && npm run dev:web\"",
-    "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules"
+    "clean": "npx rimraf node_modules apps/*/node_modules packages/*/node_modules"
   },
   "keywords": [
     "library",
