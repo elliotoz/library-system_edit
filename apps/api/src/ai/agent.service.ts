@@ -27,6 +27,8 @@ export type ChatChunk =
 export class AgentService {
   private readonly logger = new Logger(AgentService.name);
   private readonly openRouterBaseUrl = 'https://openrouter.ai/api/v1';
+  private readonly chatMaxTokens = 2048;
+  private readonly studyGuideMaxTokens = 1536;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -53,6 +55,35 @@ export class AgentService {
       'HTTP-Referer': process.env.FRONTEND_URL ?? 'http://localhost:3000',
       'X-Title': 'LibrarySystem',
     };
+  }
+
+  private parseProviderErrorMessage(status: number, errText: string): string {
+    try {
+      const parsed = JSON.parse(errText) as { error?: { message?: string } };
+      if (parsed.error?.message) {
+        return parsed.error.message;
+      }
+    } catch {
+      // fall through to generic handling
+    }
+
+    if (status === 402) {
+      return 'OZ AI is temporarily unavailable because the OpenRouter account does not currently have enough credits or output-token budget for this request.';
+    }
+
+    return `AI provider error: ${status}`;
+  }
+
+  private getUserFacingProviderError(status: number, errText: string): string {
+    if (status === 402) {
+      return 'OZ AI is temporarily unavailable because the current OpenRouter credits or token budget are too low for this request. Try again later or reduce the requested output size.';
+    }
+
+    if (status === 429) {
+      return 'OZ AI is being rate limited right now. Please wait a moment and try again.';
+    }
+
+    return this.parseProviderErrorMessage(status, errText);
   }
 
   /** Pick model tier based on message complexity, respecting an explicit override. */
@@ -251,7 +282,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
         body: JSON.stringify({
           model: OPENROUTER_MODELS.STUDY,
           messages: [{ role: 'user', content: studyPrompt }],
-          max_tokens: 4096,
+          max_tokens: this.studyGuideMaxTokens,
         }),
       });
 
@@ -1126,7 +1157,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
         model,
         messages,
         stream: false,
-        max_tokens: 4096,
+        max_tokens: this.chatMaxTokens,
       };
 
       // On the last round, remove tools to force the model to produce a text answer
@@ -1155,7 +1186,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
           continue;
         }
         this.logger.error(`OpenRouter API error ${res.status}: ${errText}`);
-        throw new Error(`AI provider error: ${res.status}`);
+        throw new Error(this.getUserFacingProviderError(res.status, errText));
       }
 
       const data = await res.json() as {
@@ -1227,6 +1258,9 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     await this.saveMessage(userId, 'assistant', fallback, conversationId);
   }
 }
+
+
+
 
 
 
