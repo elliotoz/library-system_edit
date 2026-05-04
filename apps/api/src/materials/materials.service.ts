@@ -226,6 +226,13 @@ export class MaterialsService {
       }
     }
 
+    // Admin-created materials are auto-approved; trigger indexing immediately
+    if (isAdmin && material.fileUrl) {
+      this.materialIndexer.indexMaterial(material.id).catch((err) =>
+        this.logger.error(`Auto-index failed for new material ${material.id}: ${String(err)}`),
+      );
+    }
+
     return material;
   }
 
