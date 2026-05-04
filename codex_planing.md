@@ -259,3 +259,4 @@ These entries were completed before this ledger was created and are recorded her
   - Study sessions now auto-start in `learning + explanatory`; regular chat remains `normal` until OZ infers stronger modes or the user pins them.
 
 
+
