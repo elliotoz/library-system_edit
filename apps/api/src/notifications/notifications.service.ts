@@ -9,6 +9,7 @@ interface CreateNotificationDto {
   message: string;
   bookId?: string;
   branchId?: string;
+  readingListId?: string;
 }
 
 @Injectable()
@@ -24,6 +25,7 @@ export class NotificationsService {
         message: dto.message,
         bookId: dto.bookId,
         branchId: dto.branchId,
+        readingListId: dto.readingListId,
       },
     });
   }

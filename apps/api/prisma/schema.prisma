@@ -492,8 +492,9 @@ model Notification {
   read    Boolean          @default(false)
 
   // Related entities (optional)
-  bookId   String?
-  branchId String?
+  bookId        String?
+  branchId      String?
+  readingListId String?
 
   // User who receives this notification
   userId String

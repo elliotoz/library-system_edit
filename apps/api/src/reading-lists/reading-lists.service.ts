@@ -109,7 +109,7 @@ export class ReadingListsService {
       dto.status === ReadingListStatus.PUBLISHED &&
       previousStatus !== ReadingListStatus.PUBLISHED
     ) {
-      await this.notifyFollowers(list.ownerId, updated.title, NotificationType.READING_LIST_PUBLISHED);
+      await this.notifyFollowers(list.ownerId, id, updated.title, NotificationType.READING_LIST_PUBLISHED);
     }
 
     return updated;
@@ -124,6 +124,13 @@ export class ReadingListsService {
     if (list.ownerId !== userId && !isAdmin) {
       throw new ForbiddenException('You can only delete your own reading lists');
     }
+    // Delete notifications tied to this list before removing it
+    await this.prisma.notification.deleteMany({
+      where: {
+        readingListId: id,
+        type: { in: [NotificationType.READING_LIST_PUBLISHED, NotificationType.READING_LIST_UPDATED] },
+      },
+    });
     await this.prisma.readingList.delete({ where: { id } });
     return { message: 'Reading list deleted successfully' };
   }
@@ -170,7 +177,7 @@ export class ReadingListsService {
 
       // Notify followers if published list was updated
       if (list.status === ReadingListStatus.PUBLISHED) {
-        await this.notifyFollowers(list.ownerId, list.title, NotificationType.READING_LIST_UPDATED);
+        await this.notifyFollowers(list.ownerId, listId, list.title, NotificationType.READING_LIST_UPDATED);
       }
 
       return item;
@@ -206,7 +213,7 @@ export class ReadingListsService {
 
     // Notify followers if published list was updated
     if (list.status === ReadingListStatus.PUBLISHED) {
-      await this.notifyFollowers(list.ownerId, list.title, NotificationType.READING_LIST_UPDATED);
+      await this.notifyFollowers(list.ownerId, listId, list.title, NotificationType.READING_LIST_UPDATED);
     }
 
     return { message: 'Item removed from reading list' };
@@ -363,7 +370,7 @@ export class ReadingListsService {
 
   // ── Helpers ───────────────────────────────────────────────────
 
-  private async notifyFollowers(instructorId: string, listTitle: string, type: NotificationType) {
+  private async notifyFollowers(instructorId: string, listId: string, listTitle: string, type: NotificationType) {
     const followers = await this.prisma.instructorFollower.findMany({
       where: { instructorId },
       select: { followerId: true },
@@ -388,6 +395,7 @@ export class ReadingListsService {
         type,
         title,
         message,
+        readingListId: listId,
       })),
     );
   }
