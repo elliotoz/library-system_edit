@@ -82,9 +82,18 @@ export class DashboardService {
   }
 
   async getStaffStats(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { interests: true } });
-    const borrowedBooks = await this.prisma.borrow.count({ where: { userId, status: BorrowStatus.ACTIVE } });
-    return { borrowedBooks, interests: user?.interests || [], interestCount: user?.interests?.length || 0 };
+    const [user, borrowedBooks, policy] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: userId }, select: { interests: true } }),
+      this.prisma.borrow.count({ where: { userId, status: BorrowStatus.ACTIVE } }),
+      this.prisma.borrowPolicy.findUnique({ where: { role: Role.STAFF } }),
+    ]);
+
+    return {
+      borrowedBooks,
+      interests: user?.interests || [],
+      interestCount: user?.interests?.length || 0,
+      maxBorrowDays: policy?.maxBorrowDays || 14,
+    };
   }
 
   async getRecentActivity() {
@@ -178,3 +187,5 @@ export class DashboardService {
     };
   }
 }
+
+

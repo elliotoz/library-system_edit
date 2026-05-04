@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   BookOpen, Bookmark, Sparkles, Clock, ArrowRight,
@@ -23,7 +23,10 @@ interface StaffStats {
   borrowedBooks: number;
   interests: string[];
   interestCount: number;
+  maxBorrowDays: number;
 }
+
+type RecommendationMode = 'interest' | 'catalog' | 'empty';
 
 const CATEGORY_COLORS: Record<string, string> = {
   'Psychology':       'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400',
@@ -41,21 +44,52 @@ const BOOK_GRADIENTS = [
   'from-amber-400 to-amber-600',
 ];
 
+function buildInterestSearchTerm(interests: string[]): string {
+  return interests
+    .map((interest) => interest.trim())
+    .filter(Boolean)
+    .slice(0, 4)
+    .join(' ');
+}
+
 export default function StaffDashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState<StaffStats | null>(null);
   const [recommendations, setRecommendations] = useState<Book[]>([]);
+  const [recommendationMode, setRecommendationMode] = useState<RecommendationMode>('empty');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, booksRes] = await Promise.all([
-          api.get('/dashboard/staff').catch(() => null),
-          api.get('/books?pageSize=4').catch(() => null),
-        ]);
-        if (statsRes?.data) setStats(statsRes.data);
-        if (booksRes?.data) setRecommendations(booksRes.data.data || []);
+        const statsRes = await api.get('/dashboard/staff').catch(() => null);
+        const staffStats = statsRes?.data as StaffStats | undefined;
+        if (staffStats) {
+          setStats(staffStats);
+        }
+
+        const interestSearch = buildInterestSearchTerm(staffStats?.interests || []);
+        let books: Book[] = [];
+        let mode: RecommendationMode = 'empty';
+
+        if (interestSearch) {
+          const interestRes = await api
+            .get(`/books?pageSize=4&search=${encodeURIComponent(interestSearch)}`)
+            .catch(() => null);
+          books = interestRes?.data?.data || [];
+          if (books.length > 0) {
+            mode = 'interest';
+          }
+        }
+
+        if (books.length === 0) {
+          const catalogRes = await api.get('/books?pageSize=4').catch(() => null);
+          books = catalogRes?.data?.data || [];
+          mode = books.length > 0 ? 'catalog' : 'empty';
+        }
+
+        setRecommendations(books);
+        setRecommendationMode(mode);
       } catch (e) {
         console.error(e);
       } finally {
@@ -72,6 +106,16 @@ export default function StaffDashboard() {
     return 'Good evening';
   };
 
+  const recommendationHeading = useMemo(() => {
+    if (recommendationMode === 'interest') {
+      return 'Recommended Based on Your Interests';
+    }
+    if (recommendationMode === 'catalog') {
+      return 'Suggested Books from the Catalog';
+    }
+    return 'Suggested Books';
+  }, [recommendationMode]);
+
   if (isLoading) {
     return (
       <div className="space-y-6 animate-pulse">
@@ -87,14 +131,13 @@ export default function StaffDashboard() {
   const statCards = [
     { label: 'Books Borrowed', value: stats?.borrowedBooks ?? 0, icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/30', border: 'border-l-blue-500' },
     { label: 'Interests Saved', value: stats?.interestCount ?? 0, icon: Bookmark, color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/30', border: 'border-l-green-500' },
-    { label: 'AI Suggestions', value: 12, icon: Sparkles, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/30', border: 'border-l-purple-500' },
-    { label: 'Days Borrow Limit', value: 14, icon: Clock, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/30', border: 'border-l-amber-500' },
+    { label: 'Suggested Books', value: recommendations.length, icon: Sparkles, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/30', border: 'border-l-purple-500' },
+    { label: 'Days Borrow Limit', value: stats?.maxBorrowDays ?? 14, icon: Clock, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/30', border: 'border-l-amber-500' },
   ];
 
   return (
     <div className="space-y-6">
 
-      {/* ── Welcome Banner ── */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-600 to-teal-700 p-6 text-white shadow-lg">
         <div className="absolute inset-0 opacity-10"
           style={{ backgroundImage: 'radial-gradient(circle at 80% 50%, white 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
@@ -105,12 +148,11 @@ export default function StaffDashboard() {
             <p className="text-emerald-200 text-sm mt-1">Welcome to your staff dashboard</p>
           </div>
           <span className="hidden sm:block px-3 py-1 bg-white/15 rounded-full text-xs font-medium backdrop-blur-sm">
-            Library Staff
+            University Staff
           </span>
         </div>
       </div>
 
-      {/* ── Stat Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((s, i) => (
           <div key={i} className={cn('glass-card p-4 border-l-4', s.border)}>
@@ -127,51 +169,50 @@ export default function StaffDashboard() {
         ))}
       </div>
 
-      {/* ── Recommended Books ── */}
       <div className="glass-card overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/[0.06] dark:border-white/[0.06]">
-          <h2 className="font-semibold text-gray-900 dark:text-white">Recommended Based on Your Interests</h2>
+          <h2 className="font-semibold text-gray-900 dark:text-white">{recommendationHeading}</h2>
           <Link href="/dashboard/catalog"
             className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 flex items-center gap-1">
             View All <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
         <div className="p-5">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {(recommendations.length > 0
-              ? recommendations
-              : [
-                  { id: '1', title: 'Thinking, Fast and Slow', authors: ['Daniel Kahneman'], category: 'Psychology', availableCopies: 1 },
-                  { id: '2', title: 'The Psychology of Money', authors: ['Morgan Housel'], category: 'Finance', availableCopies: 0 },
-                  { id: '3', title: 'Atomic Habits', authors: ['James Clear'], category: 'Self-Improvement', availableCopies: 2 },
-                  { id: '4', title: 'Influence', authors: ['Robert Cialdini'], category: 'Psychology', availableCopies: 1 },
-                ]
-            ).map((book, i) => (
-              <Link key={book.id} href={recommendations.length > 0 ? `/dashboard/catalog/${book.id}` : '/dashboard/catalog'} className="group block">
-                <div className={cn('relative aspect-[3/4] rounded-xl mb-3 overflow-hidden transition-all group-hover:shadow-lg group-hover:-translate-y-0.5', !book.coverImageUrl && cn('flex flex-col items-center justify-center bg-gradient-to-br p-3', BOOK_GRADIENTS[i % 4]))}>
-                  {book.coverImageUrl ? (
-                    <img src={book.coverImageUrl} alt={book.title} className="w-full h-full object-cover" />
-                  ) : (
-                    <>
-                      <BookOpen className="w-10 h-10 text-white/80 mb-2" />
-                      <p className="text-white/70 text-[10px] text-center line-clamp-3">{book.title}</p>
-                    </>
+          {recommendations.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {recommendations.map((book, i) => (
+                <Link key={book.id} href={`/dashboard/catalog/${book.id}`} className="group block">
+                  <div className={cn('relative aspect-[3/4] rounded-xl mb-3 overflow-hidden transition-all group-hover:shadow-lg group-hover:-translate-y-0.5', !book.coverImageUrl && cn('flex flex-col items-center justify-center bg-gradient-to-br p-3', BOOK_GRADIENTS[i % 4]))}>
+                    {book.coverImageUrl ? (
+                      <img src={book.coverImageUrl} alt={book.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <>
+                        <BookOpen className="w-10 h-10 text-white/80 mb-2" />
+                        <p className="text-white/70 text-[10px] text-center line-clamp-3">{book.title}</p>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white line-clamp-1 group-hover:text-primary-600 transition-colors">{book.title}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">{book.authors.join(', ')}</p>
+                  {book.category && (
+                    <span className={cn('inline-block mt-1.5 text-[11px] px-2 py-0.5 rounded-full', CATEGORY_COLORS[book.category] || CATEGORY_COLORS.default)}>
+                      {book.category}
+                    </span>
                   )}
-                </div>
-                <p className="text-sm font-medium text-gray-900 dark:text-white line-clamp-1 group-hover:text-primary-600 transition-colors">{book.title}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">{book.authors.join(', ')}</p>
-                {book.category && (
-                  <span className={cn('inline-block mt-1.5 text-[11px] px-2 py-0.5 rounded-full', CATEGORY_COLORS[book.category] || CATEGORY_COLORS.default)}>
-                    {book.category}
-                  </span>
-                )}
-              </Link>
-            ))}
-          </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-gray-200 dark:border-gray-700 p-6 text-center">
+              <p className="text-sm font-medium text-gray-900 dark:text-white">No book suggestions available yet.</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Add interests in your profile or browse the catalog to help OZ and the library suggest better matches.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ── AI Assistant Banner ── */}
       <Link href="/dashboard/ai-assistant"
         className="group flex items-center justify-between gap-4 rounded-xl bg-gradient-to-r from-primary-500 to-primary-700 p-5 shadow-sm hover:shadow-md hover:from-primary-600 hover:to-primary-800 transition-all">
         <div className="flex items-center gap-4">
@@ -180,7 +221,7 @@ export default function StaffDashboard() {
           </div>
           <div>
             <h3 className="font-semibold text-white">AI Personal Assistant</h3>
-            <p className="text-white/70 text-sm mt-0.5">Get personalized recommendations based on your interests</p>
+            <p className="text-white/70 text-sm mt-0.5">Ask OZ for reading recommendations, policy help, and study support.</p>
           </div>
         </div>
         <span className="hidden sm:flex items-center gap-2 px-4 py-2 bg-white text-primary-600 rounded-lg text-sm font-medium group-hover:bg-primary-50 transition-colors flex-shrink-0">
@@ -188,7 +229,6 @@ export default function StaffDashboard() {
         </span>
       </Link>
 
-      {/* ── Quick Actions ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { href: '/dashboard/catalog', icon: BookOpen, label: 'Search Catalog', desc: 'Browse and reserve books', color: 'text-primary-500', bg: 'bg-primary-50 dark:bg-primary-900/30', hover: 'hover:border-primary-300 dark:hover:border-primary-700' },
