@@ -85,7 +85,7 @@ The **AI-Integrated University Library Management System** is a comprehensive we
 - 📊 **Analytics Dashboard** — Real-time statistics and borrowing trends
 - 🌙 **Dark Mode Support** — Eye-friendly interface for extended use
 - 🎨 **Liquid Glass Design System** — WebGL aurora background, Framer Motion spring animations, glass chrome layer with content-aware opacity
-- 🤖 **OZ AI Agentic Assistant** — SSE streaming, tool-calling agent loop with real-time library data access, per-conversation history, image understanding, and book cover scanning powered by OpenRouter
+- 🤖 **OZ AI Agentic Assistant** — SSE streaming, tool-calling agent loop with real-time library data access, per-conversation history, image understanding, book cover scanning, and grounded document reading from uploaded book PDFs and indexed study materials
 
 ---
 
@@ -659,8 +659,12 @@ If the FREE tier is rate-limited (429), the agent automatically falls back to CH
 | Tool | Description |
 |------|-------------|
 | `search_catalog` | Search books by keyword; returns title, authors, availability |
-| `get_book_details` | Full detail for a specific book ID |
-| `read_ebook` | Fetch and return e-book text content from URL |
+| `get_book_details` | Full detail for a specific book ID, including `readUrl` for managed PDFs and e-books |
+| `read_ebook` | Read grounded content from a managed book PDF (`pdfUrl`) or supported e-book URL; uploaded PDFs are extracted and cached before OZ answers |
+| `search_study_material` | Search indexed, approved study materials and return grounded matches |
+| `list_study_materials` | List accessible indexed materials for discovery before deeper questions |
+| `get_chunk_context` | Expand the surrounding context for a specific indexed material chunk |
+| `get_material_outline` | Build a quick outline from indexed material chunks |
 | `fetch_webpage` | General web fetch for research or external context |
 | `get_my_borrows` | Caller's currently active borrows with due dates |
 | `get_catalog_stats` | System-wide counts: books, copies, available, borrowed, e-books |
@@ -691,11 +695,41 @@ Content-Type: application/json
 
 Uses OpenRouter (multimodal model). Extracts title, authors, ISBN, publisher, and publication year.
 
+### Admin SOP: Upload Books and Materials for OZ
+
+Use the library workflows below if you want OZ to answer from your own documents instead of falling back to generic web knowledge.
+
+#### Books (best path for AI-readable PDFs)
+
+1. Create the book record in the Admin Books screen.
+2. Upload the PDF through the admin book PDF flow (`POST /books/:id/pdf` or the admin UI).
+3. The system stores the file in S3/local storage and saves the resulting URL in `Book.pdfUrl`.
+4. The PDF indexing pipeline extracts text, stores it on the `Book` row (`pdfExtractedText`, `pdfIndexStatus`, `pdfPageCount`), and OZ can read it through `read_ebook`.
+5. If older book PDFs are still `PENDING`, run the admin backfill endpoint:
+   `POST /books/admin/reindex-pending-pdfs?limit=25`
+
+Important:
+- Uploading a PDF directly to S3 without linking it to a `Book` record is not enough for OZ.
+- `pdfUrl` is the database field that points to the uploaded book PDF; that is the managed path OZ reads.
+- `ebookUrl` is still supported for external e-book links, but uploaded PDFs should use `pdfUrl`.
+
+#### Study Materials (best path for course/research documents)
+
+1. Upload materials through the Materials workflow, not by placing files in storage manually.
+2. Instructor submissions must be approved and published before OZ can use them.
+3. Admin-created materials with supported files are auto-approved and indexed.
+4. Indexed text is stored in `material_chunks`, and OZ uses the study-material tools to answer from those chunks.
+
+Supported document types for ingestion:
+- Books: PDF via `Book.pdfUrl`
+- Materials: `.pdf`, `.doc`, `.docx`, `.txt`
+
 ### Permission Safety
 
 - Tool results are scoped: `get_my_borrows` returns only the requesting user's data
 - Staff/Admin-only tools (`get_active_borrows`, `get_active_reservations`) enforce role check inside tool handler
 - Admin-only tool (`get_user_stats`) enforces ADMIN role
+- Study-material tools expose only approved, published, indexed material the caller is allowed to access
 - The AI informs but never executes write actions
 - SSRF protection: `fetch_webpage` and `read_ebook` block localhost, RFC-1918, and link-local addresses
 
@@ -809,7 +843,7 @@ Compound indexes added for common query patterns:
 - `Reservation(userId, status)` — user active reservation checks
 - `ReadingList(status, visibility)` — global feed discovery
 
-Run `npx prisma migrate dev` after pulling to apply the new indexes.
+Run `npx prisma migrate dev` (local) or `npx prisma migrate deploy` (deployment) after pulling to apply the latest schema changes, including material indexing and book PDF extraction fields.
 
 ---
 
@@ -1045,3 +1079,5 @@ This project is developed as a graduation project for Üsküdar University, Facu
 **Built with ❤️ for Üsküdar University**
 
 [⬆ Back to Top](#-ai-integrated-university-library-management-system)
+
+
