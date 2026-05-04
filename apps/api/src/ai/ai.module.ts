@@ -33,6 +33,6 @@ import { MaterialsModule } from '../materials/materials.module';
     ToolHookService,
     TokenTrackerService,
   ],
-  exports: [AgentService, ProviderFactory],
+  exports: [AgentService, OpenRouterProvider, ProviderFactory],
 })
 export class AiModule {}

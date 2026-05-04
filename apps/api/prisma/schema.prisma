@@ -141,7 +141,7 @@ model User {
   department String?
   courses    String[] @default([])
   avatarUrl  String?
-  isActive  Boolean @default(true)
+  isActive   Boolean  @default(true)
 
   // Notification preferences (stored as JSON)
   notificationPrefs Json @default("{\"emailNotifications\":true,\"dueDateReminders\":true,\"reservationAlerts\":true}")
@@ -154,8 +154,8 @@ model User {
   // Relations
   borrows           Borrow[]
   reservations      Reservation[]
-  uploadedBooks     Book[]         @relation("UploadedBy")
-  uploadedMaterials Material[]     @relation("MaterialUploader")
+  uploadedBooks     Book[]               @relation("UploadedBy")
+  uploadedMaterials Material[]           @relation("MaterialUploader")
   notifications     Notification[]
   readingLists      ReadingList[]
   following         InstructorFollower[] @relation("Follower")
@@ -452,7 +452,7 @@ model Material {
   isApproved  Boolean @default(false)
 
   // AI indexing
-  indexStatus IndexStatus @default(PENDING)
+  indexStatus IndexStatus     @default(PENDING)
   chunks      MaterialChunk[]
 
   // Timestamps
@@ -516,7 +516,7 @@ model ReadingList {
   id          String  @id @default(cuid())
   title       String
   description String?
-  courseCode   String?
+  courseCode  String?
   semester    String?
   isActive    Boolean @default(true)
 
@@ -540,8 +540,8 @@ model ReadingList {
 }
 
 model ReadingListItem {
-  id         String @id @default(cuid())
-  orderIndex Int    @default(0)
+  id         String  @id @default(cuid())
+  orderIndex Int     @default(0)
   notes      String?
 
   // Parent list
@@ -589,8 +589,8 @@ model InstructorFollower {
 // ============================================
 
 model FinePayment {
-  id       String     @id @default(cuid())
-  status   FineStatus @default(PENDING)
+  id     String     @id @default(cuid())
+  status FineStatus @default(PENDING)
 
   // Linked borrow (one fine per borrow)
   borrowId String @unique
@@ -619,13 +619,15 @@ model FinePayment {
 }
 
 model AiConversation {
-  id        String      @id @default(cuid())
-  userId    String
-  title     String      @default("New Chat")
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages  AiMessage[]
+  id          String      @id @default(cuid())
+  userId      String
+  title       String      @default("New Chat")
+  studyBookId String?
+  mode        String      @default("normal")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    AiMessage[]
 
   @@index([userId, updatedAt])
   @@map("ai_conversations")

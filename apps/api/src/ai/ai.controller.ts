@@ -7,7 +7,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AiService } from './ai.service';
 import { AgentService, ChatChunk } from './agent.service';
-import { GroqService } from './groq.service';
+import { OpenRouterProvider } from './providers/openrouter.provider';
 import { TokenTrackerService, TokenUsageSummary } from './session/token-tracker.service';
 import { UpdateInterestsDto } from './dto/update-interests.dto';
 import { ScanCoverDto } from './dto/scan-cover.dto';
@@ -20,7 +20,7 @@ export class AiController {
   constructor(
     private readonly aiService: AiService,
     private readonly agentService: AgentService,
-    private readonly groq: GroqService,
+    private readonly openRouter: OpenRouterProvider,
     private readonly tokenTrackerService: TokenTrackerService,
   ) {}
 
@@ -92,6 +92,31 @@ export class AiController {
     return this.tokenTrackerService.getSummary(userId, conversationId);
   }
 
+  @Post('study')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(201)
+  @ApiOperation({ summary: 'Create a dedicated study session for a book' })
+  async createStudySession(
+    @CurrentUser('id') userId: string,
+    @Body() body: { bookId: string; mode?: string },
+  ) {
+    return this.agentService.createStudySession(userId, body.bookId, body.mode);
+  }
+
+  @Patch('conversations/:id/mode')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Update the response mode for a conversation' })
+  async updateConversationMode(
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+    @Body() body: { mode: string },
+  ) {
+    await this.agentService.updateConversationMode(id, userId, body.mode);
+  }
+
   @Post('chat')
   @UseGuards(JwtAuthGuard, ThrottlerGuard)
   @Throttle({ default: { ttl: 60000, limit: 15 } })
@@ -107,6 +132,7 @@ export class AiController {
       imageBase64?: string;
       conversationId?: string;
       model?: string;
+      mode?: string;
     },
     @Req() req: Request,
     @Res() res: Response,
@@ -128,6 +154,7 @@ export class AiController {
         cookieHeader,
         body.conversationId,
         body.model,
+        body.mode,
       );
 
       for await (const chunk of stream) {
@@ -180,6 +207,6 @@ export class AiController {
   @ApiResponse({ status: 200, description: 'Extracted book metadata' })
   @ApiResponse({ status: 403, description: 'Admin only' })
   scanCover(@Body() dto: ScanCoverDto) {
-    return this.groq.scanBookCover(dto.image);
+    return this.openRouter.scanBookCover(dto.image);
   }
 }

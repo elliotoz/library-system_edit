@@ -11,7 +11,7 @@ import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { MailService } from '../mail/mail.service';
-import { GroqService } from '../ai/groq.service';
+import { OpenRouterProvider } from '../ai/providers/openrouter.provider';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -22,7 +22,7 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
     private readonly mailService: MailService,
-    private readonly aiService: GroqService,
+    private readonly aiService: OpenRouterProvider,
   ) {
     const corsOrigin = this.configService.get<string>('CORS_ORIGIN') || 'http://localhost:3000';
     this.frontendUrl = this.configService.get<string>('FRONTEND_URL') || corsOrigin.split(',')[0].trim();

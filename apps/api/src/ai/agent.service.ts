@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogSearchService } from './catalog-search.service';
 import { BorrowStatus, BookCopyStatus, IndexStatus } from '@prisma/client';
@@ -123,6 +123,116 @@ export class AgentService {
   async saveMessage(userId: string, role: string, content: string, conversationId?: string) {
     return this.prisma.aiMessage.create({
       data: { userId, role, content, ...(conversationId ? { conversationId } : {}) },
+    });
+  }
+
+  // ── Study sessions ─────────────────────────────────────────────
+
+  async createStudySession(
+    userId: string,
+    bookId: string,
+    mode: string = 'normal',
+  ): Promise<{ conversationId: string; openingMessage: string }> {
+    const book = await this.prisma.book.findUnique({
+      where: { id: bookId },
+      select: {
+        title: true,
+        authors: true,
+        description: true,
+        category: true,
+        subjectTags: true,
+        publicationYear: true,
+        publisher: true,
+        pageCount: true,
+        isEbookAvailable: true,
+      },
+    });
+
+    if (!book) {
+      throw new NotFoundException(`Book ${bookId} not found`);
+    }
+
+    const conv = await this.prisma.aiConversation.create({
+      data: {
+        userId,
+        title: `Study: ${book.title.slice(0, 50)}`,
+        studyBookId: bookId,
+        mode,
+      },
+    });
+
+    const authorsStr = Array.isArray(book.authors) ? book.authors.join(', ') : (book.authors ?? '');
+    const subjectTagsStr = Array.isArray(book.subjectTags) && book.subjectTags.length > 0
+      ? book.subjectTags.join(', ')
+      : 'none';
+    const publisherSuffix = book.publisher ? `by ${book.publisher}` : '';
+
+    const studyPrompt = `You are a university library study assistant. A student has opened a dedicated study session for this book.
+
+Title: ${book.title}
+Authors: ${authorsStr}
+Category: ${book.category ?? 'Not specified'}
+Subject tags: ${subjectTagsStr}
+Description: ${book.description ?? 'No description available'}
+Published: ${book.publicationYear ?? 'Unknown'} ${publisherSuffix}
+Pages: ${book.pageCount ?? 'Unknown'}
+E-book available: ${book.isEbookAvailable ? 'Yes' : 'No'}
+
+Write a structured study guide in markdown covering:
+1. **What this book is about** (2–3 sentences)
+2. **Who it is best suited for and why**
+3. **How to approach reading it** (strategy, order, pace)
+4. **5 key concepts or themes to watch for**
+5. **3 guiding questions to keep in mind while reading**
+
+Be concise, practical, and encouraging. Base everything on the book details provided above. Do not invent content beyond what is given.`;
+
+    let studyGuide = '';
+    try {
+      const res = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: this.openRouterHeaders,
+        body: JSON.stringify({
+          model: OPENROUTER_MODELS.STUDY,
+          messages: [{ role: 'user', content: studyPrompt }],
+          max_tokens: 4096,
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        this.logger.warn(`Study guide generation failed (${res.status}): ${errText} — using rule-based fallback`);
+      } else {
+        const data = await res.json() as { choices: Array<{ message: { content: string | null } }> };
+        studyGuide = data.choices[0]?.message?.content ?? '';
+      }
+    } catch (err) {
+      this.logger.warn(`Study guide LLM error: ${String(err)} — using rule-based fallback`);
+    }
+
+    if (!studyGuide) {
+      studyGuide = `## 📖 Study Guide: ${book.title}\n\n` +
+        `**Authors:** ${authorsStr || 'Unknown'}\n` +
+        (book.category ? `**Category:** ${book.category}\n` : '') +
+        (book.description ? `\n${book.description}\n` : '') +
+        `\n### How to approach this book\n` +
+        `Start with the table of contents to get a map of the material, then read chapter by chapter taking notes on key terms and arguments. Return to chapters that introduce new concepts.\n\n` +
+        `### Key questions to keep in mind\n` +
+        `1. What is the central argument or purpose of this book?\n` +
+        `2. What evidence or examples does the author use to support their points?\n` +
+        `3. How does this connect to what you already know about the subject?\n\n` +
+        `Ask me anything about this book to deepen your understanding.`;
+    }
+
+    await this.saveMessage(userId, 'assistant', studyGuide, conv.id);
+
+    return { conversationId: conv.id, openingMessage: studyGuide };
+  }
+
+  async updateConversationMode(id: string, userId: string, mode: string): Promise<void> {
+    await this.prisma.aiConversation.updateMany({
+      where: { id, userId },
+      data: { mode },
     });
   }
 
@@ -588,6 +698,7 @@ export class AgentService {
     cookieHeader: string,
     conversationId?: string,
     modelOverride?: string,
+    mode?: string,
   ): AsyncGenerator<ChatChunk> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -632,7 +743,15 @@ export class AgentService {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
       }),
     };
-    const systemPrompt = buildSystemPromptFromModule(promptContext);
+    const MODE_PREFIXES: Record<string, string> = {
+      learning: 'STUDY MODE — LEARNING: Use the Socratic method. Ask questions to test the student\'s understanding. Guide them to the answer rather than stating it directly. After each answer you give, pose a follow-up question.\n\n',
+      planning: 'STUDY MODE — PLANNING: Focus on creating structured study plans, schedules, and milestones. Break topics into phases. Help the student prioritise and organise their study time.\n\n',
+      explanatory: 'STUDY MODE — EXPLANATORY: Prioritise step-by-step breakdowns. Use real-world analogies and concrete examples before introducing theory. Assume the student is encountering this topic for the first time.\n\n',
+      formal: 'STUDY MODE — FORMAL: Use an academic, precise tone. Structure responses with clear headings. Reference the book\'s content and concepts by name. Avoid casual language.\n\n',
+      concise: 'STUDY MODE — CONCISE: Be maximally brief. Use bullet points. Maximum 3 sentences per point. No padding or preamble.\n\n',
+    };
+    const modePrefix = (mode && MODE_PREFIXES[mode]) ? MODE_PREFIXES[mode] : '';
+    const systemPrompt = modePrefix + buildSystemPromptFromModule(promptContext);
 
     // Auto-title conversation
     if (conversationId) {

@@ -4,7 +4,7 @@ import { AiContext } from './context-builder.service';
 import { ChatResponse } from './ai.service';
 import { SemanticSearchService, RankedBookResult } from './semantic-search.service';
 import { SearchIntent } from './types/search.types';
-import { GroqService } from './groq.service';
+import { OpenRouterProvider, OPENROUTER_MODELS, modelForRole } from './providers/openrouter.provider';
 
 const MAX_TOPIC_LENGTH = 120;
 
@@ -36,7 +36,7 @@ export class LearningPathService {
 
   constructor(
     private readonly semanticSearch: SemanticSearchService,
-    private readonly groq: GroqService,
+    private readonly openRouter: OpenRouterProvider,
   ) {}
 
   isLearningPathQuery(message: string): boolean {
@@ -58,7 +58,6 @@ export class LearningPathService {
 
     const stages = this.groupByDifficulty(ranked);
 
-    // Try LLM-enhanced descriptions
     try {
       return await this.enhanceWithLLM(ctx, topic, stages);
     } catch (err) {
@@ -87,7 +86,6 @@ export class LearningPathService {
 
     let topic = words.join(' ');
 
-    // Fallback: use interests or faculty when message is too vague
     if (!topic) {
       if (ctx.user.interests.length > 0) {
         topic = ctx.user.interests.slice(0, 2).join(' ');
@@ -98,7 +96,6 @@ export class LearningPathService {
       }
     }
 
-    // Sanitize length to prevent prompt injection via long messages
     return topic.slice(0, MAX_TOPIC_LENGTH).trim();
   }
 
@@ -107,12 +104,10 @@ export class LearningPathService {
   private buildSearchIntent(topic: string, ctx: AiContext): SearchIntent {
     const keywords = topic.split(/\s+/).filter((w) => w.length > 2);
 
-    // Enrich with user interests if topic is vague
     if (keywords.length <= 1 && ctx.user.interests.length > 0) {
       keywords.push(...ctx.user.interests.slice(0, 2));
     }
 
-    // Enrich with borrow history categories as secondary signals
     if (keywords.length <= 1) {
       const historyCategories = [
         ...new Set(ctx.borrowHistory.recentBooks.map((b) => b.category).filter(Boolean)),
@@ -157,7 +152,6 @@ export class LearningPathService {
       }
     }
 
-    // Ensure at least some distribution — move overflow from core
     if (foundations.length === 0 && core.length > 1) {
       foundations.push(core.shift()!);
     }
@@ -218,7 +212,6 @@ export class LearningPathService {
   ): string {
     const lines: string[] = [];
 
-    // Note borrow history relevance
     if (ctx.borrowHistory.recentBooks.length > 0) {
       const pastCategories = [...new Set(
         ctx.borrowHistory.recentBooks.map((b) => b.category).filter(Boolean),
@@ -228,7 +221,6 @@ export class LearningPathService {
       }
     }
 
-    // Flag books the user is currently reading
     const allBooks = [...stages.foundations, ...stages.core, ...stages.advanced];
     const activeTitles = new Set(ctx.activeBorrows.items.map((b) => b.title));
     const overlap = allBooks.filter((b) => activeTitles.has(b.title));
@@ -304,6 +296,7 @@ export class LearningPathService {
     ].join('\n');
 
     const roleLabel = ctx.user.role.charAt(0) + ctx.user.role.slice(1).toLowerCase();
+    const model = modelForRole(ctx.user.role);
 
     const prompt =
       `You are a university library assistant. ` +
@@ -317,12 +310,15 @@ export class LearningPathService {
       `- Use markdown formatting. Be concise.\n` +
       `- Do not recommend external websites, databases, or resources outside the library system.\n`;
 
-    const model = this.groq.getModel(ctx.user.role);
-    const result = await this.groq.generate(model, prompt);
+    const result = await this.openRouter.chat({
+      model,
+      system: '',
+      messages: [{ role: 'user', content: prompt }],
+    });
 
     let reply = `## 📚 Learning Path: ${topic}\n\n`;
     reply += this.roleIntro(ctx);
-    reply += result.response + '\n\n';
+    reply += result.text + '\n\n';
     reply += '### Recommended Books\n\n';
     reply += this.formatStage('Stage 1: Foundations', stages.foundations);
     reply += this.formatStage('Stage 2: Core', stages.core);
@@ -332,7 +328,7 @@ export class LearningPathService {
 
     return {
       reply,
-      modelUsed: this.groq.defaultModel,
+      modelUsed: model,
       sources: [`/dashboard/catalog?search=${encodeURIComponent(topic)}`],
     };
   }

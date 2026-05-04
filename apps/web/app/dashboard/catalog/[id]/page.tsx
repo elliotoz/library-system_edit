@@ -75,6 +75,7 @@ export default function BookDetailPage() {
     useState<ReservationInfo | null>(null);
   const [notifyWhenAvailable, setNotifyWhenAvailable] = useState(false);
   const [coverError, setCoverError] = useState(false);
+  const [studyLoading, setStudyLoading] = useState(false);
 
   useEffect(() => {
     const fetchBook = async () => {
@@ -643,13 +644,40 @@ export default function BookDetailPage() {
             )}
 
             {/* AI Study Help */}
-            <Link
-              href={`/dashboard/ai-assistant?book=${book.id}`}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:from-purple-600 hover:to-violet-700 hover:shadow-purple-500/30"
+            <button
+              onClick={async () => {
+                setStudyLoading(true);
+                try {
+                  const res = await fetch('/api/ai/study', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ bookId: book.id }),
+                  });
+                  if (!res.ok) throw new Error('Failed');
+                  const { conversationId } = await res.json() as { conversationId: string };
+                  router.push(`/dashboard/ai-assistant?conversation=${conversationId}&study=1`);
+                } catch {
+                  toast.error('Failed to start study session. Please try again.');
+                } finally {
+                  setStudyLoading(false);
+                }
+              }}
+              disabled={studyLoading}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:from-purple-600 hover:to-violet-700 hover:shadow-purple-500/30 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <Sparkles className="h-4 w-4" />
-              Get AI Study Help
-            </Link>
+              {studyLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Preparing study session…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  Get AI Study Help
+                </>
+              )}
+            </button>
 
             {/* My Reservations */}
             <Link

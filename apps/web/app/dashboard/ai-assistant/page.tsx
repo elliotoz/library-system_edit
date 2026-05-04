@@ -2,8 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import { X, BookOpen, Plus, Trash2, MessageSquare, History } from 'lucide-react';
+import { BookOpen, Plus, Trash2, MessageSquare, History, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { renderMessage } from '@/lib/renderMessage';
@@ -34,12 +33,14 @@ interface Conversation {
   updatedAt: string;
 }
 
-interface BookContext {
-  id: string;
-  title: string;
-  authors: string[];
-  category: string | null;
-}
+const STUDY_MODES = [
+  { value: 'normal',      label: 'Normal' },
+  { value: 'learning',    label: 'Learning' },
+  { value: 'explanatory', label: 'Explanatory' },
+  { value: 'planning',    label: 'Planning' },
+  { value: 'formal',      label: 'Formal' },
+  { value: 'concise',     label: 'Concise' },
+] as const;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -121,13 +122,13 @@ async function compressImage(file: File): Promise<string> {
 export default function AIAssistantPage() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
-  const bookId = searchParams.get('book');
+  const conversationIdFromUrl = searchParams.get('conversation');
+  const isStudySession = searchParams.get('study') === '1';
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [aiOnline, setAiOnline] = useState<boolean | null>(null);
-  const [bookContext, setBookContext] = useState<BookContext | null>(null);
-  const [bookContextDismissed, setBookContextDismissed] = useState(false);
+  const [activeMode, setActiveMode] = useState('normal');
   const [historyLoaded, setHistoryLoaded] = useState(false);
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -136,7 +137,6 @@ export default function AIAssistantPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const contextSentRef = useRef(false);
   const messagesRef = useRef<ChatMessage[]>([]);
   const activeConvRef = useRef<string | null>(null);
 
@@ -204,6 +204,20 @@ export default function AIAssistantPage() {
     setDeletingId(null);
   }, [switchConversation]);
 
+  const handleModeChange = useCallback(async (mode: string) => {
+    setActiveMode(mode);
+    const convId = activeConvRef.current;
+    if (!convId) return;
+    try {
+      await fetch(`/api/ai/conversations/${convId}/mode`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ mode }),
+      });
+    } catch { /* non-critical */ }
+  }, []);
+
   // ── Bootstrap ────────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -216,6 +230,14 @@ export default function AIAssistantPage() {
   useEffect(() => {
     (async () => {
       const convs = await loadConversations();
+
+      if (conversationIdFromUrl) {
+        // Direct load — study session or shared link
+        setActiveConversationId(conversationIdFromUrl);
+        await loadConversationMessages(conversationIdFromUrl);
+        return;
+      }
+
       if (convs.length > 0) {
         setActiveConversationId(convs[0].id);
         await loadConversationMessages(convs[0].id);
@@ -233,14 +255,6 @@ export default function AIAssistantPage() {
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    if (!bookId) return;
-    fetch(`/api/books/${bookId}`, { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setBookContext({ id: d.id, title: d.title, authors: d.authors ?? [], category: d.category }); })
-      .catch(() => null);
-  }, [bookId]);
 
   // ── Send ─────────────────────────────────────────────────────────────────────
 
@@ -269,7 +283,7 @@ export default function AIAssistantPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ message: userMessage, history, hasImage: !!imgBase64, imageBase64: imgBase64 ?? null, conversationId: convId, model: modelOverride }),
+        body: JSON.stringify({ message: userMessage, history, hasImage: !!imgBase64, imageBase64: imgBase64 ?? null, conversationId: convId, model: modelOverride, mode: activeMode }),
       });
 
       if (response.status === 429) {
@@ -308,15 +322,7 @@ export default function AIAssistantPage() {
 
     setIsStreaming(false);
     loadConversations().then(updated => setConversations(updated));
-  }, [isStreaming, loadConversations]);
-
-  // Auto-send book context
-  useEffect(() => {
-    if (!bookContext || !historyLoaded || contextSentRef.current) return;
-    contextSentRef.current = true;
-    const authorsStr = bookContext.authors.length > 0 ? ` by ${bookContext.authors.join(', ')}` : '';
-    sendMessage(`I'm looking at "${bookContext.title}"${authorsStr}${bookContext.category ? ` (${bookContext.category})` : ''}. Can you give me a study guide and recommend related books?`);
-  }, [bookContext, historyLoaded, sendMessage]);
+  }, [isStreaming, activeMode, loadConversations]);
 
   // Bridge AssistantChatInput → sendMessage
   const handleChatSend = useCallback(async (payload: ChatSendPayload) => {
@@ -332,7 +338,7 @@ export default function AIAssistantPage() {
   }, [sendMessage]);
 
   const suggestions = getSuggestions(user?.role, user?.facultyName);
-  const showSuggestions = historyLoaded && messages.length === 0 && !bookId;
+  const showSuggestions = historyLoaded && messages.length === 0 && !isStudySession;
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -445,24 +451,31 @@ export default function AIAssistantPage() {
         )}
       </div>
 
-      {/* Book context banner */}
-      {bookContext && !bookContextDismissed && (
-        <div className="flex items-start gap-3 px-4 py-3 bg-primary-500/10 border border-primary-500/30 rounded-xl">
-          <BookOpen className="w-4 h-4 text-primary-500 flex-shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-primary-600 dark:text-primary-400 font-medium truncate">
-              Study help for:{' '}
-              <Link href={`/dashboard/catalog/${bookContext.id}`} className="underline underline-offset-2 hover:opacity-80">
-                {bookContext.title}
-              </Link>
-            </p>
-            {bookContext.authors.length > 0 && (
-              <p className="text-xs text-primary-500/70 mt-0.5">{bookContext.authors.join(', ')}</p>
+      {/* Mode selector */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-xs text-gray-500 dark:text-gray-400 mr-0.5 flex-shrink-0">Mode:</span>
+        {STUDY_MODES.map(m => (
+          <button
+            key={m.value}
+            onClick={() => handleModeChange(m.value)}
+            className={cn(
+              'px-3 py-1 rounded-full text-xs font-medium transition-colors border',
+              activeMode === m.value
+                ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/40'
+                : 'text-gray-500 dark:text-gray-400 border-gray-200 dark:border-white/10 hover:border-purple-500/30 hover:text-purple-500 dark:hover:text-purple-400',
             )}
-          </div>
-          <button onClick={() => setBookContextDismissed(true)} className="text-primary-500/50 hover:text-primary-500">
-            <X className="w-4 h-4" />
+          >
+            {m.label}
           </button>
+        ))}
+      </div>
+
+      {/* Study session banner */}
+      {isStudySession && (
+        <div className="flex items-center gap-2.5 px-4 py-2.5 bg-purple-500/10 border border-purple-500/30 rounded-xl">
+          <BookOpen className="w-4 h-4 text-purple-500 flex-shrink-0" />
+          <span className="text-sm font-medium text-purple-600 dark:text-purple-400">Study Session</span>
+          <span className="text-xs text-purple-500/60">— Your personalised study guide is ready below</span>
         </div>
       )}
 
@@ -566,7 +579,7 @@ export default function AIAssistantPage() {
           <AssistantChatInput
             onSendMessage={handleChatSend}
             disabled={isStreaming}
-            placeholder={bookId ? 'Ask about this book…' : 'Ask me anything about books…'}
+            placeholder={isStudySession ? 'Ask about this book…' : 'Ask me anything about books…'}
           />
         </div>
       </div>

@@ -5,7 +5,7 @@ import { ChatResponse } from './ai.service';
 import { SemanticSearchService, RankedBookResult } from './semantic-search.service';
 import { SearchIntent, ReadingListResult } from './types/search.types';
 import { CatalogSearchService } from './catalog-search.service';
-import { GroqService } from './groq.service';
+import { OpenRouterProvider, OPENROUTER_MODELS, modelForRole } from './providers/openrouter.provider';
 
 const MAX_TOPIC_LENGTH = 120;
 
@@ -29,7 +29,7 @@ export class ResearchAssistantService {
   constructor(
     private readonly semanticSearch: SemanticSearchService,
     private readonly catalogSearch: CatalogSearchService,
-    private readonly groq: GroqService,
+    private readonly openRouter: OpenRouterProvider,
   ) {}
 
   isResearchQuery(message: string): boolean {
@@ -49,7 +49,6 @@ export class ResearchAssistantService {
 
     const books = this.semanticSearch.rankBooks(candidates, intent, context);
 
-    // Try LLM-enhanced summary
     try {
       return await this.enhanceWithLLM(ctx, topic, books, readingLists);
     } catch (err) {
@@ -84,9 +83,6 @@ export class ResearchAssistantService {
 
   private buildSearchIntent(topic: string, ctx: AiContext): SearchIntent {
     const keywords = topic.split(/\s+/).filter((w) => w.length > 2);
-
-    // Role-aware audience level: students benefit from a mix,
-    // instructors and admins want advanced material
     const audienceLevel = this.audienceLevelForRole(ctx.user.role);
 
     return {
@@ -107,7 +103,6 @@ export class ResearchAssistantService {
       case Role.STUDENT:
       case Role.STAFF:
       default:
-        // Students and staff benefit from seeing all levels
         return null;
     }
   }
@@ -226,6 +221,7 @@ export class ResearchAssistantService {
   ): Promise<ChatResponse> {
     const bookTitles = books.map((b) => b.title).join(', ');
     const roleLabel = ctx.user.role.charAt(0) + ctx.user.role.slice(1).toLowerCase();
+    const model = modelForRole(ctx.user.role);
 
     const prompt =
       `You are a university library research assistant. ` +
@@ -239,13 +235,16 @@ export class ResearchAssistantService {
       `- Do not recommend external websites, databases, or resources outside the library system.\n` +
       `- Be concise and practical.\n`;
 
-    const model = this.groq.getModel(ctx.user.role);
-    const result = await this.groq.generate(model, prompt);
+    const result = await this.openRouter.chat({
+      model,
+      system: '',
+      messages: [{ role: 'user', content: prompt }],
+    });
 
     const sources: string[] = [];
     let reply = `## 🔬 Research Guide: ${topic}\n\n`;
     reply += this.priorReadingNote(ctx, books);
-    reply += result.response + '\n\n';
+    reply += result.text + '\n\n';
 
     if (books.length > 0) {
       reply += '### Relevant Books\n';
@@ -271,6 +270,6 @@ export class ResearchAssistantService {
     reply += '### Suggested Next Steps\n';
     reply += this.nextSteps(ctx);
 
-    return { reply, modelUsed: this.groq.defaultModel, sources };
+    return { reply, modelUsed: model, sources };
   }
 }
