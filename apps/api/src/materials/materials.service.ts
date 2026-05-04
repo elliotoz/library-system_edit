@@ -104,15 +104,6 @@ export class MaterialsService {
     }
     // 'all' or undefined = no filter
 
-    console.log(
-      "Admin materials query - page:",
-      page,
-      "pageSize:",
-      pageSize,
-      "where:",
-      JSON.stringify(where)
-    );
-
     const [materials, total] = await Promise.all([
       this.prisma.material.findMany({
         where,
@@ -127,8 +118,6 @@ export class MaterialsService {
       }),
       this.prisma.material.count({ where }),
     ]);
-
-    console.log("Admin materials found:", materials.length);
 
     return {
       data: materials,

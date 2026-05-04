@@ -354,7 +354,7 @@ JWT_SECRET="change-me-must-match-api"
 
 The `/auth/config` endpoint returns the current status of each feature:
 ```json
-{ "googleOAuthEnabled": false, "smtpEnabled": false }
+{ "googleOAuthEnabled": false, "smtpEnabled": false, "aiEnabled": true }
 ```
 
 ---
@@ -770,7 +770,7 @@ When `OPENROUTER_API_KEY` is not set, `/ai/status` returns `{ "available": false
 - [x] 3D Login/Signup redesign (Spline interactive robot, glassmorphism form card, traveling border beams)
 - [x] OZ AI — full agentic rewrite (SSE streaming, tool-calling loop, replaces intent-router)
 - [x] AI conversation history persistence (AiConversation model, conversation sidebar)
-- [x] Book cover scanning via gemma3:4b multimodal model
+- [x] Book cover scanning via OpenRouter multimodal model
 - [x] Student UX audit — fines page, department-based recommendations, borrow history fine cross-reference, a11y toggle roles
 - [x] Instructor dashboard — new-list flow, share-research widget, followers widget
 - [x] Automated overdue/due-soon notification scheduler (hourly, 22h dedup)

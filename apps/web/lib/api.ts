@@ -18,64 +18,14 @@ const api: AxiosInstance = axios.create({
 // Public routes that should not trigger 401 redirect
 const PUBLIC_ROUTES = ['/login', '/signup', '/verify-email', '/forgot-password', '/reset-password'];
 
-// Request interceptor - log all requests
-api.interceptors.request.use((config) => {
-  const timestamp = new Date().toISOString();
-  const method = config.method?.toUpperCase() || 'UNKNOWN';
-  const url = config.url || 'unknown';
-
-  console.log(`%c[${timestamp}] → ${method} ${url}`, 'color: #0066cc; font-weight: bold');
-  if (config.data && method !== 'GET') {
-    console.log(`%c  Payload:`, 'color: #666; font-size: 11px', JSON.stringify(config.data).substring(0, 200));
-  }
-  if (config.params && Object.keys(config.params).length > 0) {
-    console.log(`%c  Params:`, 'color: #666; font-size: 11px', config.params);
-  }
-
-  return config;
-});
-
-// Response interceptor - log responses and handle errors
+// Response interceptor - handle auth errors
 api.interceptors.response.use(
-  (response) => {
-    const timestamp = new Date().toISOString();
-    const method = response.config.method?.toUpperCase() || 'UNKNOWN';
-    const url = response.config.url || 'unknown';
-    const status = response.status;
-    const statusText = response.statusText;
-    const statusColor = status >= 400 ? '#cc0000' : status >= 300 ? '#ff9900' : '#00cc00';
-
-    console.log(
-      `%c[${timestamp}] ← ${status} ${statusText} ${method} ${url}`,
-      `color: ${statusColor}; font-weight: bold`
-    );
-    console.log(`%c  Response Data:`, 'color: #666; font-size: 11px', response.data);
-
-    return response;
-  },
+  (response) => response,
   (error: AxiosError<ApiError>) => {
-    const timestamp = new Date().toISOString();
-    const method = error.config?.method?.toUpperCase() || 'UNKNOWN';
-    const url = error.config?.url || 'unknown';
-    const status = error.response?.status || 'UNKNOWN';
-    const statusText = error.response?.statusText || error.message;
-
-    console.error(
-      `%c[${timestamp}] ✗ ${status} ${statusText} ${method} ${url}`,
-      'color: #cc0000; font-weight: bold'
-    );
-    console.error(`%c  Error:`, 'color: #990000; font-size: 11px', {
-      message: error.message,
-      response: error.response?.data,
-      stack: error.stack,
-    });
-
     if (error.response?.status === 401) {
-      // Redirect to login on auth failure, but not from public auth routes
       if (typeof window !== 'undefined') {
         const isPublicRoute = PUBLIC_ROUTES.some(route => window.location.pathname.startsWith(route));
         if (!isPublicRoute) {
-          console.warn('[API] Redirecting to login due to 401 Unauthorized');
           window.location.href = '/login';
         }
       }

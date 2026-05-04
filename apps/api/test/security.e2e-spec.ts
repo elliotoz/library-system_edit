@@ -259,6 +259,24 @@ describe("Security E2E", () => {
         .attach("file", Buffer.from("fake pdf"), { filename: "test.pdf", contentType: "application/pdf" })
         .expect(403);
     });
+
+    it("returns 200 when an instructor uploads a material file", async () => {
+      const { cookie } = await loginAs(app, "instructor");
+      await request(server)
+        .post("/materials/upload")
+        .set("Cookie", cookie)
+        .attach("file", Buffer.from("%PDF-1.4 fake"), { filename: "test.pdf", contentType: "application/pdf" })
+        .expect(200);
+    });
+
+    it("returns 200 when an admin uploads a material file", async () => {
+      const { cookie } = await loginAs(app, "admin");
+      await request(server)
+        .post("/materials/upload")
+        .set("Cookie", cookie)
+        .attach("file", Buffer.from("%PDF-1.4 fake"), { filename: "test.pdf", contentType: "application/pdf" })
+        .expect(200);
+    });
   });
 
   // ── Auth config response shape — GET /auth/config ────────────────────────
