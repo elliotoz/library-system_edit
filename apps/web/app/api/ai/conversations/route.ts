@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
+import { SERVER_API_URL } from '@/lib/server-api';
 
-const BACKEND = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const BACKEND = SERVER_API_URL;
 
 export async function GET(request: NextRequest) {
   const res = await fetch(`${BACKEND}/ai/conversations`, {

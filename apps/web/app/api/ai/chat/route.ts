@@ -1,10 +1,10 @@
 import { NextRequest } from 'next/server';
+import { SERVER_API_URL } from '@/lib/server-api';
 
 export async function POST(request: NextRequest) {
   const cookieHeader = request.headers.get('cookie') || '';
-  const backendUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/ai/chat`;
+  const backendUrl = `${SERVER_API_URL}/ai/chat`;
 
-  // Read raw body to avoid Next.js default 1MB JSON limit
   const rawBody = await request.text();
 
   const response = await fetch(backendUrl, {

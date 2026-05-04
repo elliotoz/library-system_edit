@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
+import { SERVER_API_URL } from '@/lib/server-api';
 
-const BACKEND = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const BACKEND = SERVER_API_URL;
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,14 +16,11 @@ export async function POST(request: NextRequest) {
     });
 
     if (!res.ok) {
-      const errBody = await res.text();
-      console.error(`[/api/ai/study] backend error ${res.status}:`, errBody);
-      return Response.json({ error: errBody }, { status: res.status });
+      return Response.json({ error: 'Backend study request failed' }, { status: res.status });
     }
 
     return Response.json(await res.json(), { status: 201 });
-  } catch (err) {
-    console.error('[/api/ai/study] proxy error:', err);
+  } catch {
     return Response.json({ error: 'Failed to reach backend' }, { status: 502 });
   }
 }

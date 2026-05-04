@@ -1,10 +1,11 @@
 import { NextRequest } from 'next/server';
+import { SERVER_API_URL } from '@/lib/server-api';
 
 export async function GET(request: NextRequest) {
   const cookieHeader = request.headers.get('cookie') || '';
   const conversationId = request.nextUrl.searchParams.get('conversationId');
 
-  const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/ai/history${
+  const url = `${SERVER_API_URL}/ai/history${
     conversationId ? `?conversationId=${conversationId}` : ''
   }`;
 

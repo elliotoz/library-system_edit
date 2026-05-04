@@ -1,35 +1,35 @@
-// src/prisma/prisma.service.ts
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { PrismaClient } from "@prisma/client";
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(PrismaService.name);
+
   constructor() {
-    const isDocker = process.env.DOCKER_ENV === 'true';
-    const dbHost = process.env.POSTGRES_HOST || (isDocker ? 'postgres' : 'localhost');
-    const dbUser = process.env.POSTGRES_USER || 'library_admin';
-    const dbPass = process.env.POSTGRES_PASSWORD || 'library_password_2024';
-    const dbName = process.env.POSTGRES_DB || 'library_system';
-    const dbPort = process.env.POSTGRES_PORT || '5432';
+    const isDocker = process.env.DOCKER_ENV === "true";
+    const dbHost = process.env.POSTGRES_HOST || (isDocker ? "postgres" : "localhost");
+    const dbUser = process.env.POSTGRES_USER || "library_admin";
+    const dbPass = process.env.POSTGRES_PASSWORD || "library_password_2024";
+    const dbName = process.env.POSTGRES_DB || "library_system";
+    const dbPort = process.env.POSTGRES_PORT || "5432";
     const databaseUrl =
       process.env.DATABASE_URL ||
       `postgresql://${dbUser}:${dbPass}@${dbHost}:${dbPort}/${dbName}?schema=public`;
+    const enableSqlLogging = process.env.LOG_SQL === "true";
 
     super({
       datasources: { db: { url: databaseUrl } },
-      log: process.env.NODE_ENV === 'development' 
-        ? ['query', 'info', 'warn', 'error']
-        : ['error'],
+      log: enableSqlLogging ? ["query", "warn", "error"] : ["warn", "error"],
     });
   }
 
   async onModuleInit() {
     await this.$connect();
-    console.log('📦 Prisma connected to database');
+    this.logger.log(JSON.stringify({ event: "prisma.connected", service: "library-api" }));
   }
 
   async onModuleDestroy() {
     await this.$disconnect();
-    console.log('📦 Prisma disconnected from database');
+    this.logger.log(JSON.stringify({ event: "prisma.disconnected", service: "library-api" }));
   }
 }

@@ -3,7 +3,6 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { ThrottlerModule } from "@nestjs/throttler";
 import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
 import { RequestLoggerMiddleware } from "./common/middleware/request-logger.middleware";
-import { RequestLoggingMiddleware } from "./common/middleware/request-logging.middleware";
 import { PrismaModule } from "./prisma/prisma.module";
 import { MailModule } from "./mail/mail.module";
 import { AuthModule } from "./auth/auth.module";
@@ -67,8 +66,6 @@ import { ExternalBooksModule } from "./external-books/external-books.module";
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(RequestIdMiddleware, RequestLoggerMiddleware, RequestLoggingMiddleware)
-      .forRoutes("*");
+    consumer.apply(RequestIdMiddleware, RequestLoggerMiddleware).forRoutes("*");
   }
 }
