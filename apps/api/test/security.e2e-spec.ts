@@ -1,8 +1,20 @@
 import * as request from "supertest";
+import * as fs from "fs";
+import * as path from "path";
 import { INestApplication } from "@nestjs/common";
 import { getApp, closeApp } from "./helpers/test-app";
 import { loginAs, clearAuthCache } from "./helpers/auth.helper";
 import { resetDatabase, disconnectTestPrisma } from "./helpers/db.helper";
+
+const UPLOADS_MATERIALS_DIR = path.resolve(__dirname, "../uploads/materials");
+
+function safeDeleteUpload(fileUrl: string): void {
+  if (!fileUrl.startsWith("/uploads/materials/")) return;
+  const filename = path.basename(fileUrl);
+  const target = path.resolve(UPLOADS_MATERIALS_DIR, filename);
+  if (!target.startsWith(UPLOADS_MATERIALS_DIR + path.sep) && target !== UPLOADS_MATERIALS_DIR) return;
+  try { fs.unlinkSync(target); } catch { /* ignore missing */ }
+}
 
 describe("Security E2E", () => {
   let app: INestApplication;
@@ -242,6 +254,12 @@ describe("Security E2E", () => {
   // ── Materials upload role enforcement — POST /materials/upload ────────────
 
   describe("POST /materials/upload — role enforcement", () => {
+    const uploadedFiles: string[] = [];
+
+    afterAll(() => {
+      uploadedFiles.forEach(safeDeleteUpload);
+    });
+
     it("returns 403 when a student uploads a material file", async () => {
       const { cookie } = await loginAs(app, "student");
       await request(server)
@@ -262,20 +280,22 @@ describe("Security E2E", () => {
 
     it("returns 201 when an instructor uploads a material file", async () => {
       const { cookie } = await loginAs(app, "instructor");
-      await request(server)
+      const res = await request(server)
         .post("/materials/upload")
         .set("Cookie", cookie)
         .attach("file", Buffer.from("%PDF-1.4 fake"), { filename: "test.pdf", contentType: "application/pdf" })
         .expect(201);
+      if (res.body.fileUrl) uploadedFiles.push(res.body.fileUrl as string);
     });
 
     it("returns 201 when an admin uploads a material file", async () => {
       const { cookie } = await loginAs(app, "admin");
-      await request(server)
+      const res = await request(server)
         .post("/materials/upload")
         .set("Cookie", cookie)
         .attach("file", Buffer.from("%PDF-1.4 fake"), { filename: "test.pdf", contentType: "application/pdf" })
         .expect(201);
+      if (res.body.fileUrl) uploadedFiles.push(res.body.fileUrl as string);
     });
   });
 
