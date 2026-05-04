@@ -18,10 +18,54 @@ const api: AxiosInstance = axios.create({
 // Public routes that should not trigger 401 redirect
 const PUBLIC_ROUTES = ['/login', '/signup', '/verify-email', '/forgot-password', '/reset-password'];
 
-// Response interceptor - handle auth errors
+const IS_DEV = process.env.NODE_ENV === 'development';
+
+// Fields that must never appear in logs even in dev
+const REDACTED_KEYS = new Set([
+  'password', 'token', 'accessToken', 'refreshToken', 'resetToken',
+  'verificationToken', 'authorization', 'cookie', 'set-cookie',
+]);
+
+function sanitizeForLog(obj: unknown, depth = 0): unknown {
+  if (depth > 3 || obj === null || typeof obj !== 'object') return '[omitted]';
+  const result: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+    result[k] = REDACTED_KEYS.has(k.toLowerCase()) ? '[redacted]' : (typeof v === 'object' ? sanitizeForLog(v, depth + 1) : '[omitted]');
+  }
+  return result;
+}
+
+// Request interceptor — dev-only sanitized summary, no payloads in production
+api.interceptors.request.use((config) => {
+  if (IS_DEV) {
+    const method = config.method?.toUpperCase() ?? 'UNKNOWN';
+    const url = config.url ?? 'unknown';
+    const summary = config.data ? sanitizeForLog(config.data) : undefined;
+    // eslint-disable-next-line no-console
+    console.debug(`→ ${method} ${url}`, summary ?? '');
+  }
+  return config;
+});
+
+// Response interceptor — dev-only status log, handle auth errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (IS_DEV) {
+      const method = response.config.method?.toUpperCase() ?? 'UNKNOWN';
+      const url = response.config.url ?? 'unknown';
+      // eslint-disable-next-line no-console
+      console.debug(`← ${response.status} ${method} ${url}`);
+    }
+    return response;
+  },
   (error: AxiosError<ApiError>) => {
+    if (IS_DEV) {
+      const method = error.config?.method?.toUpperCase() ?? 'UNKNOWN';
+      const url = error.config?.url ?? 'unknown';
+      const status = error.response?.status ?? 'ERR';
+      // eslint-disable-next-line no-console
+      console.debug(`✗ ${status} ${method} ${url}`);
+    }
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
         const isPublicRoute = PUBLIC_ROUTES.some(route => window.location.pathname.startsWith(route));
