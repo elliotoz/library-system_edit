@@ -22,7 +22,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:seed": "prisma db seed",
-    "covers:backfill": "ts-node src/scripts/backfill-book-covers.ts"
+    "covers:backfill": "ts-node src/scripts/backfill-book-covers.ts",
+    "prisma:generate:clean": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\prisma-generate-clean.ps1"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
