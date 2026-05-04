@@ -527,8 +527,42 @@ Be concise, practical, and encouraging. Base everything on the book details prov
         }
 
         case 'read_ebook': {
-          this.assertSafeUrl(args.url as string);
-          const res = await fetch(args.url as string, {
+          const url = args.url as string;
+          this.assertSafeUrl(url);
+
+          // PDF URLs cannot be HTML-stripped — look up the book in DB for structured context
+          if (url.toLowerCase().endsWith('.pdf')) {
+            const book = await this.prisma.book.findFirst({
+              where: { pdfUrl: url },
+              select: {
+                title: true, authors: true, description: true,
+                category: true, subjectTags: true,
+                publicationYear: true, publisher: true, pageCount: true,
+              },
+            });
+            if (book) {
+              const summary = [
+                `Title: ${book.title}`,
+                `Authors: ${(book.authors as string[]).join(', ')}`,
+                book.category ? `Category: ${book.category}` : null,
+                book.publicationYear ? `Year: ${book.publicationYear}` : null,
+                book.publisher ? `Publisher: ${book.publisher}` : null,
+                book.pageCount ? `Pages: ${book.pageCount}` : null,
+                book.subjectTags && (book.subjectTags as string[]).length > 0
+                  ? `Topics: ${(book.subjectTags as string[]).join(', ')}` : null,
+                '',
+                book.description ?? 'No description available.',
+              ].filter((l) => l !== null).join('\n');
+              return { result: `E-BOOK SUMMARY (PDF — ${args.question as string}):\n\n${summary}`, citations: [] };
+            }
+            return {
+              result: 'This is a PDF file and cannot be read as plain text by this tool. Try using search_study_material to search for content by topic instead.',
+              citations: [],
+            };
+          }
+
+          // HTML ebook — fetch and strip tags as before
+          const res = await fetch(url, {
             headers: { 'User-Agent': 'LibraryBotAI/1.0' },
             signal: AbortSignal.timeout(15000),
           });
