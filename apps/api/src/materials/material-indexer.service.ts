@@ -5,7 +5,8 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as mammoth from 'mammoth';
 
-let pdfjsLib: any = null;
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require('pdf-parse') as (buffer: Buffer) => Promise<{ text: string; numpages: number }>;
 
 /** Target chunk size in words (~500 tokens at ~1.25 words/token) */
 const CHUNK_WORDS = 400;
@@ -32,23 +33,6 @@ export class MaterialIndexerService {
   private readonly inFlight = new Set<string>();
 
   constructor(private readonly prisma: PrismaService) {}
-
-  /**
-   * Lazy-load pdfjs-dist on first use.
-   * Required because pdfjs-dist is an ES module and needs async import.
-   */
-  private async getPdfjsLib(): Promise<any> {
-    if (pdfjsLib === null) {
-      pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-      // Set up worker path for pdfjs in Node.js environment
-      const workerPath = path.join(
-        path.dirname(require.resolve('pdfjs-dist/legacy/build/pdf.mjs')),
-        'pdf.worker.min.mjs',
-      );
-      pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath;
-    }
-    return pdfjsLib;
-  }
 
   /**
    * Public entry point — call fire-and-forget from the approval flow.
@@ -169,26 +153,21 @@ export class MaterialIndexerService {
 
   /**
    * Extract paragraphs from a PDF with 1-based page numbers.
-   * Uses pdfjs-dist to parse PDF and extract text page-by-page.
+   * Uses pdf-parse to extract text, then splits on form-feed characters for per-page content.
    */
   private async extractPdfParagraphs(buffer: Buffer): Promise<Paragraph[]> {
-    const pdfjs = await this.getPdfjsLib();
-    const pdf = await pdfjs.getDocument({ data: buffer }).promise;
+    const { text, numpages } = await pdfParse(buffer);
+    const pages = text.split('\f');
     const paragraphs: Paragraph[] = [];
 
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ');
-
+    for (let i = 0; i < numpages; i++) {
+      const pageText = pages[i] ?? '';
       const rawParagraphs = pageText.split(/\n{2,}/);
 
       for (const raw of rawParagraphs) {
-        const text = raw.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-        if (text.length >= MIN_CHUNK_CHARS) {
-          paragraphs.push({ text, pageNumber: pageNum });
+        const cleanText = raw.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+        if (cleanText.length >= MIN_CHUNK_CHARS) {
+          paragraphs.push({ text: cleanText, pageNumber: i + 1 });
         }
       }
     }
