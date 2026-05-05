@@ -161,6 +161,8 @@ export class AiController {
       for await (const chunk of stream) {
         if (chunk.type === 'mode_state') {
           res.write(`data: ${JSON.stringify({ modeState: chunk.modeState })}\n\n`);
+        } else if (chunk.type === 'model_state') {
+          res.write(`data: ${JSON.stringify({ modelState: chunk.modelState })}\n\n`);
         } else if (chunk.type === 'text') {
           res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
         } else {
@@ -213,6 +215,7 @@ export class AiController {
     return this.openRouter.scanBookCover(dto.image);
   }
 }
+
 
 
 

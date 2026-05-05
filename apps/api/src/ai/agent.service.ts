@@ -18,8 +18,19 @@ export interface BookCitation {
   copies: string;
 }
 
+export type ModelSelectionSource = 'auto' | 'manual' | 'fallback';
+
+export interface ConversationModelState {
+  manualModel: string | null;
+  lastResolvedModel: string | null;
+  lastModelSelectionSource: ModelSelectionSource | null;
+  activeModel: string | null;
+  reason: string | null;
+}
+
 export type ChatChunk =
   | { type: 'mode_state'; modeState: AiModeState }
+  | { type: 'model_state'; modelState: ConversationModelState }
   | { type: 'text'; text: string }
   | { type: 'books'; books: BookCitation[] };
 
@@ -132,6 +143,65 @@ export class AgentService {
     });
   }
 
+  private normalizeManualModel(model?: string | null): string | null {
+    if (!model || model === 'auto') return null;
+    return model;
+  }
+
+  private buildConversationModelState(conversation: {
+    manualModel?: string | null;
+    lastResolvedModel?: string | null;
+    lastModelSelectionSource?: string | null;
+  }): ConversationModelState {
+    const manualModel = this.normalizeManualModel(conversation.manualModel);
+    const lastResolvedModel = conversation.lastResolvedModel ?? null;
+    const lastModelSelectionSource = (conversation.lastModelSelectionSource as ModelSelectionSource | null) ?? null;
+
+    return {
+      manualModel,
+      lastResolvedModel,
+      lastModelSelectionSource,
+      activeModel: lastResolvedModel ?? manualModel,
+      reason: null,
+    };
+  }
+
+  private resolveModelSelection(message: string, hasImage: boolean, manualModel?: string | null): ConversationModelState {
+    const normalizedManualModel = this.normalizeManualModel(manualModel);
+
+    if (normalizedManualModel) {
+      return {
+        manualModel: normalizedManualModel,
+        lastResolvedModel: normalizedManualModel,
+        lastModelSelectionSource: 'manual',
+        activeModel: normalizedManualModel,
+        reason: 'manual_override',
+      };
+    }
+
+    let resolvedModel: string = OPENROUTER_MODELS.CHEAP;
+    let reason = 'default_tools';
+
+    if (hasImage) {
+      resolvedModel = OPENROUTER_MODELS.CHEAP;
+      reason = 'image';
+    } else if (this.isDeepQuery(message)) {
+      resolvedModel = OPENROUTER_MODELS.SMART;
+      reason = 'deep_query';
+    } else if (this.isSimpleMessage(message)) {
+      resolvedModel = OPENROUTER_MODELS.FREE;
+      reason = 'simple_query';
+    }
+
+    return {
+      manualModel: null,
+      lastResolvedModel: resolvedModel,
+      lastModelSelectionSource: 'auto',
+      activeModel: resolvedModel,
+      reason,
+    };
+  }
+
   private serializeConversation(conversation: {
     id: string;
     title: string;
@@ -140,6 +210,9 @@ export class AgentService {
     studyBookId?: string | null;
     manualModes?: string[];
     lastAutoModes?: string[];
+    manualModel?: string | null;
+    lastResolvedModel?: string | null;
+    lastModelSelectionSource?: string | null;
   }) {
     return {
       id: conversation.id,
@@ -148,6 +221,7 @@ export class AgentService {
       updatedAt: conversation.updatedAt,
       studyBookId: conversation.studyBookId ?? null,
       ...this.buildConversationModeState(conversation),
+      ...this.buildConversationModelState(conversation),
     };
   }
 
@@ -163,6 +237,9 @@ export class AgentService {
         studyBookId: true,
         manualModes: true,
         lastAutoModes: true,
+        manualModel: true,
+        lastResolvedModel: true,
+        lastModelSelectionSource: true,
       },
     });
 
@@ -180,6 +257,9 @@ export class AgentService {
         studyBookId: true,
         manualModes: true,
         lastAutoModes: true,
+        manualModel: true,
+        lastResolvedModel: true,
+        lastModelSelectionSource: true,
       },
     });
 
@@ -245,6 +325,9 @@ export class AgentService {
         studyBookId: bookId,
         manualModes: normalizeAiModes(requestedManualModes),
         lastAutoModes: getDefaultAutoModes(true),
+        manualModel: null,
+        lastResolvedModel: OPENROUTER_MODELS.STUDY,
+        lastModelSelectionSource: 'auto',
       },
     });
 
@@ -1090,10 +1173,19 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     };
 
     const hasManualModeOverride = typeof manualModesInput === 'string' || Array.isArray(manualModesInput);
+    const hasModelOverride = typeof modelOverride === 'string';
     const conversation = conversationId
       ? await this.prisma.aiConversation.findFirst({
           where: { id: conversationId, userId },
-          select: { id: true, studyBookId: true, manualModes: true, lastAutoModes: true },
+          select: {
+            id: true,
+            studyBookId: true,
+            manualModes: true,
+            lastAutoModes: true,
+            manualModel: true,
+            lastResolvedModel: true,
+            lastModelSelectionSource: true,
+          },
         })
       : null;
 
@@ -1108,9 +1200,13 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     }
 
     const storedModeState = this.buildConversationModeState(conversation ?? {});
+    const storedModelState = this.buildConversationModelState(conversation ?? {});
     const manualModes = hasManualModeOverride
       ? normalizeAiModes(manualModesInput)
       : storedModeState.manualModes;
+    const manualModel = hasModelOverride
+      ? this.normalizeManualModel(modelOverride)
+      : storedModelState.manualModel;
     const autoModes = inferAutoModes({
       message,
       history,
@@ -1121,6 +1217,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
       lastAutoModes: autoModes,
       isStudySession: !!conversation?.studyBookId,
     });
+    let modelState = this.resolveModelSelection(message, hasImage, manualModel);
 
     const systemPrompt = `${buildModeInstructionBlock(modeState.activeModes)}${buildSystemPromptFromModule(promptContext)}`;
 
@@ -1128,6 +1225,9 @@ Be concise, practical, and encouraging. Base everything on the book details prov
       const updateData: Record<string, unknown> = {
         updatedAt: new Date(),
         lastAutoModes: modeState.lastAutoModes,
+        manualModel: modelState.manualModel,
+        lastResolvedModel: modelState.lastResolvedModel,
+        lastModelSelectionSource: modelState.lastModelSelectionSource,
       };
 
       if (messageCount === 0) {
@@ -1142,6 +1242,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     }
 
     yield { type: 'mode_state', modeState };
+    yield { type: 'model_state', modelState };
 
     // Build messages — OpenRouter uses OpenAI-compatible message format
     type ChatMessage = Record<string, unknown>;
@@ -1170,7 +1271,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     const simple = this.isSimpleMessage(message);
     const deep = this.isDeepQuery(message);
     const useTools = !hasImage && !simple;
-    let model = this.pickModel(message, hasImage, modelOverride);
+    let model = modelState.activeModel ?? OPENROUTER_MODELS.CHEAP;
 
     const tierLabel = deep ? 'SMART' : simple ? 'FREE' : hasImage ? 'CHEAP(vision)' : 'CHEAP(tools)';
     this.logger.log(`🤖 AI Request — model: ${model} | tools: ${useTools} | tier: ${tierLabel}`);
@@ -1211,6 +1312,23 @@ Be concise, practical, and encouraging. Base everything on the book details prov
         if (res.status === 429 && model === OPENROUTER_MODELS.FREE) {
           this.logger.warn(`Free tier rate-limited, falling back to CHEAP tier`);
           model = OPENROUTER_MODELS.CHEAP;
+          modelState = {
+            ...modelState,
+            lastResolvedModel: model,
+            lastModelSelectionSource: 'fallback',
+            activeModel: model,
+            reason: 'rate_limit_fallback',
+          };
+          if (conversationId) {
+            await this.prisma.aiConversation.update({
+              where: { id: conversationId },
+              data: {
+                lastResolvedModel: modelState.lastResolvedModel,
+                lastModelSelectionSource: modelState.lastModelSelectionSource,
+              },
+            });
+          }
+          yield { type: 'model_state', modelState };
           body.model = model;
           round--; // don't count this as a tool-loop round
           continue;
@@ -1341,6 +1459,10 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     await this.saveMessage(userId, 'assistant', fallback, conversationId);
   }
 }
+
+
+
+
 
 
 

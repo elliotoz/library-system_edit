@@ -9,6 +9,7 @@ import { renderMessage } from '@/lib/renderMessage';
 import { BookCitationCards } from '@/components/BookCitationCards';
 import { AssistantChatInput, type ChatSendPayload } from '@/components/ui/assistant-chat-input';
 import { type AiMode, type DisplayAiMode, normalizeAiModes, resolveAiModes } from '@/lib/ai-modes';
+import { AUTO_MODEL_ID, getAiModelLabel } from '@/lib/ai-models';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -34,7 +35,15 @@ interface ConversationModeState {
   isStudySession: boolean;
 }
 
-interface Conversation extends ConversationModeState {
+interface ConversationModelState {
+  manualModel: string | null;
+  lastResolvedModel: string | null;
+  lastModelSelectionSource: 'auto' | 'manual' | 'fallback' | null;
+  activeModel: string | null;
+  reason?: string | null;
+}
+
+interface Conversation extends ConversationModeState, ConversationModelState {
   id: string;
   title: string;
   createdAt: string;
@@ -139,6 +148,14 @@ export default function AIAssistantPage() {
   const [aiOnline, setAiOnline] = useState<boolean | null>(null);
   const [manualModes, setManualModes] = useState<AiMode[]>([]);
   const [autoModes, setAutoModes] = useState<AiMode[]>([]);
+  const [selectedModel, setSelectedModel] = useState(AUTO_MODEL_ID);
+  const [activeModelState, setActiveModelState] = useState<ConversationModelState>({
+    manualModel: null,
+    lastResolvedModel: null,
+    lastModelSelectionSource: null,
+    activeModel: null,
+    reason: null,
+  });
   const [historyLoaded, setHistoryLoaded] = useState(false);
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -163,6 +180,23 @@ export default function AIAssistantPage() {
     setAutoModes(normalizeAiModes(modeState?.lastAutoModes));
   }, []);
 
+  const applyModelState = useCallback((modelState?: Partial<ConversationModelState> | null) => {
+    const manualModel = modelState?.manualModel ?? null;
+    const lastResolvedModel = modelState?.lastResolvedModel ?? null;
+    const lastModelSelectionSource = modelState?.lastModelSelectionSource ?? null;
+    const activeModel = modelState?.activeModel ?? lastResolvedModel ?? manualModel;
+    const reason = modelState?.reason ?? null;
+
+    setActiveModelState({
+      manualModel,
+      lastResolvedModel,
+      lastModelSelectionSource,
+      activeModel,
+      reason,
+    });
+    setSelectedModel(manualModel ?? AUTO_MODEL_ID);
+  }, []);
+
   const syncConversationModes = useCallback((conversation?: Conversation | null) => {
     if (!conversation) {
       applyModeState(null);
@@ -171,6 +205,15 @@ export default function AIAssistantPage() {
 
     applyModeState(conversation);
   }, [applyModeState]);
+
+  const syncConversationModel = useCallback((conversation?: Conversation | null) => {
+    if (!conversation) {
+      applyModelState(null);
+      return;
+    }
+
+    applyModelState(conversation);
+  }, [applyModelState]);
 
   // ── Conversations ────────────────────────────────────────────────────────────
 
@@ -201,9 +244,11 @@ export default function AIAssistantPage() {
     setSidebarOpen(false);
     setMessages([]);
     setHistoryLoaded(false);
-    syncConversationModes(knownConversation ?? conversationsRef.current.find(conv => conv.id === convId) ?? null);
+    const conversation = knownConversation ?? conversationsRef.current.find(conv => conv.id === convId) ?? null;
+    syncConversationModes(conversation);
+    syncConversationModel(conversation);
     await loadConversationMessages(convId);
-  }, [loadConversationMessages, syncConversationModes]);
+  }, [loadConversationMessages, syncConversationModel, syncConversationModes]);
 
   const createNewChat = useCallback(async () => {
     try {
@@ -213,11 +258,12 @@ export default function AIAssistantPage() {
       setConversations(prev => [conv, ...prev]);
       setActiveConversationId(conv.id);
       syncConversationModes(conv);
+      syncConversationModel(conv);
       setMessages([]);
       setHistoryLoaded(true);
       setSidebarOpen(false);
     } catch { /* ignore */ }
-  }, [syncConversationModes]);
+  }, [syncConversationModel, syncConversationModes]);
 
   const handleDeleteConversation = useCallback(async (convId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -234,13 +280,14 @@ export default function AIAssistantPage() {
             setMessages([]);
             setHistoryLoaded(true);
             syncConversationModes(null);
+            syncConversationModel(null);
           }
         }
         return remaining;
       });
     } catch { /* ignore */ }
     setDeletingId(null);
-  }, [switchConversation, syncConversationModes]);
+  }, [switchConversation, syncConversationModel, syncConversationModes]);
 
   const persistManualModes = useCallback(async (nextManualModes: AiMode[]) => {
     setManualModes(nextManualModes);
@@ -286,6 +333,7 @@ export default function AIAssistantPage() {
         const conversation = convs.find(conv => conv.id === conversationIdFromUrl) ?? null;
         setActiveConversationId(conversationIdFromUrl);
         syncConversationModes(conversation);
+        syncConversationModel(conversation);
         await loadConversationMessages(conversationIdFromUrl);
         return;
       }
@@ -293,6 +341,7 @@ export default function AIAssistantPage() {
       if (convs.length > 0) {
         setActiveConversationId(convs[0].id);
         syncConversationModes(convs[0]);
+        syncConversationModel(convs[0]);
         await loadConversationMessages(convs[0].id);
       } else {
         try {
@@ -302,12 +351,13 @@ export default function AIAssistantPage() {
             setConversations([conv]);
             setActiveConversationId(conv.id);
             syncConversationModes(conv);
+            syncConversationModel(conv);
           }
         } catch { /* ignore */ }
         setHistoryLoaded(true);
       }
     })();
-  }, [conversationIdFromUrl, loadConversationMessages, loadConversations, syncConversationModes]);
+  }, [conversationIdFromUrl, loadConversationMessages, loadConversations, syncConversationModel, syncConversationModes]);
 
   // ── Send ─────────────────────────────────────────────────────────────────────
 
@@ -315,6 +365,7 @@ export default function AIAssistantPage() {
     if ((!text.trim() && !imgBase64) || isStreaming) return;
 
     const convId = activeConvRef.current;
+    const requestedModel = modelOverride && modelOverride !== AUTO_MODEL_ID ? modelOverride : undefined;
     const userMessage = text.trim() || (imgBase64 ? 'What can you tell me about this image?' : '');
 
     const userMsg: ChatMessage = {
@@ -342,7 +393,7 @@ export default function AIAssistantPage() {
           hasImage: !!imgBase64,
           imageBase64: imgBase64 ?? null,
           conversationId: convId,
-          model: modelOverride,
+          model: requestedModel,
           manualModes,
         }),
       });
@@ -375,8 +426,10 @@ export default function AIAssistantPage() {
               books?: BookCitation[];
               error?: string;
               modeState?: ConversationModeState;
+              modelState?: ConversationModelState;
             };
             if (parsed.modeState) applyModeState(parsed.modeState);
+            if (parsed.modelState) applyModelState(parsed.modelState);
             if (parsed.text) setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: m.content + parsed.text } : m));
             if (parsed.books) setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, citations: parsed.books } : m));
             if (parsed.error) setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: `Error: ${parsed.error}` } : m));
@@ -391,7 +444,8 @@ export default function AIAssistantPage() {
     const updatedConversations = await loadConversations();
     const activeConversation = updatedConversations.find(conv => conv.id === activeConvRef.current) ?? null;
     syncConversationModes(activeConversation);
-  }, [applyModeState, isStreaming, loadConversations, manualModes, syncConversationModes]);
+    syncConversationModel(activeConversation);
+  }, [applyModeState, applyModelState, isStreaming, loadConversations, manualModes, syncConversationModel, syncConversationModes]);
 
   // Bridge AssistantChatInput → sendMessage
   const handleChatSend = useCallback(async (payload: ChatSendPayload) => {
@@ -409,6 +463,12 @@ export default function AIAssistantPage() {
   const activeModes = resolveAiModes(manualModes, autoModes);
   const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId) ?? null;
   const currentIsStudySession = isStudySession || !!activeConversation?.studyBookId;
+  const activeModelLabel = getAiModelLabel(activeModelState.activeModel ?? selectedModel);
+  const activeModelSourceLabel = activeModelState.lastModelSelectionSource === 'manual'
+    ? 'Manual'
+    : activeModelState.lastModelSelectionSource === 'fallback'
+      ? 'Fallback'
+      : 'Auto';
   const suggestions = getSuggestions(user?.role, user?.facultyName);
   const showSuggestions = historyLoaded && messages.length === 0 && !currentIsStudySession;
 
@@ -555,6 +615,13 @@ export default function AIAssistantPage() {
             );
           })}
         </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs text-gray-500 dark:text-gray-400 mr-0.5 flex-shrink-0">Model:</span>
+          <span className="px-3 py-1 rounded-full text-xs font-medium border inline-flex items-center gap-1.5 bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/50 shadow-sm shadow-purple-500/15">
+            <span>{activeModelLabel}</span>
+            <span className="text-[10px] uppercase tracking-wide opacity-80">{activeModelSourceLabel}</span>
+          </span>
+        </div>
         <p className="text-[11px] text-gray-500 dark:text-gray-400">
           OZ can activate modes automatically while you chat. Click a mode to pin or unpin it manually.
         </p>
@@ -676,6 +743,9 @@ export default function AIAssistantPage() {
     </div>
   );
 }
+
+
+
 
 
 

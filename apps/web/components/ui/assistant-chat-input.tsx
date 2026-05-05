@@ -5,6 +5,7 @@ import {
   Plus, ChevronDown, ArrowUp, X, FileText, Loader2, Check, Archive,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AI_MODEL_OPTIONS, AUTO_MODEL_ID, type AiModelOption } from '@/lib/ai-models';
 
 /* ── Icons ── */
 const ThinkingIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -102,10 +103,8 @@ const PastedContentCard = ({ content, onRemove }: { content: PastedSnippet; onRe
 );
 
 /* ── Model Selector ── */
-interface Model { id: string; name: string; description: string; badge?: string }
-
 const ModelSelector = ({ models, selectedModel, onSelect }: {
-  models: Model[];
+  models: AiModelOption[];
   selectedModel: string;
   onSelect: (id: string) => void;
 }) => {
@@ -177,39 +176,23 @@ interface AssistantChatInputProps {
   onSendMessage: (payload: ChatSendPayload) => void;
   disabled?: boolean;
   placeholder?: string;
+  selectedModel?: string;
+  onSelectedModelChange?: (model: string) => void;
 }
 
-export const OPENROUTER_MODELS = [
-  {
-    id: 'google/gemini-3.1-flash-lite-preview',
-    name: 'Gemini Flash Lite',
-    description: 'Fast · catalog queries & tool use',
-  },
-  {
-    id: 'anthropic/claude-3-haiku',
-    name: 'Claude 3 Haiku',
-    description: 'Smart · deep analysis & research',
-  },
-  {
-    id: 'google/gemma-4-31b-it:free',
-    name: 'Gemma 4 (Free)',
-    description: 'Free · simple questions & greetings',
-    badge: 'Free',
-  },
-] satisfies Model[];
-
-const MODELS = OPENROUTER_MODELS;
+const MODELS = AI_MODEL_OPTIONS;
 
 export const AssistantChatInput: React.FC<AssistantChatInputProps> = ({
   onSendMessage,
   disabled = false,
   placeholder = 'Ask me anything about books…',
+  selectedModel = AUTO_MODEL_ID,
+  onSelectedModelChange,
 }) => {
   const [message, setMessage] = useState('');
   const [files, setFiles] = useState<AttachedFile[]>([]);
   const [pastedContent, setPastedContent] = useState<PastedSnippet[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(MODELS[0].id);
   const [isThinkingEnabled, setIsThinkingEnabled] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -343,7 +326,7 @@ export const AssistantChatInput: React.FC<AssistantChatInputProps> = ({
 
             {/* Right */}
             <div className="flex items-center gap-1">
-              <ModelSelector models={MODELS} selectedModel={selectedModel} onSelect={setSelectedModel} />
+              <ModelSelector models={MODELS} selectedModel={selectedModel} onSelect={(modelId) => onSelectedModelChange?.(modelId)} />
               <button
                 onClick={handleSend}
                 disabled={!hasContent}
@@ -383,3 +366,7 @@ export const AssistantChatInput: React.FC<AssistantChatInputProps> = ({
 };
 
 export default AssistantChatInput;
+
+
+
+
