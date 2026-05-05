@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { BookOpen, Plus, Trash2, MessageSquare, History, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -111,6 +111,21 @@ function formatConvTime(dateStr: string): string {
   if (diffDays === 1) return 'Yesterday';
   if (diffDays < 7) return `${diffDays}d ago`;
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+function buildConversationUrl(conversationId?: string | null, isStudySession?: boolean): string {
+  const params = new URLSearchParams();
+
+  if (conversationId) {
+    params.set('conversation', conversationId);
+  }
+
+  if (isStudySession) {
+    params.set('study', '1');
+  }
+
+  const query = params.toString();
+  return query ? `/dashboard/ai-assistant?${query}` : '/dashboard/ai-assistant';
 }
 
 async function compressImage(file: File): Promise<string> {
@@ -743,6 +758,7 @@ export default function AIAssistantPage() {
     </div>
   );
 }
+
 
 
 
