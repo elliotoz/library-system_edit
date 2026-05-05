@@ -117,7 +117,9 @@
   - `cd apps/api && npx prisma migrate deploy`
   - `npm run typecheck:api`
   - `npm run typecheck:web`
+  - `cd apps/api && npx jest --runInBand src/ai/agent.service.spec.ts`
 - Commit:
-  - `<pending>`
+  - `cb1586c` `feat(ai): add live auto model selection state`
 - Notes:
   - `gpt-oss-120b` was intentionally not added in this pass.
+
