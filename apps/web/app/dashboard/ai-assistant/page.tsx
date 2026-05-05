@@ -429,20 +429,20 @@ export default function AIAssistantPage() {
       {/* Sidebar */}
       <div className={cn(
         'absolute inset-y-0 left-0 z-30 w-72 flex flex-col',
-        'bg-gray-950/98 backdrop-blur-xl border-r border-white/10',
+        'border-r border-gray-200 bg-white/95 backdrop-blur-xl dark:border-white/10 dark:bg-gray-950/98',
         'transition-transform duration-300 ease-in-out',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full',
       )}>
-        <div className="flex items-center justify-between px-4 py-4 border-b border-white/10">
-          <span className="text-sm font-semibold text-white/90">Chat History</span>
-          <button onClick={() => setSidebarOpen(false)} className="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
+        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-4 dark:border-white/10">
+          <span className="text-sm font-semibold text-slate-900 dark:text-white/90">Chat History</span>
+          <button onClick={() => setSidebarOpen(false)} className="rounded-lg p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white">
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="px-3 py-3 border-b border-white/[0.06]">
+        <div className="border-b border-gray-200 px-3 py-3 dark:border-white/[0.06]">
           <button
             onClick={createNewChat}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-primary-500/15 border border-primary-500/30 text-primary-400 hover:bg-primary-500/25 transition-colors text-sm font-medium"
+            className="flex w-full items-center gap-2.5 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2.5 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-100 dark:border-primary-500/30 dark:bg-primary-500/15 dark:text-primary-400 dark:hover:bg-primary-500/25"
           >
             <Plus className="w-4 h-4" />New Chat
           </button>
@@ -450,8 +450,8 @@ export default function AIAssistantPage() {
         <div className="flex-1 overflow-y-auto py-2">
           {conversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-2 px-4 text-center">
-              <MessageSquare className="w-8 h-8 text-white/20" />
-              <p className="text-xs text-white/30">No conversations yet</p>
+              <MessageSquare className="h-8 w-8 text-slate-300 dark:text-white/20" />
+              <p className="text-xs text-slate-400 dark:text-white/30">No conversations yet</p>
             </div>
           ) : conversations.map(conv => (
             <button
@@ -459,20 +459,20 @@ export default function AIAssistantPage() {
               onClick={() => switchConversation(conv.id)}
               style={{ width: 'calc(100% - 8px)' }}
               className={cn(
-                'w-full text-left px-3 py-2.5 mx-1 rounded-xl transition-colors group flex items-start justify-between gap-2',
-                conv.id === activeConversationId ? 'bg-primary-500/15 text-white' : 'text-white/70 hover:bg-white/[0.05] hover:text-white',
+                'group mx-1 flex w-full items-start justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors',
+                conv.id === activeConversationId ? 'border-primary-200 bg-primary-50 text-slate-900 dark:border-primary-500/20 dark:bg-primary-500/15 dark:text-white' : 'border-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-white/70 dark:hover:bg-white/[0.05] dark:hover:text-white',
               )}
             >
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate leading-tight">{conv.title || 'New Chat'}</p>
-                <p className="text-[11px] text-white/35 mt-0.5">{formatConvTime(conv.updatedAt)}</p>
+                <p className={cn('mt-0.5 text-[11px]', conv.id === activeConversationId ? 'text-primary-700/80 dark:text-white/60' : 'text-slate-400 dark:text-white/35')}>{formatConvTime(conv.updatedAt)}</p>
               </div>
               <button
                 onClick={e => handleDeleteConversation(conv.id, e)}
                 disabled={deletingId === conv.id}
                 className={cn(
                   'flex-shrink-0 p-1 rounded-lg transition-colors mt-0.5 opacity-0 group-hover:opacity-100',
-                  'text-white/30 hover:text-red-400 hover:bg-red-400/10',
+                  'text-slate-400 hover:bg-red-50 hover:text-red-500 dark:text-white/30 dark:hover:bg-red-400/10 dark:hover:text-red-400',
                   conv.id === activeConversationId && 'opacity-40 group-hover:opacity-100',
                   deletingId === conv.id && 'opacity-100 animate-pulse',
                 )}
