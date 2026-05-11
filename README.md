@@ -1,1099 +1,1054 @@
-# 📚 AI-Integrated University Library Management System
+# Library System
 
-![Library System Banner](https://img.shields.io/badge/University-Library%20System-0D9488?style=for-the-badge&logo=book&logoColor=white)
+AI-integrated university library system for catalog management, borrowing, reservations, instructor reading lists, study materials, notifications, fines, reports, and an OpenRouter-backed library assistant.
 
-[![Next.js](https://img.shields.io/badge/Next.js-14-black?style=flat-square&logo=next.js)](https://nextjs.org/)
-[![NestJS](https://img.shields.io/badge/NestJS-10-E0234E?style=flat-square&logo=nestjs)](https://nestjs.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Prisma](https://img.shields.io/badge/Prisma-5-2D3748?style=flat-square&logo=prisma)](https://www.prisma.io/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+This README is based on the current repository code, configuration, Docker files, Prisma schema, frontend routes, backend controllers, AI services, tests, and operational docs. Items that are not present in the current repository are marked as not documented.
 
-A modern, full-stack university library management system with role-based access control, real-time notifications, and AI-powered study assistance.
+## Project Overview
 
-[Features](#-features) • [Tech Stack](#-tech-stack) • [Installation](#-installation) • [API Documentation](#-api-documentation) • [Screenshots](#-screenshots)
+This repository is a Node.js monorepo with two applications:
 
----
+- `apps/api`: NestJS API, Prisma ORM, PostgreSQL, JWT cookie authentication, Swagger, document extraction, S3/local upload support, scheduled borrow/reservation reconciliation, and AI assistant services.
+- `apps/web`: Next.js 14 App Router frontend with protected dashboard routes, role-aware navigation, API proxy rewrites, and AI chat route handlers.
 
-## 📋 Table of Contents
+Primary local ports:
 
-- [Overview](#-overview)
-- [Features](#-features)
-- [Tech Stack](#-tech-stack)
-- [Project Structure](#-project-structure)
-- [Installation](#-installation)
-- [Environment Variables](#-environment-variables)
-- [Running the Application](#-running-the-application)
-- [API Documentation](#-api-documentation)
-- [User Roles & Permissions](#-user-roles--permissions)
-- [Database Schema](#-database-schema)
-- [AI Assistant](#-ai-assistant)
-- [Screenshots](#-screenshots)
-- [Roadmap](#-roadmap)
-- [Contributing](#-contributing)
-- [License](#-license)
+| Service | Port | Source |
+|---|---:|---|
+| Web app | `3000` | `apps/web/package.json`, `apps/web/Dockerfile` |
+| API | `3001` | `apps/api/.env.example`, `apps/api/Dockerfile` |
+| PostgreSQL | `5432` | `docker-compose.yml` |
+| pgAdmin | `5050` | `docker-compose.yml` |
 
----
+## Current Feature Set
 
-## 🌿 Version History & Branch Structure
+- Email/password authentication with email verification, password reset, and password change.
+- Optional Google OAuth login when Google credentials are configured.
+- HttpOnly `access_token` cookie sessions with JWT verification.
+- Role model: `STUDENT`, `INSTRUCTOR`, `STAFF`, `ADMIN`.
+- Role-protected frontend dashboard routes and backend guards.
+- Book catalog with metadata, authors, ISBN, faculty/category/subject tags, cover images, e-book URLs, PDF URLs, copies, branches, and availability state.
+- Book copy and branch management.
+- Reservation lifecycle: `PENDING`, `APPROVED`, `READY_FOR_PICKUP`, `COLLECTED`, `CANCELLED`, `EXPIRED`.
+- Borrow lifecycle: `ACTIVE`, `RETURNED`, `OVERDUE`, extensions, and return handling.
+- Borrow policies by role.
+- Fine payments with `PENDING`, `PAID`, and `WAIVED` states.
+- Notifications with unread counts, read/delete operations, and reservation/borrow/list/system notification types.
+- Instructor reading lists with visibility and publication status.
+- Instructor following/follower features.
+- Professor/course/research material upload, approval, publishing, access controls, indexing, and search.
+- Reports export endpoints for PDF and Excel.
+- External book search/import endpoints for OpenLibrary and Gutendex.
+- Admin dashboards for users, books, branches, borrows, reservations, fines, materials, policies, reports, statistics, uploads, and imports.
+- AI assistant with conversations, saved messages, streaming SSE chat, study sessions, model selection state, response modes, tool calling, catalog access, reading-list access, borrow/reservation/stat lookups, study-material search, e-book/PDF reading, webpage fetching, and admin book-cover scanning.
+- Swagger API documentation at `/api/docs`.
+- Health probes at `/health/live`, `/health/ready`, and `/auth/health`.
 
-This repository has two active branches that represent two distinct generations of the system.
+## User Experience and Main User Journeys
 
-### `main` — V1 (Stable Baseline)
+Public and auth journeys:
 
-The original version of the system. Contains the complete core feature set (borrowing, reservations, reading lists, notifications, admin dashboard, roles), but used a **local Ollama LLM** running on the developer's machine for AI assistance.
+- A visitor can open `/`, sign up at `/signup`, verify email at `/verify-email`, log in at `/login`, request reset at `/forgot-password`, and reset a password at `/reset-password`.
+- Login sets an HttpOnly `access_token` cookie and redirects users to the role dashboard.
+- Google sign-in is shown only when configured by backend auth config.
 
-**Why V1 was replaced:**
-- Required a powerful local machine to run the model (slow on CPU, needed GPU for reasonable speed)
-- Local models (Ollama / llama3 / mistral) have limited intelligence compared to frontier cloud models
-- Not practical for real deployment — every new machine needs the model pulled and running
-- High RAM consumption competing with the Node.js + PostgreSQL stack
-- Response times of 10–60 seconds on CPU made the AI assistant unusable in practice
+Student and general authenticated journeys:
 
-### `v2-ai-upgrade` — V2 (Active Development)
+- Browse `/dashboard/catalog`, inspect `/dashboard/catalog/[id]`, reserve available copies, review active borrows at `/dashboard/borrowed`, review history at `/dashboard/history`, manage reservations at `/dashboard/reservations`, view fines at `/dashboard/fines`, and manage profile/settings/notifications.
+- Use `/dashboard/ai-assistant` to ask catalog, borrowing, reading-list, study-material, and study-session questions.
+- Browse published reading lists at `/dashboard/reading-lists` and details at `/dashboard/reading-lists/[id]`.
+- View instructor profiles at `/dashboard/instructors/[id]`.
 
-V2 replaces the local Ollama dependency with **[OpenRouter](https://openrouter.ai)** — a cloud LLM gateway that provides access to multiple models through a single API key, including a generous free tier.
+Instructor journeys:
 
-**What V2 brings over V1:**
+- Use `/dashboard/instructor`.
+- Submit materials at `/dashboard/instructor/submit-material`.
+- Review own submissions at `/dashboard/instructor/my-submissions`.
+- Create/manage reading lists at `/dashboard/instructor/reading-lists` and `/dashboard/instructor/reading-lists/[id]`.
+- View followed instructors at `/dashboard/instructor/following`.
 
-| Area | V1 (main) | V2 (v2-ai-upgrade) |
-|------|-----------|---------------------|
-| **AI Engine** | Local Ollama (llama3/mistral) | OpenRouter cloud (Gemma, Gemini Flash, Claude Haiku) |
-| **Response Speed** | 10–60s on CPU | 1–3s cloud inference |
-| **Model Intelligence** | Limited (7B–13B local models) | State-of-the-art frontier models |
-| **Deployment** | Requires GPU/high-RAM machine | Runs anywhere with an API key |
-| **Cost** | Free but hardware-bound | Free tier available ($0 for basic queries) |
-| **AI Architecture** | Single model, intent router | Multi-provider factory, tiered model selection, tool-calling agent loop |
-| **Settings Page** | Placeholder toggles (fake saves) | Fully wired: real Change Password, Notification Prefs, Download My Data |
-| **Dark Mode** | Partial (admin pages broken) | Fixed globally; muted text contrast improved across all pages |
-| **Admin Security** | Admins could follow instructors | Backend + frontend guard prevents it |
+Staff journeys:
 
-**To run V2**, you only need an `OPENROUTER_API_KEY` (free tier at [openrouter.ai](https://openrouter.ai)) — no local model setup required.
+- Use `/dashboard/staff`.
+- Access shared catalog, borrows, reservations, AI assistant, profile, notifications, reading-list, and settings surfaces allowed by frontend middleware.
 
----
+Admin journeys:
 
-## 🎯 Overview
+- Use `/dashboard/admin`.
+- Manage books, users, branches, borrows, reservations, fines, materials, reading lists, policies, reports, statistics, uploads, and external book imports.
+- Scan book-cover images through the admin-only AI cover scan endpoint.
 
-The **AI-Integrated University Library Management System** is a comprehensive web-based platform designed to manage all aspects of university library operations. Built for Üsküdar University, the system supports physical book management, digital resources, borrowing workflows, research material sharing, and administrative oversight.
+## Functional Requirements
 
-### Key Highlights
+Implemented requirements visible in code:
 
-- 🔐 **Role-Based Access Control** — Four distinct user roles with tailored experiences
-- 📖 **Complete Borrowing Lifecycle** — From reservation to return with automated fine calculation
-- 📚 **Research Materials Hub** — Instructors can share publications and course materials
-- 📋 **Reading Lists** — Instructor-curated collections with visibility control and student discovery
-- 📊 **Analytics Dashboard** — Real-time statistics and borrowing trends
-- 🌙 **Dark Mode Support** — Eye-friendly interface for extended use
-- 🎨 **Liquid Glass Design System** — WebGL aurora background, Framer Motion spring animations, glass chrome layer with content-aware opacity
-- 🤖 **OZ AI Agentic Assistant** — SSE streaming, tool-calling agent loop with real-time library data access, per-conversation history, image understanding, book cover scanning, and grounded document reading from uploaded book PDFs and indexed study materials
+- Users must authenticate before accessing `/dashboard/*`.
+- Dashboard access is role-gated in `apps/web/middleware.ts`.
+- Backend endpoints are protected with JWT guards, role guards, and public decorators.
+- New local users must verify email before login.
+- Password reset uses opaque reset tokens and generic outward messages.
+- Admins can activate/deactivate users.
+- Books can have multiple physical copies across active library branches.
+- Reservations are user/book-copy/book/branch scoped and include a server-derived `bookId`.
+- Borrow policies limit active borrows, borrow days, extension count, and extension days by role.
+- Returning overdue borrows creates pending fine records.
+- Scheduler service reconciles overdue borrows and expired reservations.
+- Materials have publication/approval state, access level, and indexing state.
+- AI assistant must use tools for live library data questions and should not guess catalog/statistical values.
+- API request validation strips non-whitelisted fields and rejects non-whitelisted input.
 
----
+## Non-Functional Requirements
 
-## ✨ Features
+Implemented or configured requirements visible in code:
 
-### For Students
+- TypeScript across frontend and backend.
+- PostgreSQL persistence through Prisma.
+- Global structured error contract with `success: false`, `message`, `requestId`, and `timestamp`.
+- Request ID and request logging middleware.
+- Configurable log level and SQL logging.
+- Helmet middleware enabled with selected cross-origin policies disabled for app compatibility.
+- CORS allowlist via `CORS_ORIGIN`.
+- Cookie-based auth with `secure`/`sameSite` adjusted for production.
+- Global and endpoint-level rate limiting via `@nestjs/throttler`.
+- Startup validation for `JWT_SECRET` length and S3 configuration.
+- Swagger-generated API docs.
+- Docker development targets for API and web.
+- Backend unit and e2e test coverage for selected critical paths.
+- Frontend output configured as Next standalone build.
 
-- Browse and search book catalog with advanced filters
-- Create and track book reservations
-- View borrowed books and due dates
-- Track a **reading streak**: counts consecutive calendar days (up to today) with at least one active borrow (borrowedAt ≤ day ≤ returnedAt or today) in ACTIVE/OVERDUE status; not based on reading time or page views
-- Access research materials and e-books
-- Receive notifications for due dates and reservation updates
-- Follow instructors and discover their reading lists
-- View and track fines (outstanding balance, paid/waived history)
-- AI assistant (OZ AI) with personalized study guidance, catalog search, and real-time library data
+Not documented in the current repository:
 
-### For Instructors
+- Formal uptime, latency, RPO/RTO, data retention, backup, observability, accessibility, or browser support targets.
+- CI/CD pipeline definitions.
 
-- All student features plus:
-- Submit research materials for library approval
-- Create and manage course reading lists (with visibility and status controls)
-- Track material submission status
-- Extended borrowing periods (30 days)
+## Monorepo Structure
 
-### For Staff
-
-**Staff** = any Üsküdar University employee who is not a librarian (e.g. department secretaries, lab assistants, IT personnel, administrative staff). They have a library card and can borrow books, but they do not manage the library. Only **Admin** users operate the library system.
-
-- All student features plus:
-- Interest-based AI recommendations (with onboarding prompt if interests are missing)
-- Slightly extended borrowing limits (7 books, 14-day period)
-
-### For Administrators (Librarians)
-
-**Admin** = the librarian(s) who operate the physical library. They are the only in-system library operators and are responsible for the day-to-day running of the system — approving reservations, processing returns, managing the catalog, and overseeing users.
-
-- **Book Management**: Add, edit, delete books and manage copies across branches
-- **User Management**: View, activate/deactivate user accounts
-- **Reservation Processing**: Approve, reject, and manage pickup workflows
-- **Borrow Management**: Process returns, calculate fines, track overdue items
-- **Materials Approval**: Review and approve instructor submissions
-- **Reading List Moderation**: View and manage all reading lists
-- **Statistics Dashboard**: View borrowing trends, popular books, and system metrics
-- **System Configuration**: Manage branches, policies, and settings
-- **Automated Notifications**: Scheduler sends overdue and due-soon alerts hourly (22-hour dedup window)
-
----
-
-## 🛠 Tech Stack
-
-### Frontend
-
-| Technology          | Purpose                                  |
-| ------------------- | ---------------------------------------- |
-| **Next.js 14**      | React framework with App Router, SSR/SSG |
-| **TypeScript**      | Type-safe JavaScript                     |
-| **Tailwind CSS**    | Utility-first styling                    |
-| **Lucide React**    | Icon library                             |
-| **Framer Motion**   | Spring physics animations                |
-| **Three.js**        | WebGL aurora mesh background             |
-| **@splinetool/react-spline** | Interactive 3D scene (login/signup) |
-| **Axios**           | HTTP client                              |
-
-### Backend
-
-| Technology          | Purpose                                  |
-| ------------------- | ---------------------------------------- |
-| **NestJS 10**       | Node.js framework with decorators and DI |
-| **TypeScript**      | Type-safe backend code                   |
-| **Prisma ORM**      | Database access and migrations           |
-| **Passport.js**     | Authentication strategies (JWT + Google) |
-| **JWT**             | Stateless authentication via HttpOnly cookies |
-| **class-validator** | Request validation                       |
-| **OpenRouter**      | Cloud LLM routing for AI assistant (tiered models) |
-
-### Database & Infrastructure
-
-| Technology         | Purpose                       |
-| ------------------ | ----------------------------- |
-| **PostgreSQL 15**  | Primary relational database   |
-| **Docker**         | Containerized development     |
-| **Docker Compose** | Multi-container orchestration |
-
----
-
-## 📁 Project Structure
-
-```
-library-system/
-├── apps/
-│   ├── api/                    # NestJS Backend
-│   │   ├── src/
-│   │   │   ├── ai/             # AI assistant module
-│   │   │   │   ├── ai.controller.ts            # REST + SSE endpoints
-│   │   │   │   ├── agent.service.ts            # Agentic loop (tool-calling, SSE)
-│   │   │   │   ├── ai.service.ts               # AI orchestrator
-│   │   │   │   ├── providers/                  # OpenRouter provider
-│   │   │   │   └── dto/                        # Request/response DTOs
-│   │   │   ├── auth/           # Authentication (JWT + Google OAuth)
-│   │   │   ├── users/          # User management
-│   │   │   ├── books/          # Book catalog & copies
-│   │   │   ├── reservations/   # Reservation workflows
-│   │   │   ├── borrows/        # Borrow management & fines
-│   │   │   ├── materials/      # Research materials
-│   │   │   ├── reading-lists/  # Instructor reading lists
-│   │   │   ├── instructor-followers/ # Instructor follow system
-│   │   │   ├── dashboard/      # Statistics & analytics
-│   │   │   ├── notifications/  # Notification system
-│   │   │   ├── prisma/         # Database client
-│   │   │   └── main.ts         # Application entry
-│   │   ├── prisma/
-│   │   │   ├── schema.prisma   # Database schema
-│   │   │   └── seed.ts         # Seed data
-│   │   └── package.json
-│   │
-│   └── web/                    # Next.js Frontend
-│       ├── app/
-│       │   ├── (auth)/         # Auth pages (login, register)
-│       │   ├── dashboard/      # Protected dashboard routes
-│       │   │   ├── admin/      # Admin-only pages
-│       │   │   ├── instructor/ # Instructor pages
-│       │   │   ├── ai-assistant/ # AI chat interface
-│       │   │   ├── catalog/    # Book catalog
-│       │   │   ├── borrowed/   # Active borrows
-│       │   │   ├── reservations/ # Reservations
-│       │   │   ├── reading-lists/ # Reading list discovery
-│       │   │   ├── instructors/  # Instructor discovery
-│       │   │   ├── materials/  # Research materials
-│       │   │   ├── history/    # Borrow history
-│       │   │   ├── profile/    # User profile
-│       │   │   ├── settings/   # User settings
-│       │   │   └── notifications/ # Notifications
-│       │   ├── layout.tsx      # Root layout
-│       │   └── page.tsx        # Landing page
-│       ├── components/         # Reusable components
-│       ├── lib/                # Utilities & API client
-│       └── package.json
-│
-├── docker-compose.yml          # Docker configuration
-├── package.json                # Root package.json
+```text
+.
+├── apps
+│   ├── api                  # NestJS backend
+│   │   ├── prisma           # Prisma schema, migrations, seed scripts
+│   │   ├── scripts          # Prisma helper scripts
+│   │   ├── src              # API modules/controllers/services
+│   │   ├── test             # E2E tests and helpers
+│   │   └── uploads          # Local upload directory if using local storage
+│   └── web                  # Next.js frontend
+│       ├── app              # App Router pages and route handlers
+│       ├── components       # UI and dashboard components
+│       ├── hooks            # React hooks
+│       ├── lib              # API clients, AI options, helpers
+│       ├── public           # Static assets
+│       └── types            # Shared frontend types
+├── docs/operations          # Testing and migration recovery notes
+├── docker-compose.yml
+├── package.json             # Root workspace scripts
 └── README.md
 ```
 
----
+The root `package.json` declares workspaces for `apps/*` and `packages/*`; no `packages` directory is present in the current repository.
 
-## 🚀 Installation
+## Frontend Architecture
 
-### Prerequisites
+The frontend is a Next.js 14 App Router application.
 
-- **Node.js** >= 20.x
-- **npm** >= 9.x
-- **Docker** & **Docker Compose**
-- **Git**
-- **OpenRouter API key** (free tier available at openrouter.ai)
+Key implementation files:
 
-### Step 1: Clone the Repository
+- `apps/web/app`: pages, layouts, global error boundary, and API route handlers.
+- `apps/web/middleware.ts`: JWT cookie verification and role-based dashboard route access.
+- `apps/web/lib/api.ts`: browser Axios client using same-origin `/api` with credentials.
+- `apps/web/lib/server-api.ts`: server route-handler backend URL resolution.
+- `apps/web/next.config.js`: standalone output, `three` transpilation, `/api` and `/uploads` rewrites to the backend.
+- `apps/web/tailwind.config.ts`: Tailwind theme, role colors, and UI tokens.
+- `apps/web/components/ui`: local UI primitives and visual components.
+
+Frontend environment:
+
+- `API_URL`: server-side backend URL for Next route handlers.
+- `NEXT_PUBLIC_API_URL`: backend URL used by rewrites and browser-visible diagnostics.
+- `NEXT_PUBLIC_APP_NAME`: app display name.
+- `JWT_SECRET`: must match backend `JWT_SECRET` for middleware JWT signature verification.
+
+Discovered frontend pages:
+
+| Route | Purpose inferred from code path |
+|---|---|
+| `/` | Public landing/home page |
+| `/login` | Login |
+| `/signup` | Registration |
+| `/verify-email` | Email verification |
+| `/forgot-password` | Password reset request |
+| `/reset-password` | Password reset |
+| `/dashboard/student` | Student dashboard |
+| `/dashboard/instructor` | Instructor dashboard |
+| `/dashboard/staff` | Staff dashboard |
+| `/dashboard/admin` | Admin dashboard |
+| `/dashboard/catalog` | Catalog search/list |
+| `/dashboard/catalog/[id]` | Book detail |
+| `/dashboard/borrowed` | Current borrowed books |
+| `/dashboard/history` | Borrow history |
+| `/dashboard/reservations` | User reservations |
+| `/dashboard/fines` | User fines |
+| `/dashboard/materials` | Materials |
+| `/dashboard/reading-lists` | Reading-list feed |
+| `/dashboard/reading-lists/[id]` | Reading-list detail |
+| `/dashboard/instructors/[id]` | Instructor profile |
+| `/dashboard/ai-assistant` | AI assistant chat |
+| `/dashboard/notifications` | Notifications |
+| `/dashboard/profile` | User profile |
+| `/dashboard/settings` | User settings |
+| `/dashboard/instructor/my-submissions` | Instructor material submissions |
+| `/dashboard/instructor/submit-material` | Submit material |
+| `/dashboard/instructor/following` | Followed instructors |
+| `/dashboard/instructor/reading-lists` | Instructor reading lists |
+| `/dashboard/instructor/reading-lists/[id]` | Instructor reading-list editor/detail |
+| `/dashboard/admin/books` | Admin book management |
+| `/dashboard/admin/books/new` | New book |
+| `/dashboard/admin/books/[id]/edit` | Edit book |
+| `/dashboard/admin/users` | Admin user management |
+| `/dashboard/admin/branches` | Branch management |
+| `/dashboard/admin/borrows` | Admin borrow management |
+| `/dashboard/admin/reservations` | Admin reservation management |
+| `/dashboard/admin/fines` | Admin fine management |
+| `/dashboard/admin/materials` | Admin material moderation |
+| `/dashboard/admin/reading-lists` | Admin reading-list moderation |
+| `/dashboard/admin/policies` | Borrow policy management |
+| `/dashboard/admin/reports` | Reports |
+| `/dashboard/admin/statistics` | Statistics |
+| `/dashboard/admin/import-books` | External book imports |
+| `/dashboard/admin/upload` | Admin uploads |
+
+Frontend API route handlers proxy selected AI calls to the backend:
+
+- `GET /api/ai/conversations`
+- `POST /api/ai/conversations`
+- `DELETE /api/ai/conversations/[id]`
+- `PATCH /api/ai/conversations/[id]/mode`
+- `GET /api/ai/history`
+- `POST /api/ai/study`
+- `POST /api/ai/chat` with SSE passthrough
+
+## Backend Architecture
+
+The backend is a NestJS API using Prisma and PostgreSQL.
+
+Key implementation files:
+
+- `apps/api/src/main.ts`: startup validation, Helmet, body limits, cookie parser, CORS, static uploads, global filters/pipes, Swagger.
+- `apps/api/src/app.module.ts`: module composition and global request middleware.
+- `apps/api/src/prisma/prisma.service.ts`: database URL construction and Prisma logging.
+- `apps/api/src/common`: global exception filter and request middleware.
+- `apps/api/src/auth`: local auth, Google OAuth, JWT strategy, decorators, and guards.
+- `apps/api/src/storage`: local/S3 upload and document buffer access.
+- `apps/api/src/mail`: SMTP or dev-console email sending.
+- `apps/api/src/ai`: assistant, providers, prompt builders, tools, modes, token tracking, search.
+
+Registered backend modules:
+
+- `AuthModule`
+- `UsersModule`
+- `BooksModule`
+- `BorrowsModule`
+- `ReservationsModule`
+- `DashboardModule`
+- `NotificationsModule`
+- `MaterialsModule`
+- `ReadingListsModule`
+- `InstructorFollowersModule`
+- `AiModule`
+- `StorageModule`
+- `HealthModule`
+- `BranchesModule`
+- `BorrowPoliciesModule`
+- `FinePaymentsModule`
+- `ReportsModule`
+- `ExternalBooksModule`
+- `PrismaModule`
+- `MailModule`
+
+## AI Assistant Integration
+
+The active AI assistant path is OpenRouter-backed.
+
+Required key for active AI features:
+
+- `OPENROUTER_API_KEY`
+
+The `.env.example` does not currently list `OPENROUTER_API_KEY`, but the active `OpenRouterProvider`, `AgentService`, health readiness check, and auth config all check for it. Add it to `apps/api/.env` when enabling AI.
+
+Provider code present:
+
+- `OpenRouterProvider`: active provider used by `ProviderFactory` and `AgentService`.
+- `GroqProvider`: provider class present and uses `GROQ_API_KEY`, but not wired into `AiModule` providers or `ProviderFactory`.
+- `GeminiProvider`: provider class present and uses `GEMINI_API_KEY`, but not wired into `AiModule` providers or `ProviderFactory`.
+
+Model options discovered in code:
+
+| Tier / UI option | Model id |
+|---|---|
+| Free/simple | `google/gemma-4-31b-it:free` |
+| Cheap/tool/vision | `google/gemini-3.1-flash-lite-preview` |
+| Smart/deep/study | `anthropic/claude-3-haiku` |
+| Cover scan vision | `google/gemini-2.0-flash-lite` |
+
+AI conversation features:
+
+- Conversation list/create/delete.
+- Message history.
+- Dedicated study sessions tied to a `Book`.
+- Saved conversation mode state: manual modes, auto modes, study-session state.
+- Saved conversation model state: manual model, resolved model, selection source.
+- Token usage metrics per user/conversation in memory through `TokenTrackerService`.
+- SSE streaming response endpoint at `POST /ai/chat`.
+
+Response modes:
+
+- `learning`
+- `explanatory`
+- `planning`
+- `formal`
+- `concise`
+
+AI tools:
+
+- `search_catalog`
+- `get_book_details`
+- `read_ebook`
+- `fetch_webpage`
+- `get_my_borrows`
+- `get_catalog_stats`
+- `get_active_borrows`
+- `get_active_reservations`
+- `get_user_stats`
+- `get_reading_lists`
+- `get_my_reading_lists`
+- `search_study_material`
+- `list_study_materials`
+- `get_chunk_context`
+- `get_material_outline`
+
+RAG and retrieval behavior:
+
+- Catalog search is keyword-first. `AI_SEMANTIC_MODE` accepts `keyword`, `hybrid`, or `embedding`; `hybrid` and `embedding` currently fall back to keyword search because vector infrastructure is not implemented.
+- Material indexing extracts `.pdf`, `.docx`, `.doc`, and `.txt`, chunks content into about 400-word chunks with 40-word overlap, stores chunks in `MaterialChunk`, and searches them with PostgreSQL full-text search.
+- Material search enforces access controls by role, uploader, public access, faculty, and course code.
+- Book PDF indexing extracts text into `Book.pdfExtractedText`, tracks page count and index status, and is used by `read_ebook`.
+- Embedding generation is a stub returning `null`; pgvector/vector columns are not present in the current Prisma schema.
+
+Prompt behavior:
+
+- The system prompt is built from role-specific base instructions and few-shot examples.
+- It injects current user context, active borrows, borrow policy, catalog totals, available copies, published reading-list count, indexed material count, and current date.
+- It explicitly instructs the assistant to use tools for live library data, catalog searches, reading lists, borrows, reservations, stats, and study material retrieval.
+
+## Docker Setup
+
+`docker-compose.yml` defines:
+
+| Service | Image/build | Container | Exposed port | Notes |
+|---|---|---|---:|---|
+| `postgres` | `postgres:15-alpine` | `library_db` | `5432` | Uses external volume `library-system_edit_postgres_data` |
+| `api` | `./apps/api` target `development` | `library_api` | `3001` | Depends on healthy Postgres |
+| `web` | `./apps/web` target `development` | `library_web` | `3000` | Depends on API |
+| `pgadmin` | `dpage/pgadmin4:latest` | `library_pgadmin` | `5050` | Default login from Compose |
+
+Start all services:
 
 ```bash
-git clone https://github.com/yourusername/library-system.git
-cd library-system
+npm run docker:up
 ```
 
-### Step 2: Install Dependencies
+Stop services:
+
+```bash
+npm run docker:down
+```
+
+View logs:
+
+```bash
+npm run docker:logs
+```
+
+Important: the Compose file uses an external volume:
+
+```yaml
+volumes:
+  postgres_data:
+    name: library-system_edit_postgres_data
+    external: true
+```
+
+Create it before first `docker-compose up` if it does not exist:
+
+```bash
+docker volume create library-system_edit_postgres_data
+```
+
+The API Dockerfile installs dependencies and runs `npx prisma generate`; the development command is `npm run start:dev`. The web Dockerfile runs `npm run dev`.
+
+## Database Setup
+
+Database stack:
+
+- PostgreSQL
+- Prisma ORM
+- Prisma Client generator with binary targets: `native`, `debian-openssl-3.0.x`, `windows`
+
+Schema source:
+
+- `apps/api/prisma/schema.prisma`
+
+Main Prisma models:
+
+- `User`
+- `Faculty`
+- `LibraryBranch`
+- `Course`
+- `Book`
+- `BookCopy`
+- `BorrowPolicy`
+- `Reservation`
+- `Borrow`
+- `Material`
+- `MaterialChunk`
+- `Notification`
+- `ReadingList`
+- `ReadingListItem`
+- `InstructorFollower`
+- `FinePayment`
+- `AiConversation`
+- `AiMessage`
+
+Enums:
+
+- `Role`
+- `BookCopyStatus`
+- `ReservationStatus`
+- `BorrowStatus`
+- `MaterialType`
+- `AccessLevel`
+- `IndexStatus`
+- `AuthProvider`
+- `ReadingListVisibility`
+- `ReadingListStatus`
+- `FineStatus`
+- `NotificationType`
+
+Migration files are present under `apps/api/prisma/migrations`, from `20251209213528_init` through `20260505170000_add_ai_conversation_model_state`.
+
+Database commands from root:
+
+```bash
+npm run db:start
+npm run db:stop
+npm run db:studio
+npm run db:migrate
+npm run db:seed
+npm run db:reset
+```
+
+API-level Prisma commands:
+
+```bash
+cd apps/api
+npm run prisma:generate
+npm run prisma:migrate
+npm run prisma:studio
+npm run prisma:seed
+npm run prisma:generate:clean
+```
+
+Seed data:
+
+- `apps/api/prisma/seed.ts` clears core tables and seeds branches, faculties, borrow policies, users, books, book copies, and sample borrows.
+- Default seeded password is `password123`.
+- Seeded dev accounts include:
+  - Student: `efe.demir@std.uskudar.edu.tr`
+  - Instructor: `kemal.sahin@uskudar.edu.tr`
+  - Staff: `ayse.yildiz@uskudar.edu.tr`
+  - Admin: `admin@uskudar.edu.tr`
+
+Additional script:
+
+- `apps/api/prisma/add-books.ts`: standalone `npx ts-node prisma/add-books.ts` script to add or update 8 test books. It is not wired into `package.json`.
+
+## Environment Variables
+
+Backend variables from `apps/api/.env.example` and code:
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | Prisma/PostgreSQL connection string |
+| `POSTGRES_HOST` | Optional DB host used by `PrismaService` when `DATABASE_URL` is absent |
+| `POSTGRES_USER` | Optional DB user fallback |
+| `POSTGRES_PASSWORD` | Optional DB password fallback |
+| `POSTGRES_DB` | Optional DB name fallback |
+| `POSTGRES_PORT` | Optional DB port fallback |
+| `DOCKER_ENV` | Uses `postgres` as fallback DB host when `true` |
+| `JWT_SECRET` | JWT signing secret; startup requires at least 32 characters |
+| `JWT_EXPIRATION` | JWT expiration config |
+| `PORT` | API port, default `3001` |
+| `NODE_ENV` | Runtime environment |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+| `GOOGLE_CALLBACK_URL` | Google OAuth callback URL |
+| `CORS_ORIGIN` | Comma-separated allowed frontend origins |
+| `FRONTEND_URL` | Canonical frontend URL for OAuth and email links |
+| `UPLOAD_DIR` | Listed in example; static serving uses `./uploads` from API process cwd |
+| `OLLAMA_BASE_URL` | Listed in example; active embedding implementation is not wired |
+| `ANTHROPIC_API_KEY` | Listed in example; active AI path uses OpenRouter |
+| `LLM_PROVIDER_PREFERENCE` | Listed in example; no active provider switching found |
+| `OPENROUTER_API_KEY` | Required by active AI provider; checked in code but missing from `.env.example` |
+| `GROQ_API_KEY` | Used only by unused `GroqProvider` class |
+| `GEMINI_API_KEY` | Used only by unused `GeminiProvider` class |
+| `AI_SEMANTIC_MODE` | `keyword`, `hybrid`, or `embedding`; default `hybrid` |
+| `AI_EMBEDDINGS_ENABLED` | Listed in example; no active code path found |
+| `STORAGE_PROVIDER` | `local` or `s3` |
+| `AWS_REGION` | S3 region |
+| `AWS_S3_BUCKET` | S3 bucket |
+| `AWS_ACCESS_KEY_ID` | AWS SDK credential chain input |
+| `AWS_SECRET_ACCESS_KEY` | AWS SDK credential chain input |
+| `AWS_S3_PUBLIC_BASE_URL` | Optional public S3 base URL override |
+| `THROTTLE_TTL` | Global rate-limit window in seconds |
+| `THROTTLE_LIMIT` | Global rate-limit max requests |
+| `THROTTLE_AUTH_LIMIT` | Listed in example; auth controllers use inline throttles |
+| `THROTTLE_AI_LIMIT` | Listed in example; AI controller uses inline throttle |
+| `MONITOR_OLLAMA` | Listed in example; readiness currently checks DB and OpenRouter key only |
+| `LOG_LEVEL` | Nest logger level |
+| `ENABLE_REQUEST_LOGGING` | Disable request logs when `false` |
+| `LOG_SQL` | Enable Prisma query logs when `true` |
+| `SMTP_HOST` | SMTP host; empty means dev/console behavior |
+| `SMTP_PORT` | SMTP port |
+| `SMTP_USER` | SMTP user |
+| `SMTP_PASS` | SMTP password |
+| `SMTP_FROM` | Sender address |
+
+Frontend variables from `apps/web/.env.example` and code:
+
+| Variable | Purpose |
+|---|---|
+| `API_URL` | Server-side backend URL for route handlers |
+| `NEXT_PUBLIC_API_URL` | Backend URL used by rewrites/browser-visible config |
+| `NEXT_PUBLIC_APP_NAME` | Display name |
+| `JWT_SECRET` | Must match API `JWT_SECRET` for middleware verification |
+
+## Local Development Setup
+
+Prerequisites:
+
+- Node.js 20 is expected by Dockerfiles.
+- npm.
+- Docker and Docker Compose for PostgreSQL or full container development.
+
+Install dependencies from the repository root:
 
 ```bash
 npm install
 ```
 
-### Step 3: Set Up Environment Variables
+Create env files:
 
 ```bash
-# Copy environment templates
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
 ```
 
-### Step 4: Start the Database
+Set matching `JWT_SECRET` values in both API and web env files. The API requires at least 32 characters.
+
+Start only PostgreSQL:
 
 ```bash
 npm run db:start
 ```
 
-### Step 5: Run Database Migrations
+Run migrations and seed:
 
 ```bash
 npm run db:migrate
 npm run db:seed
 ```
 
-### Step 6: Start the Development Servers
+Start both apps in development:
 
 ```bash
 npm run dev
 ```
 
-The application will be available at:
+The root `dev` command starts the API first, waits for `http://localhost:3001/health/live`, then starts the web app.
 
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:3001
-- **API Documentation**: http://localhost:3001/api/docs
-
----
-
-## 🔐 Environment Variables
-
-### Backend (`apps/api/.env`)
-
-```env
-# Database
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/library_db?schema=public"
-
-# JWT Configuration
-JWT_SECRET="your-super-secret-jwt-key-change-in-production"
-JWT_EXPIRATION="7d"
-
-# Server
-PORT=3001
-NODE_ENV=development
-
-# File Upload
-MAX_FILE_SIZE=52428800  # 50MB in bytes
-UPLOAD_DIR="./uploads"
-
-# Google OAuth (optional)
-GOOGLE_CLIENT_ID="your-google-client-id"
-GOOGLE_CLIENT_SECRET="your-google-client-secret"
-GOOGLE_CALLBACK_URL="http://localhost:3001/auth/google/callback"
-
-# OpenRouter (required for AI chat)
-OPENROUTER_API_KEY="sk-or-v1-..."
-
-# SMTP Email (optional — falls back to console logging if not configured)
-SMTP_HOST="smtp.example.com"
-SMTP_PORT="587"
-SMTP_USER="your-smtp-user"
-SMTP_PASS="your-smtp-password"
-SMTP_FROM="noreply@library.uskudar.edu.tr"
-```
-
-> **SMTP Note:** When `SMTP_HOST` is not set, verification codes and password reset links are logged to the server console instead of emailed. This is the default for local development — no SMTP server required.
-
-### Frontend (`apps/web/.env.local`)
-
-```env
-# API URL
-NEXT_PUBLIC_API_URL=http://localhost:3001
-
-# App Configuration
-NEXT_PUBLIC_APP_NAME="Library System"
-
-# JWT secret — must match apps/api JWT_SECRET for middleware signature verification
-JWT_SECRET="change-me-must-match-api"
-```
-
-> **JWT_SECRET Note:** The web middleware verifies JWT signatures to enforce role-based route protection at the UI layer. This secret **must match** the API's `JWT_SECRET`. If missing or mismatched, all dashboard requests redirect to the login page (fail-closed).
-
-### Optional Feature Configuration
-
-| Feature | Required Env Vars | Fallback |
-|---------|-------------------|----------|
-| **SMTP Email** | `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` | Emails logged to console |
-| **OZ AI Chat** | `OPENROUTER_API_KEY` | AI offline indicator shown |
-| **Book Cover Scan** | `OPENROUTER_API_KEY` | Scan endpoint unavailable |
-| **Google OAuth** | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Button hidden on login/signup |
-
-The `/auth/config` endpoint returns the current status of each feature:
-```json
-{ "googleOAuthEnabled": false, "smtpEnabled": false, "aiEnabled": true }
-```
-
----
-
-## 🏃 Running the Application
-
-### Development Mode
+Manual app startup:
 
 ```bash
-npm run db:start              # Database on :5432
-npm run dev                   # Backend on :3001, Frontend on :3000
+npm run dev:api
+npm run dev:web
 ```
 
-### Production Build
+Open:
+
+- Web: `http://localhost:3000`
+- API: `http://localhost:3001`
+- Swagger: `http://localhost:3001/api/docs`
+- pgAdmin with Compose: `http://localhost:5050`
+
+## Available Scripts
+
+Root scripts from `package.json`:
+
+| Script | Command |
+|---|---|
+| `dev` | `concurrently "npm run dev:api" "wait-on http://localhost:3001/health/live && npm run dev:web"` |
+| `dev:api` | `cd apps/api && npm run start:dev` |
+| `dev:web` | `cd apps/web && npm run dev` |
+| `build` | `npm run build:api && npm run build:web` |
+| `build:api` | `cd apps/api && npm run build` |
+| `build:web` | `cd apps/web && npm run build` |
+| `typecheck:api` | `cd apps/api && npm run typecheck` |
+| `typecheck:web` | `cd apps/web && npm run typecheck` |
+| `test:api` | `cd apps/api && npm run test:unit` |
+| `test:api:critical` | `cd apps/api && npm run test:critical` |
+| `test:api:e2e` | `cd apps/api && npm run test:e2e` |
+| `db:start` | `docker-compose up -d postgres` |
+| `db:stop` | `docker-compose down` |
+| `db:studio` | `cd apps/api && npx prisma studio` |
+| `db:migrate` | `cd apps/api && npx prisma migrate dev` |
+| `db:seed` | `cd apps/api && npx prisma db seed` |
+| `db:reset` | `cd apps/api && npx prisma migrate reset` |
+| `docker:up` | `docker-compose up -d` |
+| `docker:down` | `docker-compose down` |
+| `docker:logs` | `docker-compose logs -f` |
+| `dev:lan` | `concurrently "npm run dev:api" "wait-on http://localhost:3001/health/live && npm run dev:web"` |
+| `clean` | `rimraf node_modules apps/*/node_modules packages/*/node_modules` |
+
+API scripts from `apps/api/package.json`:
+
+| Script | Command |
+|---|---|
+| `build` | `nest build` |
+| `typecheck` | `npx tsc --noEmit` |
+| `format` | `prettier --write "src/**/*.ts" "test/**/*.ts"` |
+| `start` | `nest start` |
+| `start:dev` | `nest start --watch` |
+| `start:debug` | `nest start --debug --watch` |
+| `start:prod` | `node dist/src/main` |
+| `lint` | `eslint "{src,apps,libs,test}/**/*.ts" --fix` |
+| `test` | `jest` |
+| `test:unit` | `jest --runInBand` |
+| `test:critical` | `jest --runInBand src/common/filters/global-exception.filter.spec.ts src/users/users.service.spec.ts src/users/users.controller.spec.ts src/reservations/reservations.service.spec.ts src/borrows/borrow-scheduler.service.spec.ts` |
+| `test:watch` | `jest --watch` |
+| `test:cov` | `jest --coverage` |
+| `test:e2e` | `jest --config test/jest-e2e.config.ts --runInBand --no-coverage` |
+| `prisma:generate` | `prisma generate` |
+| `prisma:migrate` | `prisma migrate dev` |
+| `prisma:studio` | `prisma studio` |
+| `prisma:seed` | `prisma db seed` |
+| `covers:backfill` | `ts-node src/scripts/backfill-book-covers.ts` |
+| `prisma:generate:clean` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\prisma-generate-clean.ps1` |
+
+Web scripts from `apps/web/package.json`:
+
+| Script | Command |
+|---|---|
+| `dev` | `next dev -H 0.0.0.0` |
+| `build` | `next build` |
+| `start` | `next start` |
+| `lint` | `next lint` |
+| `lint:css` | `stylelint "**/*.css"` |
+| `typecheck` | `npx tsc --noEmit` |
+| `format` | `prettier --write "**/*.{js,jsx,ts,tsx,css,json}"` |
+
+## Testing, Linting, Formatting, and Type Checking
+
+Backend tests:
+
+- Unit/service/controller tests use Jest and `ts-jest`.
+- E2E tests use Jest with `apps/api/test/jest-e2e.config.ts`.
+- Test helpers live under `apps/api/test/helpers` and `apps/api/src/test-utils`.
+
+Discovered test suites:
+
+- `apps/api/test/security.e2e-spec.ts`
+- `apps/api/test/reservations.e2e-spec.ts`
+- `apps/api/test/borrows.e2e-spec.ts`
+- `apps/api/src/users/users.service.spec.ts`
+- `apps/api/src/users/users.controller.spec.ts`
+- `apps/api/src/books/book-document.service.spec.ts`
+- `apps/api/src/books/books.service.spec.ts`
+- `apps/api/src/reservations/reservations.service.spec.ts`
+- `apps/api/src/borrows/borrow-scheduler.service.spec.ts`
+- `apps/api/src/ai/catalog-search.service.spec.ts`
+- `apps/api/src/ai/ai-modes.spec.ts`
+- `apps/api/src/ai/agent.service.spec.ts`
+- `apps/api/src/materials/material-access.util.spec.ts`
+- `apps/api/src/common/filters/global-exception.filter.spec.ts`
+
+Common verification commands:
 
 ```bash
-npm run build
-
-# Start production servers
-cd apps/api && npm run start:prod
-cd apps/web && npm start
+npm run typecheck:api
+npm run test:api:critical
+npm run test:api:e2e
+npm run typecheck:web
 ```
 
-### Build Commands (Monorepo)
+Formatting and linting:
 
 ```bash
-npm run build                          # both apps
-cd apps/api && npx nest build          # API only
-cd apps/web && npx next build          # web only
+cd apps/api
+npm run lint
+npm run format
+
+cd ../web
+npm run lint
+npm run lint:css
+npm run format
 ```
 
-### Test from Another Device on the Same Network (LAN)
+No frontend test runner is configured in `apps/web/package.json`.
 
-The dev server binds to `0.0.0.0` so any device on your local network can connect.
+## API Documentation and Discovered Endpoints
 
-**npm dev mode:**
+Swagger is generated at:
 
-```bash
-# 1. Find your host machine IP
-#    macOS / Linux:
-ip -4 addr show | grep inet
-#    or on macOS:
-ipconfig getifaddr en0
-
-# 2. Start normally
-npm run db:start
-npm run dev
-
-# 3. On the other device, open:
-#    http://<HOST_IP>:3000
+```text
+GET /api/docs
 ```
 
-**Docker dev mode:**
+Health:
+
+- `GET /health/live`
+- `GET /health/ready`
+- `GET /auth/health`
+
+Discovered backend endpoints:
+
+### Auth
+
+- `POST /auth/login`
+- `POST /auth/logout`
+- `GET /auth/profile`
+- `GET /auth/me`
+- `POST /auth/register`
+- `POST /auth/verify-email`
+- `POST /auth/resend-verification`
+- `POST /auth/forgot-password`
+- `POST /auth/reset-password`
+- `PATCH /auth/change-password`
+- `GET /auth/google`
+- `GET /auth/google/callback`
+- `GET /auth/config`
+- `GET /auth/health`
+
+### Users
+
+- `GET /users`
+- `GET /users/stats`
+- `PATCH /users/profile`
+- `GET /users/:id`
+- `PATCH /users/interests`
+- `GET /users/preferences`
+- `PATCH /users/preferences`
+- `GET /users/export`
+- `PATCH /users/:id/deactivate`
+- `PATCH /users/:id/activate`
+
+### Books
+
+- `GET /books`
+- `GET /books/categories`
+- `GET /books/faculties`
+- `GET /books/branches`
+- `GET /books/:id`
+- `POST /books`
+- `PATCH /books/:id`
+- `DELETE /books/:id`
+- `POST /books/:id/copies`
+- `POST /books/admin/reindex-pending-pdfs`
+- `POST /books/:id/pdf`
+
+### Reservations
+
+- `GET /reservations/my`
+- `GET /reservations/my/info`
+- `GET /reservations/pending`
+- `GET /reservations/stats`
+- `GET /reservations`
+- `POST /reservations`
+- `PATCH /reservations/:id/cancel`
+- `PATCH /reservations/:id/approve`
+- `PATCH /reservations/:id/mark-ready`
+- `PATCH /reservations/:id/reject`
+- `GET /reservations/approved`
+- `GET /reservations/ready`
+- `PATCH /reservations/:id/collect`
+
+### Borrows
+
+- `GET /borrows/my`
+- `GET /borrows/active`
+- `GET /borrows/history`
+- `GET /borrows/admin/active`
+- `GET /borrows/admin/history`
+- `GET /borrows/admin/most-borrowed`
+- `GET /borrows/admin/trends`
+- `GET /borrows/admin/statistics`
+- `GET /borrows/stats`
+- `GET /borrows`
+- `PATCH /borrows/:id/extend`
+- `PATCH /borrows/:id/return`
+
+### Borrow Policies
+
+- `GET /borrow-policies/me`
+- `GET /borrow-policies`
+- `PATCH /borrow-policies/:role`
+
+### Branches
+
+- `GET /branches`
+- `POST /branches`
+- `PATCH /branches/:id`
+- `PATCH /branches/:id/activate`
+- `PATCH /branches/:id/deactivate`
+
+### Materials
+
+- `GET /materials`
+- `GET /materials/types`
+- `GET /materials/my`
+- `GET /materials/admin`
+- `GET /materials/admin/stats`
+- `GET /materials/:id`
+- `POST /materials`
+- `POST /materials/upload`
+- `PATCH /materials/:id`
+- `PATCH /materials/:id/approve`
+- `POST /materials/:id/reindex`
+- `POST /materials/admin/reindex-pending`
+- `DELETE /materials/:id`
+
+### Reading Lists
+
+- `GET /reading-lists/my`
+- `POST /reading-lists`
+- `PATCH /reading-lists/:id`
+- `DELETE /reading-lists/:id`
+- `POST /reading-lists/:id/items`
+- `DELETE /reading-lists/:id/items/:itemId`
+- `GET /reading-lists/admin/all`
+- `GET /reading-lists/feed`
+- `GET /reading-lists/instructor/:instructorId`
+- `GET /reading-lists/:id`
+
+### Instructor Followers
+
+- `GET /instructor-followers/my-following`
+- `GET /instructor-followers/my-followers`
+- `POST /instructor-followers/:instructorId/follow`
+- `DELETE /instructor-followers/:instructorId/unfollow`
+- `GET /instructor-followers/:instructorId/followers-count`
+- `GET /instructor-followers/:instructorId/is-following`
+
+### Notifications
+
+- `GET /notifications`
+- `GET /notifications/unread-count`
+- `PATCH /notifications/:id/read`
+- `PATCH /notifications/read-all`
+- `DELETE /notifications/:id`
+- `DELETE /notifications/clear-read`
+
+### Fine Payments
+
+- `GET /fine-payments/my`
+- `GET /fine-payments`
+- `GET /fine-payments/totals`
+- `GET /fine-payments/:id`
+- `PATCH /fine-payments/:id/pay`
+- `PATCH /fine-payments/:id/waive`
+
+### Dashboard
+
+- `GET /dashboard/admin`
+- `GET /dashboard/student`
+- `GET /dashboard/instructor`
+- `GET /dashboard/staff`
+- `GET /dashboard/activity`
+- `GET /dashboard/admin/user-distribution`
+- `GET /dashboard/admin/ai-metrics`
+
+### Reports
+
+- `GET /reports/summary`
+- `GET /reports/export`
+
+### External Books
+
+- `GET /external-books/search`
+- `POST /external-books/import`
+- `POST /external-books/check-existing`
+- `POST /external-books/import/openlibrary`
+- `POST /external-books/import/gutendex`
+
+### AI
+
+- `GET /ai/status`
+- `GET /ai/conversations`
+- `POST /ai/conversations`
+- `DELETE /ai/conversations/:id`
+- `GET /ai/history`
+- `GET /ai/metrics`
+- `POST /ai/study`
+- `PATCH /ai/conversations/:id/mode`
+- `POST /ai/chat`
+- `PATCH /ai/interests`
+- `GET /ai/context`
+- `POST /ai/scan-cover`
+
+## Security Considerations
+
+Implemented security controls:
+
+- Passwords are hashed with bcrypt/bcryptjs.
+- Auth tokens are stored in HttpOnly cookies.
+- Frontend middleware verifies JWT signatures with HS256 before serving dashboard routes.
+- Backend JWT guard protects authenticated endpoints.
+- Backend roles guard enforces admin/instructor-only actions where declared.
+- Login, registration, verification, password reset, and AI chat have explicit throttling.
+- Global validation pipe uses `whitelist`, `forbidNonWhitelisted`, and `transform`.
+- Global exception filter avoids leaking internals for unknown errors.
+- CORS is restricted by `CORS_ORIGIN`.
+- Helmet is enabled.
+- S3 startup config is validated when `STORAGE_PROVIDER=s3`.
+- Local upload file reads are constrained to the `uploads` directory.
+- Dev request logs redact sensitive keys in frontend Axios logging.
+
+Operational security notes:
+
+- Replace all demo secrets and Compose passwords before production.
+- Use a long, random `JWT_SECRET` and keep the same value in API and web environments.
+- Set `NODE_ENV=production` so auth cookies use production `secure`/`sameSite` behavior.
+- Configure real SMTP for verification and reset emails in production.
+- Configure production CORS origins explicitly.
+- Do not expose pgAdmin publicly without additional access controls.
+- Review S3 bucket permissions and public URL behavior before enabling `STORAGE_PROVIDER=s3`.
+- `OPENROUTER_API_KEY`, AWS credentials, SMTP credentials, Google secrets, and JWT secrets must not be committed.
+
+## Deployment or Production Notes
+
+Documented in code/config:
+
+- API production start command: `node dist/src/main`.
+- Web build output is configured as Next `standalone`.
+- Dockerfiles currently define development targets only.
+- Health checks available at `/health/live` and `/health/ready`.
+- The API validates required JWT/S3 configuration on startup.
+- Swagger is available at `/api/docs` unless disabled by deployment infrastructure.
+- Reports export PDF/Excel dependencies include `pdfkit` and `exceljs`.
+
+Not documented in the current repository:
+
+- CI/CD pipeline.
+- Cloud hosting target.
+- Production Docker Compose or Kubernetes manifests.
+- Reverse proxy configuration.
+- TLS termination.
+- Backup/restore process.
+- Migration rollout procedure beyond local Prisma recovery notes in `docs/operations/prisma-migration-recovery.md`.
+
+Production checklist:
+
+- Set production env vars for both apps.
+- Run `cd apps/api && npx prisma migrate deploy`.
+- Run `cd apps/api && npx prisma generate` or use the generated client from build.
+- Seed only if intentionally deploying sample data.
+- Configure `FRONTEND_URL`, `CORS_ORIGIN`, SMTP, storage, and OpenRouter.
+- Confirm `/health/ready` returns ready.
+- Restrict database and pgAdmin network access.
+
+## Troubleshooting
+
+API fails at startup with `JWT_SECRET must be configured`:
+
+- Set `JWT_SECRET` in `apps/api/.env`.
+- Use at least 32 characters.
+- Set the same value in `apps/web/.env.local` for middleware.
+
+Dashboard routes redirect to login even with a cookie:
+
+- Confirm `apps/web/.env.local` has `JWT_SECRET`.
+- Confirm it matches the backend.
+- Confirm the token was signed with HS256 and has a `role` claim.
+
+Docker Compose fails because the Postgres volume is missing:
 
 ```bash
+docker volume create library-system_edit_postgres_data
 npm run docker:up
-# Open http://<HOST_IP>:3000 on the other device
 ```
 
-Docker already binds all services to `0.0.0.0` via port mappings, so no extra steps are needed.
+API cannot connect to the database:
 
-> **Note:** All browser API requests use the `/api` same-origin path and are proxied server-side by Next.js, so LAN devices work without direct backend access.
+- Check `DATABASE_URL`.
+- If running API outside Docker with Compose Postgres, use host `localhost`.
+- If running inside Docker, the Compose environment uses host `postgres`.
+- Run `npm run db:start` before local API startup.
 
-> **CORS:** If you still see CORS errors (e.g., when the backend sets cookie domains), add your host IP to the API's allowed origins in `apps/api/.env`:
-> ```
-> CORS_ORIGIN="http://localhost:3000,http://<HOST_IP>:3000"
-> ```
+S3 startup validation fails:
 
-#### Off-network testing (optional)
+- If S3 is not needed locally, set `STORAGE_PROVIDER=local`.
+- If S3 is needed, set `AWS_REGION`, `AWS_S3_BUCKET`, and AWS credentials discoverable by the AWS SDK.
 
-For quick testing outside your LAN (e.g., on a mobile over cellular), you can use a temporary tunnel:
+AI status is unavailable:
+
+- Set `OPENROUTER_API_KEY` in `apps/api/.env`.
+- Check `/health/ready`; it reports AI as `configured` or `not configured`.
+
+AI semantic search does not behave like vector search:
+
+- Current `hybrid` and `embedding` modes fall back to keyword search. Vector storage and embedding generation are not implemented in the current schema/code.
+
+Email is not sent locally:
+
+- Empty `SMTP_HOST` means development behavior. Configure SMTP variables for real delivery.
+
+Prisma migration history is blocked:
+
+- See `docs/operations/prisma-migration-recovery.md`.
+- Only use `prisma migrate resolve` when the schema change is already present in the target database.
+
+Frontend API calls go to the wrong host:
+
+- The browser client uses same-origin `/api`.
+- Next rewrites `/api/:path*` and `/uploads/:path*` to `NEXT_PUBLIC_API_URL`.
+- Next route handlers use `API_URL` first, then `NEXT_PUBLIC_API_URL`, then `http://localhost:3001`.
+
+## Contributing Notes
+
+Use the existing architecture and module boundaries:
+
+- Backend features belong under `apps/api/src/<module>`.
+- Add DTOs and validation for new API inputs.
+- Add or update Swagger decorators for API endpoints.
+- Add modules to `AppModule` when creating new backend modules.
+- Frontend pages belong under `apps/web/app`.
+- Shared frontend API calls should use `apps/web/lib/api.ts`.
+- Keep role checks aligned between backend guards and `apps/web/middleware.ts`.
+- Add focused tests for business rules, security-sensitive paths, and regressions.
+- Update this README when scripts, routes, env vars, Docker services, or behavior changes.
+
+Conventions from `CONTRIBUTING.md`:
+
+- Use TypeScript.
+- Follow ESLint and Prettier configuration.
+- Use descriptive branch names such as `feature/...`, `fix/...`, `docs/...`, and `refactor/...`.
+- Use conventional commit-style messages such as `feat: ...`, `fix: ...`, `docs: ...`, `refactor: ...`, and `test: ...`.
+
+Recommended pre-PR checks:
 
 ```bash
-# Using SSH (if you have a public server):
-ssh -R 80:localhost:3000 serveo.net
-
-# Or using npx:
-npx localtunnel --port 3000
+npm run typecheck:api
+npm run test:api:critical
+npm run typecheck:web
+cd apps/api && npm run lint
+cd ../web && npm run lint
 ```
-
-> **Caution:** Tunnels expose your dev server to the internet. Use only for temporary testing and shut down when done.
-
-### Seeded Development Accounts
-
-Run the seed script to create test accounts for local development:
-
-```bash
-npm run db:seed
-```
-
-Credentials for all seeded roles (Student, Instructor, Staff, Admin) are printed to the terminal during seeding. To keep a local copy, save them to `SEED_ACCOUNTS_LOCAL.md` (already gitignored).
-
----
-
-## 📡 API Documentation
-
-### Base URL
-
-```
-http://localhost:3001
-```
-
-### Authentication
-
-All protected endpoints require a JWT token sent via HttpOnly cookie.
-
-### Endpoints Overview
-
-| Module                   | Endpoints | Description                                    |
-| ------------------------ | --------- | ---------------------------------------------- |
-| **Auth**                 | 11        | Login, register, Google OAuth, password reset, email verification, logout, change password |
-| **Users**                | 9         | CRUD, activate/deactivate, interests, preferences (GET/PATCH), data export |
-| **Books**                | 8         | Catalog, search, copies management             |
-| **Reservations**         | 7         | Create, approve, reject, collect               |
-| **Borrows**              | 10        | Checkout, return, history, statistics           |
-| **Materials**            | 6         | Upload, approve, list                          |
-| **Reading Lists**        | 10        | CRUD, items, feed, instructor lists, admin moderation |
-| **Instructor Followers** | 3         | Follow, unfollow, list followed                |
-| **Dashboard**            | 3         | Statistics, analytics                          |
-| **AI**                   | 9         | SSE chat, conversations CRUD, history, status, scan cover, update interests, get context |
-| **External Books**       | 5         | Search (Open Library + Gutendex), single import, bulk import, check existing |
-| **Notifications**        | 4         | List, mark read                                |
-| **Branches**             | 5         | CRUD, activate/deactivate (admin)              |
-| **Borrow Policies**      | 2         | List, update per role (admin)                  |
-| **Fine Payments**        | 5         | List, totals, detail, mark paid, waive (admin) |
-| **Reports**              | 2         | Summary metrics, PDF/Excel export (admin)      |
-
-### Example Requests
-
-#### Login
-
-```bash
-POST /api/auth/login
-Content-Type: application/json
-
-{
-  "email": "student@uskudar.edu.tr",
-  "password": "yourPassword"
-}
-```
-
-#### Get Book Catalog
-
-```bash
-GET /api/books?page=1&pageSize=12&faculty=FENS&category=Textbook
-Authorization: Cookie (access_token)
-```
-
-#### Create Reservation
-
-```bash
-POST /api/reservations
-Content-Type: application/json
-Authorization: Cookie (access_token)
-
-{
-  "bookId": "book-uuid",
-  "branchId": "branch-uuid"
-}
-```
-
-#### AI Chat
-
-```bash
-POST /api/ai/chat
-Content-Type: application/json
-Authorization: Cookie (access_token)
-
-{
-  "message": "Create a learning path for machine learning"
-}
-```
-
----
-
-## 👥 User Roles & Permissions
-
-| Permission              | Student | Instructor | Staff | Admin |
-| ------------------------ | ------- | ---------- | ----- | ----- |
-| Browse Catalog           | ✅      | ✅         | ✅    | ✅    |
-| Create Reservations      | ✅      | ✅         | ✅    | ✅    |
-| View Own Borrows         | ✅      | ✅         | ✅    | ✅    |
-| AI Chat Assistant        | ✅      | ✅         | ✅    | ✅    |
-| Follow Instructors       | ✅      | ✅         | ✅    | ❌    |
-| Discover Reading Lists   | ✅      | ✅         | ✅    | ✅    |
-| Submit Materials         | ❌      | ✅         | ❌    | ✅    |
-| Create Reading Lists     | ❌      | ✅         | ❌    | ❌    |
-| Approve Reservations     | ❌      | ❌         | ❌    | ✅    |
-| Process Returns          | ❌      | ❌         | ❌    | ✅    |
-| Manage Books             | ❌      | ❌         | ❌    | ✅    |
-| Manage Users             | ❌      | ❌         | ❌    | ✅    |
-| Moderate Reading Lists   | ❌      | ❌         | ❌    | ✅    |
-| View Statistics          | ❌      | ❌         | ❌    | ✅    |
-
-### Borrow Limits by Role
-
-| Role       | Max Active Borrows | Borrow Period | Max Extensions |
-| ---------- | ------------------ | ------------- | -------------- |
-| Student    | 5                  | 14 days       | 2              |
-| Instructor | 10                 | 30 days       | 3              |
-| Staff      | 7                  | 14 days       | 2              |
-| Admin      | Unlimited          | 60 days       | Unlimited      |
-
----
-
-## 🗄 Database Schema
-
-### Core Entities
-
-```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│     User     │     │     Book     │     │    Branch    │
-├──────────────┤     ├──────────────┤     ├──────────────┤
-│ id           │     │ id           │     │ id           │
-│ email        │     │ title        │     │ name         │
-│ password     │     │ authors      │     │ address      │
-│ name         │     │ isbn         │     │ isActive     │
-│ role         │     │ category     │     └──────────────┘
-│ studentId    │     │ faculty      │            │
-│ faculty      │     │ ebookUrl     │            │
-│ interests    │     │ subjectTags  │            │
-└──────────────┘     └──────────────┘            │
-       │                    │                    │
-       │              ┌─────┴───────────┐        │
-       │              │                 │        │
-       ▼              ▼                 ▼        ▼
-┌────────────────┐  ┌──────────────┐  ┌──────────────┐
-│ Reservation    │  │   BookCopy   │──│   Borrow     │
-├────────────────┤  ├──────────────┤  ├──────────────┤
-│ id             │  │ id           │  │ id           │
-│ userId         │  │ bookId       │  │ userId       │
-│ bookId         │  │ branchId     │  │ bookCopyId   │
-│ branchId       │  │ barcode      │  │ borrowDate   │
-│ status         │  │ status       │  │ dueDate      │
-│ pickupDeadline │  └──────────────┘  │ returnDate   │
-└────────────────┘                    │ fine         │
-                                      └──────────────┘
-```
-
-### Additional Entities
-
-- **Material**: Research papers, publications, course materials
-- **Notification**: User notifications for system events
-- **ReadingList**: Instructor-curated book collections with visibility and status controls
-- **ReadingListItem**: Books within a reading list
-- **InstructorFollower**: Student-to-instructor follow relationships
-- **BorrowPolicy**: Role-specific borrowing limits and rules
-
-### Notable Schema Fields (V2)
-
-- **`User.notificationPrefs`** (`Json`) — Per-user notification preferences stored as JSON: `{ emailNotifications, dueDateReminders, reservationAlerts }`. Defaults all to `true`. The borrow scheduler and reservation service check these before sending any notification.
-
----
-
-## 🤖 OZ AI — Agentic Assistant
-
-OZ AI is the library's built-in AI assistant. It runs as a **tool-calling agent loop** with **Server-Sent Events (SSE) streaming**, giving it real-time access to library data rather than relying on static context injection.
-
-### Architecture
-
-```
-User Message (text or image)
-     │
-     ▼
-┌──────────────────────────────────────────┐
-│  POST /ai/chat  →  SSE stream            │
-│  agent.service.ts — AgentService         │
-└───────────────┬──────────────────────────┘
-                │
-                ▼
-┌──────────────────────────────────────────┐
-│  OpenRouter /chat/completions            │
-│  Tiered model selection (FREE/CHEAP/SMART)
-│  System prompt + conversation history   │
-│  Tool definitions injected              │
-└───────────────┬──────────────────────────┘
-                │ tool_call?
-       ┌────────┴─────────┐
-       │ yes              │ no
-       ▼                  ▼
-┌─────────────┐   ┌───────────────────┐
-│ executeTool │   │ stream text chunk │
-│ (Prisma /   │   │ to client via SSE │
-│  fetch)     │   └───────────────────┘
-└──────┬──────┘
-       │ result injected as tool message
-       └──────────► back to OpenRouter (loop, max 5 rounds)
-```
-
-### Model Tiers
-
-| Tier | Model | Used For |
-|------|-------|----------|
-| FREE | `google/gemma-4-31b-it:free` | Simple greetings, short responses |
-| CHEAP | `google/gemini-3.1-flash-lite-preview` | Tool-calling, image analysis |
-| SMART | `anthropic/claude-3-haiku` | Deep analytical queries, research |
-
-If the FREE tier is rate-limited (429), the agent automatically falls back to CHEAP.
-
-### Tools
-
-| Tool | Description |
-|------|-------------|
-| `search_catalog` | Search books by keyword; returns title, authors, availability |
-| `get_book_details` | Full detail for a specific book ID, including `readUrl` for managed PDFs and e-books |
-| `read_ebook` | Read grounded content from a managed book PDF (`pdfUrl`) or supported e-book URL; uploaded PDFs are extracted and cached before OZ answers |
-| `search_study_material` | Search indexed, approved study materials and return grounded matches |
-| `list_study_materials` | List accessible indexed materials for discovery before deeper questions |
-| `get_chunk_context` | Expand the surrounding context for a specific indexed material chunk |
-| `get_material_outline` | Build a quick outline from indexed material chunks |
-| `fetch_webpage` | General web fetch for research or external context |
-| `get_my_borrows` | Caller's currently active borrows with due dates |
-| `get_catalog_stats` | System-wide counts: books, copies, available, borrowed, e-books |
-| `get_active_borrows` | Staff/Admin: all active borrows + top 5 most-borrowed titles |
-| `get_active_reservations` | Staff/Admin: pending and ready-for-pickup reservations |
-| `get_user_stats` | Admin: total user counts by role |
-
-### Image Understanding
-
-Users can attach an image to any message (max 1024px, JPEG compressed). The image is sent as a base64 multipart content block via the OpenRouter vision API. Useful for asking about a book cover, a reading list photo, etc.
-
-### Conversation History
-
-Each conversation is persisted in the `AiConversation` database model. Users can:
-- Start new conversations
-- Switch between past conversations from the sidebar
-- Each conversation maintains its own full message history for multi-turn context
-
-### Response Modes
-
-OZ now supports **composable response modes** instead of a single static chat mode.
-
-- `normal` is the fallback when no special mode is active.
-- Study sessions automatically begin in `learning + explanatory` mode.
-- OZ can auto-activate additional modes mid-conversation based on the user's intent.
-- Users can manually pin extra modes on top of the auto-selected set.
-- The chat UI shows active auto/manual modes in purple so the user can see the current response posture.
-
-Available modes:
-- `learning` — coaching and comprehension checks
-- `explanatory` — step-by-step teaching and concrete examples
-- `planning` — study plans, milestones, sequencing, prioritisation
-- `formal` — academic tone and structured writing
-- `concise` — compact, low-padding answers
-
-### Book Cover Scanning
-
-Administrators can scan a physical book cover image to auto-fill the add-book form:
-
-```bash
-POST /ai/scan-cover
-Content-Type: application/json
-{ "image": "<base64 JPEG>" }
-```
-
-Uses OpenRouter (multimodal model). Extracts title, authors, ISBN, publisher, and publication year.
-
-### Admin SOP: Upload Books and Materials for OZ
-
-Use the library workflows below if you want OZ to answer from your own documents instead of falling back to generic web knowledge.
-
-#### Books (best path for AI-readable PDFs)
-
-1. Create the book record in the Admin Books screen.
-2. Upload the PDF through the admin book PDF flow (`POST /books/:id/pdf` or the admin UI).
-3. The system stores the file in S3/local storage and saves the resulting URL in `Book.pdfUrl`.
-4. The PDF indexing pipeline extracts text, stores it on the `Book` row (`pdfExtractedText`, `pdfIndexStatus`, `pdfPageCount`), and OZ can read it through `read_ebook`.
-5. If older book PDFs are still `PENDING`, run the admin backfill endpoint:
-   `POST /books/admin/reindex-pending-pdfs?limit=25`
-
-Important:
-- Uploading a PDF directly to S3 without linking it to a `Book` record is not enough for OZ.
-- `pdfUrl` is the database field that points to the uploaded book PDF; that is the managed path OZ reads.
-- `ebookUrl` is still supported for external e-book links, but uploaded PDFs should use `pdfUrl`.
-
-#### Study Materials (best path for course/research documents)
-
-1. Upload materials through the Materials workflow, not by placing files in storage manually.
-2. Instructor submissions must be approved and published before OZ can use them.
-3. Admin-created materials with supported files are auto-approved and indexed.
-4. Indexed text is stored in `material_chunks`, and OZ uses the study-material tools to answer from those chunks.
-
-Supported document types for ingestion:
-- Books: PDF via `Book.pdfUrl`
-- Materials: `.pdf`, `.doc`, `.docx`, `.txt`
-
-### Permission Safety
-
-- Tool results are scoped: `get_my_borrows` returns only the requesting user's data
-- Staff/Admin-only tools (`get_active_borrows`, `get_active_reservations`) enforce role check inside tool handler
-- Admin-only tool (`get_user_stats`) enforces ADMIN role
-- Study-material tools expose only approved, published, indexed material the caller is allowed to access
-- The AI informs but never executes write actions
-- SSRF protection: `fetch_webpage` and `read_ebook` block localhost, RFC-1918, and link-local addresses
-
-### LLM Configuration (OpenRouter)
-
-Requires an OpenRouter API key (free tier available):
-
-```env
-OPENROUTER_API_KEY="sk-or-v1-..."
-```
-
-When `OPENROUTER_API_KEY` is not set, `/ai/status` returns `{ "available": false }` and the frontend shows an "Offline" indicator.
-
----
-
-## 📸 Screenshots
-
-*Screenshots coming soon*
-
----
-
-## 🗺 Roadmap
-
-### ✅ Phase 1: Core System (Completed)
-
-- [x] Authentication & Authorization (JWT + Google OAuth)
-- [x] Email Verification & Password Reset
-- [x] Book Catalog with Search & Filters
-- [x] Reservation System
-- [x] Borrow Management with Fine Calculation
-- [x] Materials Upload & Approval
-- [x] Notification System
-- [x] Admin Statistics Dashboard
-- [x] Dark Mode
-
-### ✅ Phase 2: User Features (Completed)
-
-- [x] Secure User Onboarding (Google Sign-In + Verified Email/Password Signup)
-- [x] Edit User Profile
-- [x] Instructor Follower System
-- [x] Reading Lists CRUD (visibility/status/discovery/moderation)
-
-### ✅ Phase 3: AI Integration (Completed)
-
-- [x] AI Chatbot for Study Assistance
-- [x] Role-Aware Context-Driven Recommendations
-- [x] Natural Language Catalog Search with Semantic Scoring
-- [x] Personalized Learning Path Generation
-- [x] Research Assistant with Literature Guidance
-- [x] OpenRouter LLM Integration with tiered model routing (FREE/CHEAP/SMART)
-- [x] Embeddings-Ready Semantic Search Abstraction (keyword/hybrid/embedding strategy with shared types)
-
-### 🔄 Phase 4: Production Readiness (In Progress)
-
-- [x] Email Service (SMTP with nodemailer, feature-flagged fallback)
-- [x] Cloud File Storage (AWS S3 with local fallback)
-- [x] Error Logging & Monitoring (structured logging, correlation IDs, health endpoints)
-- [x] Security Hardening (Helmet, CORS allowlist, rate limiting)
-- [x] Performance Optimization (query shaping, pagination, compound indexes)
-
-### ✅ Phase 5: Admin Enhancements (Completed)
-
-- [x] Branch Management (CRUD + activate/deactivate)
-- [x] Configurable Borrow Policies (admin UI for role-based limits)
-- [x] Fine Payment Tracking (auto-create on overdue return, admin pay/waive)
-- [x] Report Generation (PDF/Excel export with date range, summary metrics, top books)
-- [x] External E-Book Import (Open Library + Gutendex, single + bulk, duplicate prevention)
-
-### ✅ Phase 6: UI/UX & AI Overhaul (Completed)
-
-- [x] Liquid Glass Design System (WebGL aurora background, glass chrome layer, Framer Motion spring animations)
-- [x] 3D Login/Signup redesign (Spline interactive robot, glassmorphism form card, traveling border beams)
-- [x] OZ AI — full agentic rewrite (SSE streaming, tool-calling loop, replaces intent-router)
-- [x] AI conversation history persistence (AiConversation model, conversation sidebar)
-- [x] Book cover scanning via OpenRouter multimodal model
-- [x] Student UX audit — fines page, department-based recommendations, borrow history fine cross-reference, a11y toggle roles
-- [x] Instructor dashboard — new-list flow, share-research widget, followers widget
-- [x] Automated overdue/due-soon notification scheduler (hourly, 22h dedup)
-
-### ✅ Phase 7: V2 Polish & Settings Wiring (Completed)
-
-- [x] **OpenRouter migration** — replaced local Ollama with cloud LLM routing; tiered model selection (FREE/CHEAP/SMART)
-- [x] **Multi-provider AI factory** — OpenRouterProvider, GeminiProvider, GroqProvider behind a unified `ProviderFactory`; falls back gracefully
-- [x] **Change Password** — authenticated `PATCH /auth/change-password` endpoint; bcrypt re-hash; blocks OAuth accounts; modal UI with show/hide toggles
-- [x] **Notification Preferences** — `notificationPrefs Json` column on User; `GET/PATCH /users/preferences`; borrow scheduler and reservations service check prefs before sending any alert
-- [x] **Download My Data** — `GET /users/export` returns all user borrows, reservations, reading lists, and profile as JSON; frontend triggers browser file download
-- [x] **Dark mode fixes** — admin pages text was invisible; header was white in dark mode; inverted `isDarkContent` branch removed; global `@layer base` rule lifts `text-gray-500/600/700` to readable shades in dark mode
-- [x] **AI chat text contrast** — `renderMessage` opacity-based `dark:text-white/85` replaced with solid `dark:text-gray-100` (opacity blending on dark backgrounds produced medium gray, not white)
-- [x] **Admin follow guard** — admins blocked from following instructors at both controller and service level
-- [x] **AdminPageLayout** — reusable admin page wrapper component for design consistency
-
----
-
-## ⚡ Performance Optimization
-
-### Query Shaping
-- Expensive Prisma reads use `select` to fetch only required fields instead of full model includes
-- `findActiveBorrows()`, `findAllBorrows()` now return only the columns the frontend needs
-
-### Pagination & Safety Caps
-- `GET /borrows` (admin) now supports `?page=&pageSize=` with a 100-row max
-- User-scoped list endpoints (`findMyBorrows`, `findMyReservations`, `findMyLists`) have `take: 50` safety caps
-- Admin list endpoints (`findPendingReservations`, `findReadyForPickup`, `findAllForModeration`) have `take: 100` caps
-
-### Database Indexes
-Compound indexes added for common query patterns:
-- `Notification(userId, read)` — unread count queries
-- `Notification(userId, createdAt)` — notification feed sorting
-- `Borrow(userId, status)` — user active borrows lookup
-- `Borrow(status, dueAt)` — admin overdue queries
-- `Reservation(userId, status)` — user active reservation checks
-- `ReadingList(status, visibility)` — global feed discovery
-
-Run `npx prisma migrate dev` (local) or `npx prisma migrate deploy` (deployment) after pulling to apply the latest schema changes, including material indexing and book PDF extraction fields.
-
----
-
-## 🔒 Security Hardening
-
-### Helmet
-
-All responses include secure HTTP headers (X-Content-Type-Options, X-Frame-Options, Strict-Transport-Security, etc.) via [Helmet](https://helmetjs.github.io/). CSP is disabled (managed by Next.js frontend).
-
-### CORS
-
-Origins are controlled via the `CORS_ORIGIN` env var (comma-separated). Only listed origins can make credentialed requests:
-
-```env
-CORS_ORIGIN="http://localhost:3000,https://library.uskudar.edu.tr"
-```
-
-### Rate Limiting
-
-Powered by `@nestjs/throttler`. Global default: 20 requests per 60-second window.
-
-Stricter limits on sensitive endpoints:
-- **Auth** (`/auth/login`, `/auth/register`, `/auth/forgot-password`): 5 req/min
-- **AI chat** (`/ai/chat`): 15 req/min
-
-Exceeding the limit returns `429 Too Many Requests`. Tune via env vars:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `THROTTLE_TTL` | `60` | Window in seconds |
-| `THROTTLE_LIMIT` | `20` | Global max requests per window |
-| `THROTTLE_AUTH_LIMIT` | `5` | Auth endpoint limit |
-| `THROTTLE_AI_LIMIT` | `15` | AI chat limit |
-
----
-
-## 📧 Production Auth & Mail Setup
-
-Configure authentication and email services for production deployments.
-
-### Google OAuth
-
-The "Continue with Google" button is **automatically hidden** if OAuth is not configured. To enable:
-
-1. Create credentials at [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-2. Set authorized redirect URI: `https://your-api-domain/auth/google/callback`
-3. Add to `.env`:
-   ```env
-   GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
-   GOOGLE_CLIENT_SECRET="your-client-secret"
-   GOOGLE_CALLBACK_URL="https://your-api-domain/auth/google/callback"
-   ```
-
-**Startup log:**
-```
-[Bootstrap] Google OAuth: ENABLED
-```
-
-If credentials are missing:
-```
-[Bootstrap] Google OAuth: DISABLED (set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to enable)
-```
-
-### SMTP Email
-
-Email verification codes and password reset links require SMTP in production. Without it, emails are logged to the console (dev mode only).
-
-```env
-SMTP_HOST="smtp.sendgrid.net"
-SMTP_PORT="587"
-SMTP_USER="apikey"
-SMTP_PASS="SG.your-api-key"
-SMTP_FROM="noreply@library.uskudar.edu.tr"
-```
-
-**Gmail users:** You must use an [App Password](https://support.google.com/accounts/answer/185833), not your account password. Enable 2-Step Verification first, then generate an App Password for "Mail".
-
-```env
-SMTP_HOST="smtp.gmail.com"
-SMTP_PORT="587"
-SMTP_USER="your-email@gmail.com"
-SMTP_PASS="your-16-char-app-password"
-```
-
-**Startup log:**
-```
-[MailService] SMTP connected: smtp.sendgrid.net
-```
-
-If SMTP is not configured:
-```
-[MailService] SMTP_HOST not configured — emails will be logged to console instead of sent
-```
-
-### FRONTEND_URL vs CORS_ORIGIN
-
-| Variable | Purpose |
-|----------|---------|
-| `CORS_ORIGIN` | Comma-separated list of allowed origins for CORS (e.g., `http://localhost:3000,https://app.example.com`) |
-| `FRONTEND_URL` | Canonical URL for password reset links and OAuth redirects. Falls back to first CORS origin if not set. |
-
-In production, set both:
-```env
-CORS_ORIGIN="https://app.example.com,https://staging.example.com"
-FRONTEND_URL="https://app.example.com"
-```
-
----
-
-## ☁️ Cloud File Storage
-
-File uploads (avatars, materials) support both local disk and AWS S3.
-
-### Configuration
-
-Set `STORAGE_PROVIDER=s3` in `.env` along with the required AWS credentials:
-
-```env
-STORAGE_PROVIDER="s3"
-AWS_REGION="eu-central-1"
-AWS_S3_BUCKET="my-library-uploads"
-AWS_ACCESS_KEY_ID="AKIA..."
-AWS_SECRET_ACCESS_KEY="..."
-AWS_S3_PUBLIC_BASE_URL=""   # optional override
-```
-
-### Local Fallback
-
-When `STORAGE_PROVIDER` is `local` (the default) or S3 credentials are missing, uploads are written to `apps/api/uploads/` and served as static assets — no AWS account needed for development.
-
----
-
-## 🩺 Health Endpoints
-
-No authentication required. Designed for load balancers and container orchestrators.
-
-| Endpoint | Purpose | Success | Failure |
-|----------|---------|---------|---------|
-| `GET /health/live` | Liveness probe — process is running | `200` | — |
-| `GET /health/ready` | Readiness probe — dependencies healthy | `200` | `503` |
-
-**Readiness checks:**
-- **db**: Runs `SELECT 1` against PostgreSQL
-
-Example response:
-```json
-{
-  "status": "ready",
-  "checks": { "db": "up" },
-  "timestamp": "2026-03-12T10:00:00.000Z"
-}
-```
-
----
-
-## 🔍 Logging & Troubleshooting
-
-The API includes structured logging and error handling out of the box.
-
-### Request Correlation
-
-Every response includes an `x-request-id` header. If a client sends `x-request-id`, that value is preserved; otherwise a UUID is generated. Include this ID when reporting issues.
-
-### Request Logging
-
-All requests (except `/uploads/` static files) are logged with method, path, status, duration, and request ID:
-
-```
-[RequestLogger] GET /api/books 200 12ms [req=abc-123]
-```
-
-Disable per-request logging by setting `ENABLE_REQUEST_LOGGING=false` in `.env`.
-
-### Error Responses
-
-All errors return a consistent JSON shape with `requestId` and `timestamp`:
-
-```json
-{
-  "statusCode": 500,
-  "message": "Internal server error",
-  "error": "Internal Server Error",
-  "requestId": "abc-123",
-  "timestamp": "2026-03-10T12:00:00.000Z"
-}
-```
-
-Stack traces are logged server-side only and never exposed to clients.
-
-### Log Levels
-
-Set `LOG_LEVEL` in `.env` to control verbosity: `error`, `warn`, `log` (default), `debug`, or `verbose`.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Guidelines
-
-- Follow TypeScript best practices
-- Write meaningful commit messages
-- Add tests for new features
-- Update documentation as needed
-- Follow the existing code style
-
----
-
-## 📄 License
-
-This project is developed as a graduation project for Üsküdar University, Faculty of Engineering and Natural Sciences, Software Engineering Department.
-
-**© 2025-2026 Üsküdar University**
-
----
-
-## 🙏 Acknowledgments
-
-- **Thesis Advisor**: Dr. Kristin Surpuhi BENLİ
-- **Department**: Software Engineering, Üsküdar University
-- **Icons**: [Lucide Icons](https://lucide.dev/)
-- **UI Inspiration**: Modern library management systems
-
----
-
-**Built with ❤️ for Üsküdar University**
-
-[⬆ Back to Top](#-ai-integrated-university-library-management-system)
-
