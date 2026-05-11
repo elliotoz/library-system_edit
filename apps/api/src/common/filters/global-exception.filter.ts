@@ -51,12 +51,18 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       };
     }
 
-    // Server-side logging with full stack
     const stack =
       exception instanceof Error ? exception.stack : String(exception);
-    this.logger.error(
-      `${status} ${req.method} ${req.originalUrl} [req=${requestId}] ${stack}`,
-    );
+
+    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      this.logger.error(
+        `${status} ${req.method} ${req.originalUrl} [req=${requestId}] ${stack}`,
+      );
+    } else {
+      this.logger.warn(
+        `${status} ${req.method} ${req.originalUrl} [req=${requestId}] ${body.message}`,
+      );
+    }
 
     res.status(status).json(body);
   }

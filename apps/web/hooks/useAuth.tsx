@@ -1,7 +1,7 @@
 // hooks/useAuth.ts
 'use client';
 
-import { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, useCallback, createContext, useContext, ReactNode, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { mutate } from 'swr';
 import { User, LoginCredentials, DASHBOARD_ROUTES, Role } from '@/types';
@@ -25,6 +25,7 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const initialAuthChecked = useRef(false);
   const router = useRouter();
 
   // Check auth status on mount by calling /auth/me
@@ -40,6 +41,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   useEffect(() => {
+    if (initialAuthChecked.current) return;
+    initialAuthChecked.current = true;
     checkAuth();
   }, [checkAuth]);
 
