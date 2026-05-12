@@ -107,6 +107,19 @@ Use this checklist to verify all features work correctly before deployment.
 - [MANUAL] Can send a message and receive a response
 - [MANUAL] Conversation list (sidebar) loads and persists across reload
 - [MANUAL] Delete conversation removes it from the list
+- [MANUAL] New chat starts with model selector set to Auto
+- [MANUAL] `GET /ai/models` returns Auto plus the four selectable models
+- [MANUAL] Manual Codex Mini selection persists on conversation switch
+- [MANUAL] Gemma Free plus an image request shows capability fallback
+- [MANUAL] Gemma Free plus a catalog/tool request shows capability fallback
+- [MANUAL] Capability fallback does not overwrite the saved manual model
+- [MANUAL] Markdown tables, lists, and blockquotes render in assistant replies
+- [MANUAL] Math renders with KaTeX for inline and display equations
+- [MANUAL] Code blocks render with syntax highlighting and copy button
+- [MANUAL] Fenced `graph` JSON renders an interactive Plotly chart
+- [MANUAL] Invalid `graph` JSON falls back to source text
+- [MANUAL] Fenced `mermaid` content renders a diagram
+- [MANUAL] Invalid Mermaid content falls back to source text
 - [MANUAL] Chat is rate-limited (15 messages / 60s)
 - [AUTO] `GET /ai/status` requires auth (`security.e2e-spec.ts`)
 
@@ -237,6 +250,8 @@ All endpoints below require a valid `access_token` cookie unless noted.
 - [MANUAL] `POST /ai/conversations` — create conversation
 - [MANUAL] `DELETE /ai/conversations/:id` — delete conversation
 - [MANUAL] `GET /ai/history?conversationId=` — messages for a conversation
+- [MANUAL] `GET /ai/models` — list public selectable model metadata
+- [MANUAL] `PATCH /ai/conversations/:id/model` — update model preference
 - [MANUAL] `POST /ai/chat` — streaming SSE response; rate-limited 15/60s
 - [MANUAL] `POST /ai/scan-cover` — admin only
 
@@ -306,6 +321,7 @@ These should all return 400:
 | `users.controller.spec.ts`         | —     | GET /users/:id access control                               |
 | `reservations.service.spec.ts`     | —     | Service-layer concurrency                                   |
 | `borrow-scheduler.service.spec.ts` | —     | Overdue + expiry scheduler                                  |
+| `model-registry.spec.ts`           | 31    | AI model registry and fallback behavior                     |
 | `global-exception.filter.spec.ts`  | —     | Error contract shape                                        |
 
 ### Known Issues

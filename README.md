@@ -42,7 +42,7 @@ This repository is a Node.js monorepo containing two applications:
 - `apps/api`: NestJS API with Prisma ORM, PostgreSQL, JWT cookie authentication, Swagger,
   document extraction, S3/local upload support, scheduled borrow and reservation reconciliation,
   and AI assistant services.
-- `apps/web`: Next.js 14 App Router frontend with protected dashboard routes, role-aware
+- `apps/web`: Next.js 15 App Router frontend with protected dashboard routes, role-aware
   navigation, API proxy rewrites, and AI chat route handlers.
 
 Primary local ports:
@@ -82,7 +82,8 @@ Primary local ports:
 - AI assistant with conversations, saved messages, streaming SSE chat, study sessions,
   live model auto-selection, manual model override, response modes, tool calling, catalog
   access, reading-list access, borrow/reservation/stat lookups, study-material search,
-  e-book/PDF reading, webpage fetching, and admin book-cover scanning.
+  e-book/PDF reading, webpage fetching, scientific response rendering, and admin
+  book-cover scanning.
 - Swagger API documentation at `/api/docs`.
 - Health probes at `/health/live`, `/health/ready`, and `/auth/health`.
 
@@ -219,7 +220,7 @@ directory is present in the current repository.
 
 ## Frontend Architecture
 
-The frontend is a Next.js 14 App Router application built with React 18, TypeScript, Tailwind
+The frontend is a Next.js 15 App Router application built with React 18, TypeScript, Tailwind
 CSS, Framer Motion, SWR, Axios, and Radix UI primitives.
 
 Key implementation files:
@@ -320,7 +321,7 @@ Middleware route permissions (from `apps/web/middleware.ts`):
 
 ## Backend Architecture
 
-The backend is a NestJS 10 API using Prisma 5 and PostgreSQL 15.
+The backend is a NestJS 11 API using Prisma 5 and PostgreSQL 15.
 
 Key implementation files:
 
@@ -374,9 +375,7 @@ Required environment variable:
 - `OPENROUTER_API_KEY` — required by the active provider. The `/health/ready` endpoint
   reports `"ai": "configured"` when this key is present, `"ai": "not configured"` otherwise.
 
-Note: `OPENROUTER_API_KEY` is not present in `apps/api/.env.example` but is checked in
-`OpenRouterProvider`, `AgentService`, and `HealthController`. Add it to `apps/api/.env`
-when enabling AI features.
+Add `OPENROUTER_API_KEY` to `apps/api/.env` when enabling AI features.
 
 ### Provider Class
 
@@ -388,26 +387,57 @@ when enabling AI features.
 
 All model requests go through OpenRouter regardless of the underlying model provider.
 
-| Tier constant | Model ID | Used when |
-| ------------- | -------- | --------- |
-| `FREE` | `google/gemma-4-31b-it:free` | Simple greetings and short messages |
-| `CHEAP` | `google/gemini-3.1-flash-lite-preview` | Default tool-calling and catalog queries |
-| `SMART` | `anthropic/claude-3-haiku` | Deep analytical queries |
-| `STUDY` | `anthropic/claude-3-haiku` | Study session guide generation |
+- `free`: `google/gemma-4-31b-it:free` for simple greetings and
+  short messages.
+- `tool`: `google/gemini-3.1-flash-lite-preview` for tool use, catalog
+  queries, and image fallback.
+- `smart`: `anthropic/claude-3-haiku` for deep analytical queries and
+  study-session guides.
+- `technical`: `openai/gpt-5.1-codex-mini` for manual technical, coding,
+  and structured reasoning.
 
-Auto model selection logic in `AgentService.pickModel()`:
+`OPENROUTER_MODELS` still exposes `FREE`, `CHEAP`, `SMART`, and `STUDY`
+constants. The IDs come from `apps/api/src/ai/model-registry.ts`.
 
-- Image attached → `CHEAP`
-- Deep query keywords detected → `SMART`
-- Simple greeting or short message → `FREE`
-- Default → `CHEAP`
+Auto model selection logic in `AgentService.resolveModelSelection()`:
 
-Manual model override: users can select a specific model from the frontend model selector,
-which sends it in the `model` field of the chat request. The conversation stores
-`manualModel`, `lastResolvedModel`, and `lastModelSelectionSource` (`auto`, `manual`,
-or `fallback`).
+- image attached: use the tool/vision-capable standby model
+- study session or deep query: use the smart model
+- simple greeting or short message: use the free model
+- other tool/catalog requests: use the tool-capable standby model
+
+Manual model override: users can select a specific model from the frontend
+model selector, which sends it in the `model` field of the chat request.
+The conversation stores `manualModel`, `lastResolvedModel`, and
+`lastModelSelectionSource`.
+
+Model selection source values are:
+
+| Source | Meaning |
+| ------ | ------- |
+| `auto` | Auto mode selected the active model |
+| `manual` | The saved manual model handled the request directly |
+| `capability_fallback` | The saved model lacked image or tool support |
+| `rate_limit_fallback` | The selected free model was rate-limited |
+
+Capability fallback is temporary. It does not overwrite the saved manual
+model, so the next request starts from the user's selected model again.
 
 Book-cover scan uses `google/gemini-2.0-flash-lite` directly (vision model, not tiered).
+
+### Scientific Response Rendering
+
+Assistant messages render through `AIMessage` with:
+
+- Markdown and GitHub-flavored Markdown tables
+- KaTeX math via `$...$` and `$$...$$`
+- syntax-highlighted code blocks with a copy button
+- interactive Plotly graph blocks from fenced `graph` JSON
+- Mermaid diagrams from fenced `mermaid` blocks
+- source-code fallback when graph or Mermaid rendering fails
+
+Scientific output guidance is added to the system prompt when the user's
+message asks for math, science, engineering, graphing, code, or diagrams.
 
 ### Conversation Features
 
@@ -661,12 +691,8 @@ Additional script `apps/api/prisma/add-books.ts` adds or updates 8 test books wh
 | `CORS_ORIGIN` | Comma-separated list of allowed frontend origins |
 | `FRONTEND_URL` | Canonical frontend URL for OAuth redirects and email links |
 | `UPLOAD_DIR` | Upload directory path (static serving uses `./uploads` relative to API cwd) |
-| `OLLAMA_BASE_URL` | Listed in example; active embedding implementation is not wired |
-| `ANTHROPIC_API_KEY` | Listed in example; active AI path uses OpenRouter, not Anthropic SDK directly |
-| `LLM_PROVIDER_PREFERENCE` | Listed in example; no active provider switching found in code |
-| `OPENROUTER_API_KEY` | Required by active AI provider; checked in code but absent from `.env.example` |
+| `OPENROUTER_API_KEY` | Required by the active OpenRouter AI provider |
 | `AI_SEMANTIC_MODE` | `keyword`, `hybrid`, or `embedding`; default `hybrid`; hybrid falls back to keyword |
-| `AI_EMBEDDINGS_ENABLED` | Listed in example; no active code path found |
 | `STORAGE_PROVIDER` | `local` or `s3` |
 | `AWS_REGION` | S3 region; required when `STORAGE_PROVIDER=s3` |
 | `AWS_S3_BUCKET` | S3 bucket; required when `STORAGE_PROVIDER=s3` |
@@ -677,7 +703,6 @@ Additional script `apps/api/prisma/add-books.ts` adds or updates 8 test books wh
 | `THROTTLE_LIMIT` | Global rate-limit max requests per window |
 | `THROTTLE_AUTH_LIMIT` | Auth endpoint throttle limit (auth controllers use inline throttles) |
 | `THROTTLE_AI_LIMIT` | AI chat throttle limit (AI controller uses inline throttle of 15/60s) |
-| `MONITOR_OLLAMA` | Listed in example; readiness check covers DB and OpenRouter key only |
 | `LOG_LEVEL` | Nest logger level: `error`, `warn`, `log`, `debug`, `verbose` |
 | `ENABLE_REQUEST_LOGGING` | Set to `"false"` to silence per-request logs |
 | `LOG_SQL` | Set to `"true"` to enable Prisma SQL query logs |
@@ -871,6 +896,7 @@ Discovered test suites:
 | `src/borrows/borrow-scheduler.service.spec.ts` | Unit | Overdue and expiry scheduler |
 | `src/ai/catalog-search.service.spec.ts` | Unit | Catalog search |
 | `src/ai/ai-modes.spec.ts` | Unit | AI mode resolution logic |
+| `src/ai/model-registry.spec.ts` | Unit | AI model registry and fallback behavior |
 | `src/ai/agent.service.spec.ts` | Unit | Agent service |
 | `src/materials/material-access.util.spec.ts` | Unit | Material access control |
 | `src/common/filters/global-exception.filter.spec.ts` | Unit | Error contract shape |
@@ -1098,8 +1124,10 @@ http://localhost:3001/api/docs
 - `DELETE /ai/conversations/:id`
 - `GET /ai/history`
 - `GET /ai/metrics`
+- `GET /ai/models`
 - `POST /ai/study`
 - `PATCH /ai/conversations/:id/mode`
+- `PATCH /ai/conversations/:id/model`
 - `POST /ai/chat` (SSE streaming; rate-limited 15 requests/60s)
 - `PATCH /ai/interests`
 - `GET /ai/context`
