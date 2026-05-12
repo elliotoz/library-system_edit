@@ -1,24 +1,60 @@
 # Library System
 
-AI-integrated university library system for catalog management, borrowing, reservations, instructor reading lists, study materials, notifications, fines, reports, and an OpenRouter-backed library assistant.
+AI-integrated university library system for Üsküdar University. Covers catalog management,
+borrowing, reservations, instructor reading lists, study materials, notifications, fines,
+reports, and an OpenRouter-backed AI library assistant.
 
-This README is based on the current repository code, configuration, Docker files, Prisma schema, frontend routes, backend controllers, AI services, tests, and operational docs. Items that are not present in the current repository are marked as not documented.
+This README is based directly on the current repository code, configuration, Docker files,
+Prisma schema, frontend routes, backend controllers, AI services, tests, and operational docs.
+Items absent from the current repository are marked as **not documented in the current repository**.
+
+---
+
+## Table of Contents
+
+- [Project Overview](#project-overview)
+- [Current Feature Set](#current-feature-set)
+- [User Experience and Main User Journeys](#user-experience-and-main-user-journeys)
+- [Functional Requirements](#functional-requirements)
+- [Non-Functional Requirements](#non-functional-requirements)
+- [Monorepo Structure](#monorepo-structure)
+- [Frontend Architecture](#frontend-architecture)
+- [Backend Architecture](#backend-architecture)
+- [AI Assistant Integration](#ai-assistant-integration)
+- [Docker Setup](#docker-setup)
+- [Database Setup](#database-setup)
+- [Environment Variables](#environment-variables)
+- [Local Development Setup](#local-development-setup)
+- [Available Scripts](#available-scripts)
+- [Testing, Linting, Formatting, and Type Checking](#testing-linting-formatting-and-type-checking)
+- [API Documentation and Discovered Endpoints](#api-documentation-and-discovered-endpoints)
+- [Security Considerations](#security-considerations)
+- [Deployment and Production Notes](#deployment-and-production-notes)
+- [Troubleshooting](#troubleshooting)
+- [Contributing Notes](#contributing-notes)
+
+---
 
 ## Project Overview
 
-This repository is a Node.js monorepo with two applications:
+This repository is a Node.js monorepo containing two applications:
 
-- `apps/api`: NestJS API, Prisma ORM, PostgreSQL, JWT cookie authentication, Swagger, document extraction, S3/local upload support, scheduled borrow/reservation reconciliation, and AI assistant services.
-- `apps/web`: Next.js 14 App Router frontend with protected dashboard routes, role-aware navigation, API proxy rewrites, and AI chat route handlers.
+- `apps/api`: NestJS API with Prisma ORM, PostgreSQL, JWT cookie authentication, Swagger,
+  document extraction, S3/local upload support, scheduled borrow and reservation reconciliation,
+  and AI assistant services.
+- `apps/web`: Next.js 14 App Router frontend with protected dashboard routes, role-aware
+  navigation, API proxy rewrites, and AI chat route handlers.
 
 Primary local ports:
 
-| Service | Port | Source |
-|---|---:|---|
-| Web app | `3000` | `apps/web/package.json`, `apps/web/Dockerfile` |
-| API | `3001` | `apps/api/.env.example`, `apps/api/Dockerfile` |
-| PostgreSQL | `5432` | `docker-compose.yml` |
-| pgAdmin | `5050` | `docker-compose.yml` |
+| Service    | Port   | Source                                           |
+| ---------- | -----: | ------------------------------------------------ |
+| Web app    | `3000` | `apps/web/package.json`, `apps/web/Dockerfile`   |
+| API        | `3001` | `apps/api/.env.example`, `apps/api/Dockerfile`   |
+| PostgreSQL | `5432` | `docker-compose.yml`                             |
+| pgAdmin    | `5050` | `docker-compose.yml`                             |
+
+---
 
 ## Current Feature Set
 
@@ -27,99 +63,129 @@ Primary local ports:
 - HttpOnly `access_token` cookie sessions with JWT verification.
 - Role model: `STUDENT`, `INSTRUCTOR`, `STAFF`, `ADMIN`.
 - Role-protected frontend dashboard routes and backend guards.
-- Book catalog with metadata, authors, ISBN, faculty/category/subject tags, cover images, e-book URLs, PDF URLs, copies, branches, and availability state.
+- Book catalog with metadata, authors, ISBN, faculty/category/subject tags, cover images,
+  e-book URLs, PDF URLs, copies, branches, and availability state.
 - Book copy and branch management.
 - Reservation lifecycle: `PENDING`, `APPROVED`, `READY_FOR_PICKUP`, `COLLECTED`, `CANCELLED`, `EXPIRED`.
-- Borrow lifecycle: `ACTIVE`, `RETURNED`, `OVERDUE`, extensions, and return handling.
-- Borrow policies by role.
+- Borrow lifecycle: `ACTIVE`, `RETURNED`, `OVERDUE`; extensions and return handling.
+- Borrow policies configurable per role.
 - Fine payments with `PENDING`, `PAID`, and `WAIVED` states.
-- Notifications with unread counts, read/delete operations, and reservation/borrow/list/system notification types.
-- Instructor reading lists with visibility and publication status.
-- Instructor following/follower features.
-- Professor/course/research material upload, approval, publishing, access controls, indexing, and search.
+- Notifications with unread counts, read/delete operations, and multiple notification types.
+- Instructor reading lists with visibility, publication status, and per-item ordering.
+- Instructor following/follower relationships.
+- Research material upload (professor publications, research papers, course materials, theses)
+  with approval, publishing, access controls, indexing, and search.
 - Reports export endpoints for PDF and Excel.
-- External book search/import endpoints for OpenLibrary and Gutendex.
-- Admin dashboards for users, books, branches, borrows, reservations, fines, materials, policies, reports, statistics, uploads, and imports.
-- AI assistant with conversations, saved messages, streaming SSE chat, study sessions, model selection state, response modes, tool calling, catalog access, reading-list access, borrow/reservation/stat lookups, study-material search, e-book/PDF reading, webpage fetching, and admin book-cover scanning.
+- External book search and import from OpenLibrary and Gutendex.
+- Admin dashboards for users, books, branches, borrows, reservations, fines, materials,
+  policies, reports, statistics, uploads, and external book imports.
+- AI assistant with conversations, saved messages, streaming SSE chat, study sessions,
+  live model auto-selection, manual model override, response modes, tool calling, catalog
+  access, reading-list access, borrow/reservation/stat lookups, study-material search,
+  e-book/PDF reading, webpage fetching, and admin book-cover scanning.
 - Swagger API documentation at `/api/docs`.
 - Health probes at `/health/live`, `/health/ready`, and `/auth/health`.
 
+---
+
 ## User Experience and Main User Journeys
 
-Public and auth journeys:
+### Public and Auth Journeys
 
-- A visitor can open `/`, sign up at `/signup`, verify email at `/verify-email`, log in at `/login`, request reset at `/forgot-password`, and reset a password at `/reset-password`.
-- Login sets an HttpOnly `access_token` cookie and redirects users to the role dashboard.
-- Google sign-in is shown only when configured by backend auth config.
+- A visitor opens `/`, signs up at `/signup`, verifies email at `/verify-email`, logs in at
+  `/login`, requests a reset at `/forgot-password`, and resets a password at `/reset-password`.
+- Login sets an HttpOnly `access_token` cookie and redirects users to their role dashboard.
+- The Google sign-in button is shown only when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+  are configured in the backend.
 
-Student and general authenticated journeys:
+### Student and General Authenticated Journeys
 
-- Browse `/dashboard/catalog`, inspect `/dashboard/catalog/[id]`, reserve available copies, review active borrows at `/dashboard/borrowed`, review history at `/dashboard/history`, manage reservations at `/dashboard/reservations`, view fines at `/dashboard/fines`, and manage profile/settings/notifications.
-- Use `/dashboard/ai-assistant` to ask catalog, borrowing, reading-list, study-material, and study-session questions.
-- Browse published reading lists at `/dashboard/reading-lists` and details at `/dashboard/reading-lists/[id]`.
+- Browse `/dashboard/catalog`, inspect `/dashboard/catalog/[id]`, reserve available copies,
+  review active borrows at `/dashboard/borrowed`, review history at `/dashboard/history`,
+  manage reservations at `/dashboard/reservations`, view fines at `/dashboard/fines`, and
+  manage profile/settings/notifications.
+- Use `/dashboard/ai-assistant` to ask catalog, borrowing, reading-list, study-material, and
+  study-session questions with a streaming AI assistant.
+- Browse published reading lists at `/dashboard/reading-lists` and details at
+  `/dashboard/reading-lists/[id]`.
 - View instructor profiles at `/dashboard/instructors/[id]`.
 
-Instructor journeys:
+### Instructor Journeys
 
-- Use `/dashboard/instructor`.
+- Access the instructor dashboard at `/dashboard/instructor`.
 - Submit materials at `/dashboard/instructor/submit-material`.
 - Review own submissions at `/dashboard/instructor/my-submissions`.
-- Create/manage reading lists at `/dashboard/instructor/reading-lists` and `/dashboard/instructor/reading-lists/[id]`.
+- Create and manage reading lists at `/dashboard/instructor/reading-lists` and
+  `/dashboard/instructor/reading-lists/[id]`.
 - View followed instructors at `/dashboard/instructor/following`.
 
-Staff journeys:
+### Staff Journeys
 
-- Use `/dashboard/staff`.
-- Access shared catalog, borrows, reservations, AI assistant, profile, notifications, reading-list, and settings surfaces allowed by frontend middleware.
+- Access `/dashboard/staff`.
+- Access shared catalog, borrows, reservations, AI assistant, profile, notifications,
+  reading lists, and settings surfaces permitted by frontend middleware.
 
-Admin journeys:
+### Admin Journeys
 
-- Use `/dashboard/admin`.
-- Manage books, users, branches, borrows, reservations, fines, materials, reading lists, policies, reports, statistics, uploads, and external book imports.
-- Scan book-cover images through the admin-only AI cover scan endpoint.
+- Access `/dashboard/admin`.
+- Manage books, users, branches, borrows, reservations, fines, materials, reading lists,
+  policies, reports, statistics, uploads, and external book imports.
+- Scan book-cover images through the admin-only `POST /ai/scan-cover` endpoint.
+
+---
 
 ## Functional Requirements
 
-Implemented requirements visible in code:
+Implemented requirements visible in the current code:
 
 - Users must authenticate before accessing `/dashboard/*`.
 - Dashboard access is role-gated in `apps/web/middleware.ts`.
 - Backend endpoints are protected with JWT guards, role guards, and public decorators.
 - New local users must verify email before login.
-- Password reset uses opaque reset tokens and generic outward messages.
-- Admins can activate/deactivate users.
+- Password reset uses opaque reset tokens and returns generic outward messages.
+- Admins can activate and deactivate users.
 - Books can have multiple physical copies across active library branches.
-- Reservations are user/book-copy/book/branch scoped and include a server-derived `bookId`.
-- Borrow policies limit active borrows, borrow days, extension count, and extension days by role.
-- Returning overdue borrows creates pending fine records.
-- Scheduler service reconciles overdue borrows and expired reservations.
+- Reservations are user/book-copy/book/branch scoped; `bookId` is server-derived, never
+  accepted from client input.
+- A unique partial index prevents duplicate active reservations for the same user and book.
+- Borrow policies limit active borrows, borrow days, extension count, and extension days per role.
+- Returning an overdue borrow creates a pending fine record.
+- A scheduler service reconciles overdue borrows and expired reservations.
 - Materials have publication/approval state, access level, and indexing state.
-- AI assistant must use tools for live library data questions and should not guess catalog/statistical values.
+- The AI assistant must use tools for live library data and must not guess catalog or
+  statistical values.
 - API request validation strips non-whitelisted fields and rejects non-whitelisted input.
+
+---
 
 ## Non-Functional Requirements
 
-Implemented or configured requirements visible in code:
+Implemented or configured requirements visible in the current code:
 
 - TypeScript across frontend and backend.
-- PostgreSQL persistence through Prisma.
-- Global structured error contract with `success: false`, `message`, `requestId`, and `timestamp`.
-- Request ID and request logging middleware.
+- PostgreSQL persistence through Prisma ORM.
+- Global structured error contract: `success: false`, `message`, `requestId`, `timestamp`.
+- Request-ID and request-logging middleware applied to all routes.
 - Configurable log level and SQL logging.
-- Helmet middleware enabled with selected cross-origin policies disabled for app compatibility.
+- Helmet middleware enabled with `contentSecurityPolicy`, `crossOriginEmbedderPolicy`, and
+  `crossOriginResourcePolicy` disabled for app compatibility.
 - CORS allowlist via `CORS_ORIGIN`.
 - Cookie-based auth with `secure`/`sameSite` adjusted for production.
 - Global and endpoint-level rate limiting via `@nestjs/throttler`.
-- Startup validation for `JWT_SECRET` length and S3 configuration.
-- Swagger-generated API docs.
-- Docker development targets for API and web.
+- Startup validation for `JWT_SECRET` length and S3 configuration; the API exits if invalid.
+- Swagger-generated API docs served at `/api/docs`.
+- Docker development targets for the API and web app.
 - Backend unit and e2e test coverage for selected critical paths.
-- Frontend output configured as Next standalone build.
+- Frontend output configured as Next.js standalone build.
+- JSON body limit raised to `10mb` to accommodate AI chat with embedded file content.
 
 Not documented in the current repository:
 
-- Formal uptime, latency, RPO/RTO, data retention, backup, observability, accessibility, or browser support targets.
+- Formal uptime, latency, RPO/RTO, data retention, backup, observability, accessibility, or
+  browser support targets.
 - CI/CD pipeline definitions.
+
+---
 
 ## Monorepo Structure
 
@@ -128,50 +194,61 @@ Not documented in the current repository:
 ├── apps
 │   ├── api                  # NestJS backend
 │   │   ├── prisma           # Prisma schema, migrations, seed scripts
-│   │   ├── scripts          # Prisma helper scripts
-│   │   ├── src              # API modules/controllers/services
+│   │   ├── scripts          # Prisma helper scripts (Windows PowerShell)
+│   │   ├── src              # API modules, controllers, services
 │   │   ├── test             # E2E tests and helpers
-│   │   └── uploads          # Local upload directory if using local storage
+│   │   └── uploads          # Local upload directory when using local storage
 │   └── web                  # Next.js frontend
-│       ├── app              # App Router pages and route handlers
+│       ├── app              # App Router pages and API route handlers
 │       ├── components       # UI and dashboard components
 │       ├── hooks            # React hooks
-│       ├── lib              # API clients, AI options, helpers
+│       ├── lib              # API clients, AI model/mode definitions, helpers
 │       ├── public           # Static assets
-│       └── types            # Shared frontend types
-├── docs/operations          # Testing and migration recovery notes
+│       └── types            # Shared frontend TypeScript types
+├── docs
+│   └── operations           # Testing checklist and migration recovery notes
 ├── docker-compose.yml
-├── package.json             # Root workspace scripts
+├── package.json             # Root workspace scripts and dev dependencies
 └── README.md
 ```
 
-The root `package.json` declares workspaces for `apps/*` and `packages/*`; no `packages` directory is present in the current repository.
+The root `package.json` declares workspaces for `apps/*` and `packages/*`. No `packages`
+directory is present in the current repository.
+
+---
 
 ## Frontend Architecture
 
-The frontend is a Next.js 14 App Router application.
+The frontend is a Next.js 14 App Router application built with React 18, TypeScript, Tailwind
+CSS, Framer Motion, SWR, Axios, and Radix UI primitives.
 
 Key implementation files:
 
-- `apps/web/app`: pages, layouts, global error boundary, and API route handlers.
-- `apps/web/middleware.ts`: JWT cookie verification and role-based dashboard route access.
-- `apps/web/lib/api.ts`: browser Axios client using same-origin `/api` with credentials.
-- `apps/web/lib/server-api.ts`: server route-handler backend URL resolution.
-- `apps/web/next.config.js`: standalone output, `three` transpilation, `/api` and `/uploads` rewrites to the backend.
-- `apps/web/tailwind.config.ts`: Tailwind theme, role colors, and UI tokens.
-- `apps/web/components/ui`: local UI primitives and visual components.
+| File | Purpose |
+| ---- | ------- |
+| `apps/web/app` | Pages, layouts, global error boundary, API route handlers |
+| `apps/web/middleware.ts` | JWT cookie verification and role-based dashboard route access |
+| `apps/web/lib/api.ts` | Browser Axios client using same-origin `/api` with credentials |
+| `apps/web/lib/server-api.ts` | Server route-handler backend URL resolution |
+| `apps/web/lib/ai-models.ts` | AI model options exposed to the frontend model selector |
+| `apps/web/lib/ai-modes.ts` | AI mode definitions for the frontend mode UI |
+| `apps/web/next.config.js` | Standalone output, `three` transpilation, `/api` and `/uploads` rewrites |
+| `apps/web/tailwind.config.ts` | Tailwind theme, role colors, and UI tokens |
+| `apps/web/components/ui` | Local UI primitives and visual components |
 
-Frontend environment:
+Frontend environment variables (from `apps/web/.env.example`):
 
-- `API_URL`: server-side backend URL for Next route handlers.
-- `NEXT_PUBLIC_API_URL`: backend URL used by rewrites and browser-visible diagnostics.
-- `NEXT_PUBLIC_APP_NAME`: app display name.
-- `JWT_SECRET`: must match backend `JWT_SECRET` for middleware JWT signature verification.
+| Variable               | Purpose                                                               |
+| ---------------------- | --------------------------------------------------------------------- |
+| `API_URL`              | Server-side backend URL for Next.js route handlers                    |
+| `NEXT_PUBLIC_API_URL`  | Backend URL used by rewrites and browser-visible diagnostics          |
+| `NEXT_PUBLIC_APP_NAME` | Application display name                                              |
+| `JWT_SECRET`           | Must match the API `JWT_SECRET` for middleware JWT signature verification |
 
 Discovered frontend pages:
 
-| Route | Purpose inferred from code path |
-|---|---|
+| Route | Purpose |
+| ----- | ------- |
 | `/` | Public landing/home page |
 | `/login` | Login |
 | `/signup` | Registration |
@@ -182,15 +259,15 @@ Discovered frontend pages:
 | `/dashboard/instructor` | Instructor dashboard |
 | `/dashboard/staff` | Staff dashboard |
 | `/dashboard/admin` | Admin dashboard |
-| `/dashboard/catalog` | Catalog search/list |
+| `/dashboard/catalog` | Catalog search and list |
 | `/dashboard/catalog/[id]` | Book detail |
 | `/dashboard/borrowed` | Current borrowed books |
 | `/dashboard/history` | Borrow history |
 | `/dashboard/reservations` | User reservations |
 | `/dashboard/fines` | User fines |
-| `/dashboard/materials` | Materials |
-| `/dashboard/reading-lists` | Reading-list feed |
-| `/dashboard/reading-lists/[id]` | Reading-list detail |
+| `/dashboard/materials` | Materials browse |
+| `/dashboard/reading-lists` | Reading list feed |
+| `/dashboard/reading-lists/[id]` | Reading list detail |
 | `/dashboard/instructors/[id]` | Instructor profile |
 | `/dashboard/ai-assistant` | AI assistant chat |
 | `/dashboard/notifications` | Notifications |
@@ -200,7 +277,7 @@ Discovered frontend pages:
 | `/dashboard/instructor/submit-material` | Submit material |
 | `/dashboard/instructor/following` | Followed instructors |
 | `/dashboard/instructor/reading-lists` | Instructor reading lists |
-| `/dashboard/instructor/reading-lists/[id]` | Instructor reading-list editor/detail |
+| `/dashboard/instructor/reading-lists/[id]` | Instructor reading list editor |
 | `/dashboard/admin/books` | Admin book management |
 | `/dashboard/admin/books/new` | New book |
 | `/dashboard/admin/books/[id]/edit` | Edit book |
@@ -210,14 +287,14 @@ Discovered frontend pages:
 | `/dashboard/admin/reservations` | Admin reservation management |
 | `/dashboard/admin/fines` | Admin fine management |
 | `/dashboard/admin/materials` | Admin material moderation |
-| `/dashboard/admin/reading-lists` | Admin reading-list moderation |
+| `/dashboard/admin/reading-lists` | Admin reading list moderation |
 | `/dashboard/admin/policies` | Borrow policy management |
 | `/dashboard/admin/reports` | Reports |
 | `/dashboard/admin/statistics` | Statistics |
 | `/dashboard/admin/import-books` | External book imports |
 | `/dashboard/admin/upload` | Admin uploads |
 
-Frontend API route handlers proxy selected AI calls to the backend:
+Frontend API route handlers that proxy selected AI calls to the backend:
 
 - `GET /api/ai/conversations`
 - `POST /api/ai/conversations`
@@ -227,129 +304,222 @@ Frontend API route handlers proxy selected AI calls to the backend:
 - `POST /api/ai/study`
 - `POST /api/ai/chat` with SSE passthrough
 
+Middleware route permissions (from `apps/web/middleware.ts`):
+
+- `/dashboard/admin` and all sub-routes: `ADMIN` only.
+- `/dashboard/student`: `STUDENT`, `ADMIN`.
+- `/dashboard/instructor`: `INSTRUCTOR`, `ADMIN`.
+- `/dashboard/staff`: `STAFF`, `ADMIN`.
+- Catalog, borrowed, reservations, AI assistant, profile, settings, notifications,
+  reading lists, instructors: all four roles.
+- `/dashboard/fines`, `/dashboard/history`, `/dashboard/materials` are not in the
+  middleware permission map — any authenticated user may navigate to them; backend
+  data scoping prevents cross-user data exposure.
+
+---
+
 ## Backend Architecture
 
-The backend is a NestJS API using Prisma and PostgreSQL.
+The backend is a NestJS 10 API using Prisma 5 and PostgreSQL 15.
 
 Key implementation files:
 
-- `apps/api/src/main.ts`: startup validation, Helmet, body limits, cookie parser, CORS, static uploads, global filters/pipes, Swagger.
-- `apps/api/src/app.module.ts`: module composition and global request middleware.
-- `apps/api/src/prisma/prisma.service.ts`: database URL construction and Prisma logging.
-- `apps/api/src/common`: global exception filter and request middleware.
-- `apps/api/src/auth`: local auth, Google OAuth, JWT strategy, decorators, and guards.
-- `apps/api/src/storage`: local/S3 upload and document buffer access.
-- `apps/api/src/mail`: SMTP or dev-console email sending.
-- `apps/api/src/ai`: assistant, providers, prompt builders, tools, modes, token tracking, search.
+| File | Purpose |
+| ---- | ------- |
+| `apps/api/src/main.ts` | Startup validation, Helmet, body limits, cookie parser, CORS, static uploads, global filters/pipes, Swagger |
+| `apps/api/src/app.module.ts` | Module composition and global request middleware |
+| `apps/api/src/prisma/prisma.service.ts` | Database URL construction and Prisma logging |
+| `apps/api/src/common` | Global exception filter, request-ID middleware, request-logger middleware |
+| `apps/api/src/auth` | Local auth, Google OAuth, JWT strategy, decorators, and guards |
+| `apps/api/src/storage` | Local/S3 upload and document buffer access |
+| `apps/api/src/mail` | SMTP or dev-console email sending |
+| `apps/api/src/ai` | Assistant, providers, prompt builder, tools, modes, token tracking, search |
 
 Registered backend modules:
 
-- `AuthModule`
-- `UsersModule`
-- `BooksModule`
-- `BorrowsModule`
-- `ReservationsModule`
-- `DashboardModule`
-- `NotificationsModule`
-- `MaterialsModule`
-- `ReadingListsModule`
-- `InstructorFollowersModule`
-- `AiModule`
-- `StorageModule`
-- `HealthModule`
-- `BranchesModule`
-- `BorrowPoliciesModule`
-- `FinePaymentsModule`
-- `ReportsModule`
-- `ExternalBooksModule`
-- `PrismaModule`
-- `MailModule`
+| Module | Purpose |
+| ------ | ------- |
+| `AuthModule` | Login, registration, email verification, password reset, Google OAuth, JWT strategy |
+| `UsersModule` | User profile, preferences, interests, activation/deactivation, user stats |
+| `BooksModule` | Catalog CRUD, book copies, PDF indexing, cover images, branch availability |
+| `BorrowsModule` | Borrow lifecycle, extensions, returns, overdue detection, scheduler |
+| `ReservationsModule` | Reservation lifecycle from pending through collection or expiry |
+| `DashboardModule` | Role-specific dashboard aggregates, activity feed, admin AI metrics |
+| `NotificationsModule` | User notifications, unread counts, read/delete operations |
+| `MaterialsModule` | Research material upload, approval, indexing, chunking, and search |
+| `ReadingListsModule` | Instructor reading list creation, management, and feed |
+| `InstructorFollowersModule` | Follow/unfollow relationships between users and instructors |
+| `AiModule` | AI assistant conversations, study sessions, SSE chat, tools, cover scan |
+| `StorageModule` | Local and S3 file storage, upload handling, document buffer access |
+| `HealthModule` | Liveness and readiness probes |
+| `BranchesModule` | Library branch creation, activation, and deactivation |
+| `BorrowPoliciesModule` | Per-role borrow limits, days, and extension rules |
+| `FinePaymentsModule` | Fine records, payment, and waiver |
+| `ReportsModule` | PDF and Excel report export |
+| `ExternalBooksModule` | OpenLibrary and Gutendex search and import |
+| `PrismaModule` | Shared Prisma client, exported globally |
+| `MailModule` | SMTP or console email sending for auth flows |
+
+---
 
 ## AI Assistant Integration
 
-The active AI assistant path is OpenRouter-backed.
+### Provider
 
-Required key for active AI features:
+The active AI provider is OpenRouter. All model calls go through `OpenRouterProvider` and
+`AgentService`, which make direct HTTP requests to `https://openrouter.ai/api/v1`.
 
-- `OPENROUTER_API_KEY`
+Required environment variable:
 
-The `.env.example` does not currently list `OPENROUTER_API_KEY`, but the active `OpenRouterProvider`, `AgentService`, health readiness check, and auth config all check for it. Add it to `apps/api/.env` when enabling AI.
+- `OPENROUTER_API_KEY` — required by the active provider. The `/health/ready` endpoint
+  reports `"ai": "configured"` when this key is present, `"ai": "not configured"` otherwise.
 
-Provider code present:
+Note: `OPENROUTER_API_KEY` is not present in `apps/api/.env.example` but is checked in
+`OpenRouterProvider`, `AgentService`, and `HealthController`. Add it to `apps/api/.env`
+when enabling AI features.
 
-- `OpenRouterProvider`: active provider used by `ProviderFactory` and `AgentService`.
-- `GroqProvider`: provider class present and uses `GROQ_API_KEY`, but not wired into `AiModule` providers or `ProviderFactory`.
-- `GeminiProvider`: provider class present and uses `GEMINI_API_KEY`, but not wired into `AiModule` providers or `ProviderFactory`.
+### Provider Classes
 
-Model options discovered in code:
+| Class | Status | Key Variable |
+| ----- | ------ | ------------ |
+| `OpenRouterProvider` | Active — wired into `AiModule` and `ProviderFactory` | `OPENROUTER_API_KEY` |
+| `GroqProvider` | Class present; not wired into `AiModule` or `ProviderFactory` | `GROQ_API_KEY` |
+| `GeminiProvider` | Class present; not wired into `AiModule` or `ProviderFactory` | `GEMINI_API_KEY` |
 
-| Tier / UI option | Model id |
-|---|---|
-| Free/simple | `google/gemma-4-31b-it:free` |
-| Cheap/tool/vision | `google/gemini-3.1-flash-lite-preview` |
-| Smart/deep/study | `anthropic/claude-3-haiku` |
-| Cover scan vision | `google/gemini-2.0-flash-lite` |
+### Model Tiers
 
-AI conversation features:
+All model requests go through OpenRouter regardless of the underlying model provider.
 
-- Conversation list/create/delete.
-- Message history.
-- Dedicated study sessions tied to a `Book`.
-- Saved conversation mode state: manual modes, auto modes, study-session state.
-- Saved conversation model state: manual model, resolved model, selection source.
-- Token usage metrics per user/conversation in memory through `TokenTrackerService`.
-- SSE streaming response endpoint at `POST /ai/chat`.
+| Tier constant | Model ID | Used when |
+| ------------- | -------- | --------- |
+| `FREE` | `google/gemma-4-31b-it:free` | Simple greetings and short messages |
+| `CHEAP` | `google/gemini-3.1-flash-lite-preview` | Default tool-calling and catalog queries |
+| `SMART` | `anthropic/claude-3-haiku` | Deep analytical queries |
+| `STUDY` | `anthropic/claude-3-haiku` | Study session guide generation |
 
-Response modes:
+Auto model selection logic in `AgentService.pickModel()`:
 
-- `learning`
-- `explanatory`
-- `planning`
-- `formal`
-- `concise`
+- Image attached → `CHEAP`
+- Deep query keywords detected → `SMART`
+- Simple greeting or short message → `FREE`
+- Default → `CHEAP`
 
-AI tools:
+Manual model override: users can select a specific model from the frontend model selector,
+which sends it in the `model` field of the chat request. The conversation stores
+`manualModel`, `lastResolvedModel`, and `lastModelSelectionSource` (`auto`, `manual`,
+or `fallback`).
 
-- `search_catalog`
-- `get_book_details`
-- `read_ebook`
-- `fetch_webpage`
-- `get_my_borrows`
-- `get_catalog_stats`
-- `get_active_borrows`
-- `get_active_reservations`
-- `get_user_stats`
-- `get_reading_lists`
-- `get_my_reading_lists`
-- `search_study_material`
-- `list_study_materials`
-- `get_chunk_context`
-- `get_material_outline`
+Book-cover scan uses `google/gemini-2.0-flash-lite` directly (vision model, not tiered).
 
-RAG and retrieval behavior:
+### Conversation Features
 
-- Catalog search is keyword-first. `AI_SEMANTIC_MODE` accepts `keyword`, `hybrid`, or `embedding`; `hybrid` and `embedding` currently fall back to keyword search because vector infrastructure is not implemented.
-- Material indexing extracts `.pdf`, `.docx`, `.doc`, and `.txt`, chunks content into about 400-word chunks with 40-word overlap, stores chunks in `MaterialChunk`, and searches them with PostgreSQL full-text search.
-- Material search enforces access controls by role, uploader, public access, faculty, and course code.
-- Book PDF indexing extracts text into `Book.pdfExtractedText`, tracks page count and index status, and is used by `read_ebook`.
-- Embedding generation is a stub returning `null`; pgvector/vector columns are not present in the current Prisma schema.
+- Conversation list, create, delete.
+- Message history per conversation.
+- Dedicated study sessions: initiated via `POST /ai/study` with a `bookId`. This creates an
+  `AiConversation` with `studyBookId` set and locks the conversation to `learning` and
+  `explanatory` modes. The `STUDY` model tier is used for the opening guide generation.
+  Subsequent messages in the same conversation use the normal model selection logic.
+- Saved mode state: `manualModes`, `lastAutoModes` persisted per conversation.
+- Saved model state: `manualModel`, `lastResolvedModel`, `lastModelSelectionSource`.
+- Token usage metrics per user and conversation, tracked in memory by `TokenTrackerService`.
+- SSE streaming response at `POST /ai/chat`.
+- Chat rate limit: 15 requests per 60 seconds.
 
-Prompt behavior:
+### Response Modes
 
-- The system prompt is built from role-specific base instructions and few-shot examples.
-- It injects current user context, active borrows, borrow policy, catalog totals, available copies, published reading-list count, indexed material count, and current date.
-- It explicitly instructs the assistant to use tools for live library data, catalog searches, reading lists, borrows, reservations, stats, and study material retrieval.
+Modes are stored per conversation and influence system prompt instructions.
+
+| Mode | Behaviour |
+| ---- | --------- |
+| `learning` | Socratic coaching with retrieval questions and comprehension checks |
+| `explanatory` | Step-by-step explanations with concrete examples |
+| `planning` | Phases, milestones, priorities, timelines, and next-step plans |
+| `formal` | Academic, polished tone with clear headings |
+| `concise` | Tight responses, short bullets, minimal padding |
+
+Study sessions default to `learning` + `explanatory`. Modes are inferred automatically from
+message content and can also be set manually.
+
+### AI Tools
+
+Tools registered in `AgentService.getTools()` and executed via `AgentService.executeTool()`:
+
+| Tool | Description |
+| ---- | ----------- |
+| `search_catalog` | Keyword search across the library catalog |
+| `get_book_details` | Full details for a specific book including availability |
+| `read_ebook` | Read an e-book or uploaded book PDF for summaries and quotes |
+| `fetch_webpage` | Fetch any public URL |
+| `get_my_borrows` | Current user's active borrows and due dates |
+| `get_catalog_stats` | Total book, copy, and e-book counts from the database |
+| `get_active_borrows` | All currently active borrows and top 5 most-borrowed books |
+| `get_active_reservations` | All active reservations (pending or ready for pickup) |
+| `get_user_stats` | Total registered user counts by role |
+| `get_reading_lists` | Published reading lists curated by instructors |
+| `get_my_reading_lists` | Current instructor's own reading lists including drafts |
+| `search_study_material` | Full-text search across indexed study material chunks |
+| `list_study_materials` | List all indexed study materials available to the user |
+| `get_chunk_context` | Neighbouring chunks around a specific material chunk |
+| `get_material_outline` | Opening chunks of a study material to understand its structure |
+
+### RAG and Retrieval Behavior
+
+- **Catalog search**: keyword-first. `AI_SEMANTIC_MODE` accepts `keyword`, `hybrid`, or
+  `embedding`; the `hybrid` and `embedding` modes currently fall back to keyword search
+  because vector infrastructure is not implemented. Embedding generation returns `null`;
+  no pgvector columns are present in the current Prisma schema.
+- **Material indexing**: extracts text from `.pdf`, `.docx`, `.doc`, and `.txt` files, chunks
+  content into approximately 400-word chunks with 40-word overlap, stores chunks in
+  `MaterialChunk`, and searches with PostgreSQL full-text search.
+- **Material access control**: enforced by role, uploader identity, public access, faculty
+  code, and course code.
+- **Book PDF indexing**: extracts text into `Book.pdfExtractedText`, tracks page count and
+  index status (`pdfIndexStatus`), used by the `read_ebook` tool.
+
+### System Prompt Behavior
+
+The system prompt is built by `buildSystemPrompt()` in
+`apps/api/src/ai/prompts/system-prompt-builder.ts`. It:
+
+- Injects role-specific base instructions and few-shot behavioral examples.
+- Injects current user context: name, role, faculty, interests, active borrows, borrow policy
+  limits, catalog totals, available copies, published reading list count, indexed material
+  count, and current date.
+- Explicitly instructs the assistant to use tools for all live library data questions and
+  never to guess or invent catalog or statistical values.
+- Instructs the assistant to respond in English by default and switch to Turkish only when the
+  user's message is written in Turkish.
+- Instructs the assistant to read attached file content when present in the message.
+
+---
 
 ## Docker Setup
 
 `docker-compose.yml` defines:
 
-| Service | Image/build | Container | Exposed port | Notes |
-|---|---|---|---:|---|
-| `postgres` | `postgres:15-alpine` | `library_db` | `5432` | Uses external volume `library-system_edit_postgres_data` |
+| Service | Image / Build | Container | Port | Notes |
+| ------- | ------------- | --------- | ----: | ----- |
+| `postgres` | `postgres:15-alpine` | `library_db` | `5432` | External named volume |
 | `api` | `./apps/api` target `development` | `library_api` | `3001` | Depends on healthy Postgres |
 | `web` | `./apps/web` target `development` | `library_web` | `3000` | Depends on API |
-| `pgadmin` | `dpage/pgadmin4:latest` | `library_pgadmin` | `5050` | Default login from Compose |
+| `pgadmin` | `dpage/pgadmin4:latest` | `library_pgadmin` | `5050` | Default email `admin@uskudar.edu.tr` |
+
+All services share a bridge network named `library_network`.
+
+The Compose file uses an **external** named volume:
+
+```yaml
+volumes:
+  postgres_data:
+    name: library-system_edit_postgres_data
+    external: true
+```
+
+Create this volume before the first `docker-compose up` if it does not exist:
+
+```bash
+docker volume create library-system_edit_postgres_data
+```
 
 Start all services:
 
@@ -369,191 +539,201 @@ View logs:
 npm run docker:logs
 ```
 
-Important: the Compose file uses an external volume:
+The API Dockerfile (`apps/api/Dockerfile`):
 
-```yaml
-volumes:
-  postgres_data:
-    name: library-system_edit_postgres_data
-    external: true
-```
+- Base image: `node:20-slim` with `openssl` installed.
+- Installs dependencies and runs `npx prisma generate` in a `deps` stage.
+- The `development` stage copies the node\_modules and source, exposes port `3001`,
+  and runs `npm run start:dev`.
 
-Create it before first `docker-compose up` if it does not exist:
+The web Dockerfile (`apps/web/Dockerfile`):
 
-```bash
-docker volume create library-system_edit_postgres_data
-```
+- Base image: `node:20-alpine`.
+- The `development` stage copies node\_modules and source, exposes port `3000`,
+  and runs `npm run dev`.
 
-The API Dockerfile installs dependencies and runs `npx prisma generate`; the development command is `npm run start:dev`. The web Dockerfile runs `npm run dev`.
+---
 
 ## Database Setup
 
 Database stack:
 
-- PostgreSQL
-- Prisma ORM
+- PostgreSQL 15
+- Prisma ORM 5
 - Prisma Client generator with binary targets: `native`, `debian-openssl-3.0.x`, `windows`
 
-Schema source:
+Schema source: `apps/api/prisma/schema.prisma`
 
-- `apps/api/prisma/schema.prisma`
+### Prisma Models
 
-Main Prisma models:
+| Model | Description |
+| ----- | ----------- |
+| `User` | Authenticated users with role, auth provider, email verification, profile, and preferences |
+| `Faculty` | University faculties with optional default branch |
+| `LibraryBranch` | Physical library branches/campuses |
+| `Course` | Courses linked to faculties |
+| `Book` | Catalog books with metadata, copies, PDF indexing, and e-book fields |
+| `BookCopy` | Individual physical copies with barcode, branch, status, and condition |
+| `BorrowPolicy` | Per-role borrow limits, days, extensions |
+| `Reservation` | Reservation lifecycle per user/book copy/branch |
+| `Borrow` | Borrow records with extension tracking and optional fine |
+| `Material` | Uploaded instructor materials with indexing and access control |
+| `MaterialChunk` | Full-text-searchable chunks of indexed material content |
+| `Notification` | User notifications with type, read state, and related entity references |
+| `ReadingList` | Instructor-curated book lists with visibility and status |
+| `ReadingListItem` | Ordered book entries within a reading list |
+| `InstructorFollower` | Follow relationships between users and instructors |
+| `FinePayment` | Fines linked to overdue borrows with status and payment tracking |
+| `AiConversation` | AI chat conversations with mode state and model state |
+| `AiMessage` | Individual messages in an AI conversation |
 
-- `User`
-- `Faculty`
-- `LibraryBranch`
-- `Course`
-- `Book`
-- `BookCopy`
-- `BorrowPolicy`
-- `Reservation`
-- `Borrow`
-- `Material`
-- `MaterialChunk`
-- `Notification`
-- `ReadingList`
-- `ReadingListItem`
-- `InstructorFollower`
-- `FinePayment`
-- `AiConversation`
-- `AiMessage`
+### Enums
 
-Enums:
+`Role`, `BookCopyStatus`, `ReservationStatus`, `BorrowStatus`, `MaterialType`, `AccessLevel`,
+`IndexStatus`, `AuthProvider`, `ReadingListVisibility`, `ReadingListStatus`, `FineStatus`,
+`NotificationType`
 
-- `Role`
-- `BookCopyStatus`
-- `ReservationStatus`
-- `BorrowStatus`
-- `MaterialType`
-- `AccessLevel`
-- `IndexStatus`
-- `AuthProvider`
-- `ReadingListVisibility`
-- `ReadingListStatus`
-- `FineStatus`
-- `NotificationType`
+### Migrations
 
-Migration files are present under `apps/api/prisma/migrations`, from `20251209213528_init` through `20260505170000_add_ai_conversation_model_state`.
+Migration files are present under `apps/api/prisma/migrations`, from
+`20251209213528_init` through `20260505170000_add_ai_conversation_model_state`.
 
-Database commands from root:
+### Database Commands
+
+From the repository root:
 
 ```bash
-npm run db:start
-npm run db:stop
-npm run db:studio
-npm run db:migrate
-npm run db:seed
-npm run db:reset
+npm run db:start      # Start only PostgreSQL via Docker Compose
+npm run db:stop       # Stop Docker Compose services
+npm run db:studio     # Open Prisma Studio
+npm run db:migrate    # Run Prisma migrate dev
+npm run db:seed       # Seed the database
+npm run db:reset      # Reset and re-migrate the database
 ```
 
-API-level Prisma commands:
+From `apps/api`:
 
 ```bash
-cd apps/api
-npm run prisma:generate
-npm run prisma:migrate
-npm run prisma:studio
-npm run prisma:seed
-npm run prisma:generate:clean
+npm run prisma:generate        # Generate Prisma Client
+npm run prisma:migrate         # prisma migrate dev
+npm run prisma:studio          # prisma studio
+npm run prisma:seed            # prisma db seed
+npm run prisma:generate:clean  # Windows PowerShell clean generate helper
 ```
 
-Seed data:
+### Seed Data
 
-- `apps/api/prisma/seed.ts` clears core tables and seeds branches, faculties, borrow policies, users, books, book copies, and sample borrows.
-- Default seeded password is `password123`.
-- Seeded dev accounts include:
-  - Student: `efe.demir@std.uskudar.edu.tr`
-  - Instructor: `kemal.sahin@uskudar.edu.tr`
-  - Staff: `ayse.yildiz@uskudar.edu.tr`
-  - Admin: `admin@uskudar.edu.tr`
+`apps/api/prisma/seed.ts` clears core tables and seeds branches, faculties, borrow policies,
+users, books, book copies, and sample borrows.
 
-Additional script:
+Default password for all seeded accounts: `password123`
 
-- `apps/api/prisma/add-books.ts`: standalone `npx ts-node prisma/add-books.ts` script to add or update 8 test books. It is not wired into `package.json`.
+| Role | Email |
+| ---- | ----- |
+| Student | `efe.demir@std.uskudar.edu.tr` |
+| Instructor | `kemal.sahin@uskudar.edu.tr` |
+| Staff | `ayse.yildiz@uskudar.edu.tr` |
+| Admin | `admin@uskudar.edu.tr` |
+
+Additional script `apps/api/prisma/add-books.ts` adds or updates 8 test books when run with
+`npx ts-node prisma/add-books.ts`. It is not wired into `package.json`.
+
+---
 
 ## Environment Variables
 
-Backend variables from `apps/api/.env.example` and code:
+### Backend (`apps/api/.env.example` and code)
 
 | Variable | Purpose |
-|---|---|
+| -------- | ------- |
 | `DATABASE_URL` | Prisma/PostgreSQL connection string |
 | `POSTGRES_HOST` | Optional DB host used by `PrismaService` when `DATABASE_URL` is absent |
 | `POSTGRES_USER` | Optional DB user fallback |
 | `POSTGRES_PASSWORD` | Optional DB password fallback |
 | `POSTGRES_DB` | Optional DB name fallback |
 | `POSTGRES_PORT` | Optional DB port fallback |
-| `DOCKER_ENV` | Uses `postgres` as fallback DB host when `true` |
+| `DOCKER_ENV` | Uses `postgres` as fallback DB host when `"true"` |
 | `JWT_SECRET` | JWT signing secret; startup requires at least 32 characters |
-| `JWT_EXPIRATION` | JWT expiration config |
-| `PORT` | API port, default `3001` |
-| `NODE_ENV` | Runtime environment |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `JWT_EXPIRATION` | JWT expiration (e.g. `7d`) |
+| `PORT` | API listen port; default `3001` |
+| `NODE_ENV` | Runtime environment (`development` / `production`) |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID; leave empty to disable Google sign-in |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 | `GOOGLE_CALLBACK_URL` | Google OAuth callback URL |
-| `CORS_ORIGIN` | Comma-separated allowed frontend origins |
-| `FRONTEND_URL` | Canonical frontend URL for OAuth and email links |
-| `UPLOAD_DIR` | Listed in example; static serving uses `./uploads` from API process cwd |
+| `CORS_ORIGIN` | Comma-separated list of allowed frontend origins |
+| `FRONTEND_URL` | Canonical frontend URL for OAuth redirects and email links |
+| `UPLOAD_DIR` | Upload directory path (static serving uses `./uploads` relative to API cwd) |
 | `OLLAMA_BASE_URL` | Listed in example; active embedding implementation is not wired |
-| `ANTHROPIC_API_KEY` | Listed in example; active AI path uses OpenRouter |
-| `LLM_PROVIDER_PREFERENCE` | Listed in example; no active provider switching found |
-| `OPENROUTER_API_KEY` | Required by active AI provider; checked in code but missing from `.env.example` |
-| `GROQ_API_KEY` | Used only by unused `GroqProvider` class |
-| `GEMINI_API_KEY` | Used only by unused `GeminiProvider` class |
-| `AI_SEMANTIC_MODE` | `keyword`, `hybrid`, or `embedding`; default `hybrid` |
+| `ANTHROPIC_API_KEY` | Listed in example; active AI path uses OpenRouter, not Anthropic SDK directly |
+| `LLM_PROVIDER_PREFERENCE` | Listed in example; no active provider switching found in code |
+| `OPENROUTER_API_KEY` | Required by active AI provider; checked in code but absent from `.env.example` |
+| `GROQ_API_KEY` | Used only by the inactive `GroqProvider` class |
+| `GEMINI_API_KEY` | Used only by the inactive `GeminiProvider` class |
+| `AI_SEMANTIC_MODE` | `keyword`, `hybrid`, or `embedding`; default `hybrid`; hybrid falls back to keyword |
 | `AI_EMBEDDINGS_ENABLED` | Listed in example; no active code path found |
 | `STORAGE_PROVIDER` | `local` or `s3` |
-| `AWS_REGION` | S3 region |
-| `AWS_S3_BUCKET` | S3 bucket |
+| `AWS_REGION` | S3 region; required when `STORAGE_PROVIDER=s3` |
+| `AWS_S3_BUCKET` | S3 bucket; required when `STORAGE_PROVIDER=s3` |
 | `AWS_ACCESS_KEY_ID` | AWS SDK credential chain input |
 | `AWS_SECRET_ACCESS_KEY` | AWS SDK credential chain input |
 | `AWS_S3_PUBLIC_BASE_URL` | Optional public S3 base URL override |
 | `THROTTLE_TTL` | Global rate-limit window in seconds |
-| `THROTTLE_LIMIT` | Global rate-limit max requests |
-| `THROTTLE_AUTH_LIMIT` | Listed in example; auth controllers use inline throttles |
-| `THROTTLE_AI_LIMIT` | Listed in example; AI controller uses inline throttle |
-| `MONITOR_OLLAMA` | Listed in example; readiness currently checks DB and OpenRouter key only |
-| `LOG_LEVEL` | Nest logger level |
-| `ENABLE_REQUEST_LOGGING` | Disable request logs when `false` |
-| `LOG_SQL` | Enable Prisma query logs when `true` |
-| `SMTP_HOST` | SMTP host; empty means dev/console behavior |
+| `THROTTLE_LIMIT` | Global rate-limit max requests per window |
+| `THROTTLE_AUTH_LIMIT` | Auth endpoint throttle limit (auth controllers use inline throttles) |
+| `THROTTLE_AI_LIMIT` | AI chat throttle limit (AI controller uses inline throttle of 15/60s) |
+| `MONITOR_OLLAMA` | Listed in example; readiness check covers DB and OpenRouter key only |
+| `LOG_LEVEL` | Nest logger level: `error`, `warn`, `log`, `debug`, `verbose` |
+| `ENABLE_REQUEST_LOGGING` | Set to `"false"` to silence per-request logs |
+| `LOG_SQL` | Set to `"true"` to enable Prisma SQL query logs |
+| `SMTP_HOST` | SMTP host; empty means dev/console email behavior |
 | `SMTP_PORT` | SMTP port |
 | `SMTP_USER` | SMTP user |
 | `SMTP_PASS` | SMTP password |
 | `SMTP_FROM` | Sender address |
 
-Frontend variables from `apps/web/.env.example` and code:
+### Frontend (`apps/web/.env.example`)
 
 | Variable | Purpose |
-|---|---|
-| `API_URL` | Server-side backend URL for route handlers |
-| `NEXT_PUBLIC_API_URL` | Backend URL used by rewrites/browser-visible config |
-| `NEXT_PUBLIC_APP_NAME` | Display name |
-| `JWT_SECRET` | Must match API `JWT_SECRET` for middleware verification |
+| -------- | ------- |
+| `API_URL` | Server-side backend URL for Next.js route handlers |
+| `NEXT_PUBLIC_API_URL` | Backend URL used by rewrites and browser-visible config |
+| `NEXT_PUBLIC_APP_NAME` | Application display name |
+| `JWT_SECRET` | Must match API `JWT_SECRET` for middleware JWT signature verification |
+
+---
 
 ## Local Development Setup
 
-Prerequisites:
+### Prerequisites
 
-- Node.js 20 is expected by Dockerfiles.
-- npm.
-- Docker and Docker Compose for PostgreSQL or full container development.
+- Node.js 20 (expected by Dockerfiles)
+- npm
+- Docker and Docker Compose (for PostgreSQL or full container development)
 
-Install dependencies from the repository root:
+### Steps
+
+Install all workspace dependencies from the repository root:
 
 ```bash
 npm install
 ```
 
-Create env files:
+Create environment files:
 
 ```bash
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
 ```
 
-Set matching `JWT_SECRET` values in both API and web env files. The API requires at least 32 characters.
+Set a matching `JWT_SECRET` of at least 32 characters in both `apps/api/.env` and
+`apps/web/.env.local`. Set `OPENROUTER_API_KEY` in `apps/api/.env` to enable AI features.
+
+Set `FRONTEND_URL` in `apps/api/.env` to `http://localhost:3000`. This value is embedded in
+email verification and password reset links. Without it those links will be broken or missing
+a host.
+
+In development, leaving `SMTP_HOST` empty causes `MailService` to print emails to the API
+console instead of sending them. Verification and reset tokens appear in the terminal output.
 
 Start only PostgreSQL:
 
@@ -568,37 +748,43 @@ npm run db:migrate
 npm run db:seed
 ```
 
-Start both apps in development:
+Start both apps in development mode:
 
 ```bash
 npm run dev
 ```
 
-The root `dev` command starts the API first, waits for `http://localhost:3001/health/live`, then starts the web app.
+The root `dev` script starts the API first, waits for `http://localhost:3001/health/live`
+to respond, then starts the web app.
 
-Manual app startup:
+Or start apps individually:
 
 ```bash
 npm run dev:api
 npm run dev:web
 ```
 
-Open:
+Open in your browser:
 
-- Web: `http://localhost:3000`
-- API: `http://localhost:3001`
-- Swagger: `http://localhost:3001/api/docs`
-- pgAdmin with Compose: `http://localhost:5050`
+| URL | Description |
+| --- | ----------- |
+| `http://localhost:3000` | Web application |
+| `http://localhost:3001` | API |
+| `http://localhost:3001/api/docs` | Swagger documentation |
+| `http://localhost:5050` | pgAdmin (when started via Docker Compose) |
+
+---
 
 ## Available Scripts
 
-Root scripts from `package.json`:
+### Root Scripts (`package.json`)
 
 | Script | Command |
-|---|---|
+| ------ | ------- |
 | `dev` | `concurrently "npm run dev:api" "wait-on http://localhost:3001/health/live && npm run dev:web"` |
 | `dev:api` | `cd apps/api && npm run start:dev` |
 | `dev:web` | `cd apps/web && npm run dev` |
+| `dev:lan` | Same as `dev` (alias for LAN access) |
 | `build` | `npm run build:api && npm run build:web` |
 | `build:api` | `cd apps/api && npm run build` |
 | `build:web` | `cd apps/web && npm run build` |
@@ -616,13 +802,12 @@ Root scripts from `package.json`:
 | `docker:up` | `docker-compose up -d` |
 | `docker:down` | `docker-compose down` |
 | `docker:logs` | `docker-compose logs -f` |
-| `dev:lan` | `concurrently "npm run dev:api" "wait-on http://localhost:3001/health/live && npm run dev:web"` |
 | `clean` | `rimraf node_modules apps/*/node_modules packages/*/node_modules` |
 
-API scripts from `apps/api/package.json`:
+### API Scripts (`apps/api/package.json`)
 
 | Script | Command |
-|---|---|
+| ------ | ------- |
 | `build` | `nest build` |
 | `typecheck` | `npx tsc --noEmit` |
 | `format` | `prettier --write "src/**/*.ts" "test/**/*.ts"` |
@@ -633,7 +818,7 @@ API scripts from `apps/api/package.json`:
 | `lint` | `eslint "{src,apps,libs,test}/**/*.ts" --fix` |
 | `test` | `jest` |
 | `test:unit` | `jest --runInBand` |
-| `test:critical` | `jest --runInBand src/common/filters/global-exception.filter.spec.ts src/users/users.service.spec.ts src/users/users.controller.spec.ts src/reservations/reservations.service.spec.ts src/borrows/borrow-scheduler.service.spec.ts` |
+| `test:critical` | `jest --runInBand` with 5 specific critical test files |
 | `test:watch` | `jest --watch` |
 | `test:cov` | `jest --coverage` |
 | `test:e2e` | `jest --config test/jest-e2e.config.ts --runInBand --no-coverage` |
@@ -642,12 +827,20 @@ API scripts from `apps/api/package.json`:
 | `prisma:studio` | `prisma studio` |
 | `prisma:seed` | `prisma db seed` |
 | `covers:backfill` | `ts-node src/scripts/backfill-book-covers.ts` |
-| `prisma:generate:clean` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\prisma-generate-clean.ps1` |
+| `prisma:generate:clean` | Windows PowerShell clean Prisma generate helper |
 
-Web scripts from `apps/web/package.json`:
+The `test:critical` command runs these five files:
+
+- `src/common/filters/global-exception.filter.spec.ts`
+- `src/users/users.service.spec.ts`
+- `src/users/users.controller.spec.ts`
+- `src/reservations/reservations.service.spec.ts`
+- `src/borrows/borrow-scheduler.service.spec.ts`
+
+### Web Scripts (`apps/web/package.json`)
 
 | Script | Command |
-|---|---|
+| ------ | ------- |
 | `dev` | `next dev -H 0.0.0.0` |
 | `build` | `next build` |
 | `start` | `next start` |
@@ -656,70 +849,82 @@ Web scripts from `apps/web/package.json`:
 | `typecheck` | `npx tsc --noEmit` |
 | `format` | `prettier --write "**/*.{js,jsx,ts,tsx,css,json}"` |
 
+---
+
 ## Testing, Linting, Formatting, and Type Checking
 
-Backend tests:
+### Backend Tests
 
-- Unit/service/controller tests use Jest and `ts-jest`.
+- Unit and service/controller tests use Jest and `ts-jest`.
 - E2E tests use Jest with `apps/api/test/jest-e2e.config.ts`.
-- Test helpers live under `apps/api/test/helpers` and `apps/api/src/test-utils`.
+- Test helpers live under `apps/api/test/helpers/` and `apps/api/src/test-utils/`.
+- No frontend test runner is configured in `apps/web/package.json`.
 
 Discovered test suites:
 
-- `apps/api/test/security.e2e-spec.ts`
-- `apps/api/test/reservations.e2e-spec.ts`
-- `apps/api/test/borrows.e2e-spec.ts`
-- `apps/api/src/users/users.service.spec.ts`
-- `apps/api/src/users/users.controller.spec.ts`
-- `apps/api/src/books/book-document.service.spec.ts`
-- `apps/api/src/books/books.service.spec.ts`
-- `apps/api/src/reservations/reservations.service.spec.ts`
-- `apps/api/src/borrows/borrow-scheduler.service.spec.ts`
-- `apps/api/src/ai/catalog-search.service.spec.ts`
-- `apps/api/src/ai/ai-modes.spec.ts`
-- `apps/api/src/ai/agent.service.spec.ts`
-- `apps/api/src/materials/material-access.util.spec.ts`
-- `apps/api/src/common/filters/global-exception.filter.spec.ts`
+| Suite | Type | Coverage |
+| ----- | ---- | -------- |
+| `test/security.e2e-spec.ts` | E2E | Auth guards, password policy, rate limits, query validation (18 tests) |
+| `test/reservations.e2e-spec.ts` | E2E | Full reservation lifecycle (20 tests) |
+| `test/borrows.e2e-spec.ts` | E2E | Extend, return, overdue fine (8 tests) |
+| `src/users/users.service.spec.ts` | Unit | Safe select, interests |
+| `src/users/users.controller.spec.ts` | Unit | GET /users/:id access control |
+| `src/books/book-document.service.spec.ts` | Unit | Document extraction |
+| `src/books/books.service.spec.ts` | Unit | Books service |
+| `src/reservations/reservations.service.spec.ts` | Unit | Service-layer concurrency |
+| `src/borrows/borrow-scheduler.service.spec.ts` | Unit | Overdue and expiry scheduler |
+| `src/ai/catalog-search.service.spec.ts` | Unit | Catalog search |
+| `src/ai/ai-modes.spec.ts` | Unit | AI mode resolution logic |
+| `src/ai/agent.service.spec.ts` | Unit | Agent service |
+| `src/materials/material-access.util.spec.ts` | Unit | Material access control |
+| `src/common/filters/global-exception.filter.spec.ts` | Unit | Error contract shape |
 
-Common verification commands:
+### Common Verification Commands
 
 ```bash
+# Type checking
 npm run typecheck:api
-npm run test:api:critical
-npm run test:api:e2e
 npm run typecheck:web
+
+# Critical backend tests (fast)
+npm run test:api:critical
+
+# Full backend unit suite
+npm run test:api
+
+# E2E backend tests (requires a running database)
+npm run test:api:e2e
 ```
 
-Formatting and linting:
+### Linting and Formatting
 
 ```bash
+# Backend
 cd apps/api
 npm run lint
 npm run format
 
-cd ../web
+# Frontend
+cd apps/web
 npm run lint
 npm run lint:css
 npm run format
 ```
 
-No frontend test runner is configured in `apps/web/package.json`.
+---
 
 ## API Documentation and Discovered Endpoints
 
-Swagger is generated at:
+Swagger UI is available at:
 
 ```text
-GET /api/docs
+http://localhost:3001/api/docs
 ```
 
-Health:
+### Health
 
-- `GET /health/live`
-- `GET /health/ready`
-- `GET /auth/health`
-
-Discovered backend endpoints:
+- `GET /health/live` — liveness probe
+- `GET /health/ready` — readiness probe; checks DB and OpenRouter key presence
 
 ### Auth
 
@@ -899,28 +1104,36 @@ Discovered backend endpoints:
 - `GET /ai/metrics`
 - `POST /ai/study`
 - `PATCH /ai/conversations/:id/mode`
-- `POST /ai/chat`
+- `POST /ai/chat` (SSE streaming; rate-limited 15 requests/60s)
 - `PATCH /ai/interests`
 - `GET /ai/context`
-- `POST /ai/scan-cover`
+- `POST /ai/scan-cover` (admin only)
+
+---
 
 ## Security Considerations
 
 Implemented security controls:
 
 - Passwords are hashed with bcrypt/bcryptjs.
-- Auth tokens are stored in HttpOnly cookies.
-- Frontend middleware verifies JWT signatures with HS256 before serving dashboard routes.
-- Backend JWT guard protects authenticated endpoints.
-- Backend roles guard enforces admin/instructor-only actions where declared.
-- Login, registration, verification, password reset, and AI chat have explicit throttling.
+- Auth tokens are stored in HttpOnly cookies; `secure` and `sameSite` are set to production
+  values when `NODE_ENV=production`.
+- Frontend middleware verifies JWT signatures with HS256 before serving any `/dashboard/*`
+  route; missing or invalid tokens redirect to `/login`.
+- Backend JWT guard protects all authenticated endpoints.
+- Backend roles guard enforces admin-only and instructor-only actions where declared.
+- Login, registration, verification, password reset, and AI chat have explicit per-endpoint
+  throttling in addition to the global throttler.
 - Global validation pipe uses `whitelist`, `forbidNonWhitelisted`, and `transform`.
-- Global exception filter avoids leaking internals for unknown errors.
+- Global exception filter returns a structured error envelope and avoids leaking internals
+  for unknown errors.
 - CORS is restricted by `CORS_ORIGIN`.
-- Helmet is enabled.
-- S3 startup config is validated when `STORAGE_PROVIDER=s3`.
+- Helmet is enabled (`contentSecurityPolicy`, `crossOriginEmbedderPolicy`, and
+  `crossOriginResourcePolicy` are disabled for app compatibility).
+- S3 startup configuration is validated when `STORAGE_PROVIDER=s3`; the API exits on failure.
 - Local upload file reads are constrained to the `uploads` directory.
-- Dev request logs redact sensitive keys in frontend Axios logging.
+- Dev-mode Axios logging in the frontend redacts sensitive header keys.
+- `POST /books` enforces a maximum of 50 copies per branch.
 
 Operational security notes:
 
@@ -928,122 +1141,121 @@ Operational security notes:
 - Use a long, random `JWT_SECRET` and keep the same value in API and web environments.
 - Set `NODE_ENV=production` so auth cookies use production `secure`/`sameSite` behavior.
 - Configure real SMTP for verification and reset emails in production.
-- Configure production CORS origins explicitly.
+- Configure production CORS origins explicitly in `CORS_ORIGIN`.
 - Do not expose pgAdmin publicly without additional access controls.
 - Review S3 bucket permissions and public URL behavior before enabling `STORAGE_PROVIDER=s3`.
-- `OPENROUTER_API_KEY`, AWS credentials, SMTP credentials, Google secrets, and JWT secrets must not be committed.
+- `OPENROUTER_API_KEY`, AWS credentials, SMTP credentials, Google OAuth secrets, and
+  `JWT_SECRET` must never be committed to version control.
 
-## Deployment or Production Notes
+---
 
-Documented in code/config:
+## Deployment and Production Notes
 
-- API production start command: `node dist/src/main`.
-- Web build output is configured as Next `standalone`.
-- Dockerfiles currently define development targets only.
-- Health checks available at `/health/live` and `/health/ready`.
-- The API validates required JWT/S3 configuration on startup.
+Documented in current code and configuration:
+
+- API production start command: `node dist/src/main`
+- Web build output is configured as Next.js `standalone`.
+- Dockerfiles currently define development targets only; no production targets are present.
+- Health checks are available at `/health/live` (liveness) and `/health/ready` (readiness).
+- The API validates required JWT and S3 configuration at startup and exits if invalid.
 - Swagger is available at `/api/docs` unless disabled by deployment infrastructure.
-- Reports export PDF/Excel dependencies include `pdfkit` and `exceljs`.
+- Reports export PDF and Excel dependencies: `pdfkit` (root workspace) and `exceljs`
+  (root workspace).
 
 Not documented in the current repository:
 
-- CI/CD pipeline.
-- Cloud hosting target.
-- Production Docker Compose or Kubernetes manifests.
-- Reverse proxy configuration.
-- TLS termination.
-- Backup/restore process.
-- Migration rollout procedure beyond local Prisma recovery notes in `docs/operations/prisma-migration-recovery.md`.
+- CI/CD pipeline definitions.
+- Cloud hosting target or Kubernetes manifests.
+- Production Docker Compose files.
+- Reverse proxy or TLS termination configuration.
+- Backup and restore procedures.
+- Migration rollout procedure beyond local recovery notes.
 
 Production checklist:
 
-- Set production env vars for both apps.
-- Run `cd apps/api && npx prisma migrate deploy`.
-- Run `cd apps/api && npx prisma generate` or use the generated client from build.
-- Seed only if intentionally deploying sample data.
-- Configure `FRONTEND_URL`, `CORS_ORIGIN`, SMTP, storage, and OpenRouter.
-- Confirm `/health/ready` returns ready.
-- Restrict database and pgAdmin network access.
+1. Set production environment variables for both apps.
+2. Run `cd apps/api && npx prisma migrate deploy` to apply migrations.
+3. Run `cd apps/api && npx prisma generate` if not using the build-stage client.
+4. Only seed if intentionally deploying sample data.
+5. Configure `FRONTEND_URL`, `CORS_ORIGIN`, SMTP, storage provider, and `OPENROUTER_API_KEY`.
+6. Confirm `GET /health/ready` returns `"status": "ready"`.
+7. Restrict database and pgAdmin network access.
+
+---
 
 ## Troubleshooting
 
-API fails at startup with `JWT_SECRET must be configured`:
+**API fails at startup with `JWT_SECRET must be configured`**
 
-- Set `JWT_SECRET` in `apps/api/.env`.
-- Use at least 32 characters.
-- Set the same value in `apps/web/.env.local` for middleware.
+Set `JWT_SECRET` in `apps/api/.env`. Use at least 32 characters. Set the same value in
+`apps/web/.env.local` for frontend middleware.
 
-Dashboard routes redirect to login even with a cookie:
+**Dashboard routes redirect to login even with a valid cookie**
 
-- Confirm `apps/web/.env.local` has `JWT_SECRET`.
-- Confirm it matches the backend.
-- Confirm the token was signed with HS256 and has a `role` claim.
+Confirm `apps/web/.env.local` contains `JWT_SECRET` and that it matches the backend value.
+The middleware verifies the JWT signature with HS256 and requires a `role` claim in the payload.
 
-Docker Compose fails because the Postgres volume is missing:
+**Docker Compose fails because the Postgres volume is missing**
 
 ```bash
 docker volume create library-system_edit_postgres_data
 npm run docker:up
 ```
 
-API cannot connect to the database:
+**API cannot connect to the database**
 
-- Check `DATABASE_URL`.
-- If running API outside Docker with Compose Postgres, use host `localhost`.
-- If running inside Docker, the Compose environment uses host `postgres`.
-- Run `npm run db:start` before local API startup.
+- Check the `DATABASE_URL` value.
+- When running the API locally outside Docker with a Compose Postgres, use host `localhost`.
+- Inside Docker the Compose service hostname is `postgres`.
+- Run `npm run db:start` before starting the API locally.
 
-S3 startup validation fails:
+**S3 startup validation fails**
 
-- If S3 is not needed locally, set `STORAGE_PROVIDER=local`.
-- If S3 is needed, set `AWS_REGION`, `AWS_S3_BUCKET`, and AWS credentials discoverable by the AWS SDK.
+If S3 is not needed locally, set `STORAGE_PROVIDER=local`. If S3 is needed, provide
+`AWS_REGION`, `AWS_S3_BUCKET`, and AWS credentials discoverable by the AWS SDK credential
+chain.
 
-AI status is unavailable:
+**AI status reports unavailable**
 
-- Set `OPENROUTER_API_KEY` in `apps/api/.env`.
-- Check `/health/ready`; it reports AI as `configured` or `not configured`.
+Set `OPENROUTER_API_KEY` in `apps/api/.env`. Check `GET /health/ready` — it reports
+`"ai": "configured"` when the key is present.
 
-AI semantic search does not behave like vector search:
+**Semantic search does not behave like vector search**
 
-- Current `hybrid` and `embedding` modes fall back to keyword search. Vector storage and embedding generation are not implemented in the current schema/code.
+The `hybrid` and `embedding` modes currently fall back to keyword search. Vector storage and
+embedding generation are not implemented in the current schema or code.
 
-Email is not sent locally:
+**Email is not delivered locally**
 
-- Empty `SMTP_HOST` means development behavior. Configure SMTP variables for real delivery.
+An empty `SMTP_HOST` causes `MailService` to log emails to the console instead of sending
+them. Configure the SMTP variables for real delivery.
 
-Prisma migration history is blocked:
+**Prisma migration history is blocked**
 
-- See `docs/operations/prisma-migration-recovery.md`.
-- Only use `prisma migrate resolve` when the schema change is already present in the target database.
+See `docs/operations/prisma-migration-recovery.md`. Use `prisma migrate resolve` only when
+the schema change is already present in the target database.
 
-Frontend API calls go to the wrong host:
+**Frontend API calls go to the wrong host**
 
-- The browser client uses same-origin `/api`.
-- Next rewrites `/api/:path*` and `/uploads/:path*` to `NEXT_PUBLIC_API_URL`.
-- Next route handlers use `API_URL` first, then `NEXT_PUBLIC_API_URL`, then `http://localhost:3001`.
+The browser Axios client uses same-origin `/api`. Next.js rewrites `/api/:path*` and
+`/uploads/:path*` to `NEXT_PUBLIC_API_URL`. Next.js route handlers use `API_URL` first,
+then `NEXT_PUBLIC_API_URL`, then `http://localhost:3001`.
+
+---
 
 ## Contributing Notes
 
-Use the existing architecture and module boundaries:
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow guide including branch naming,
+commit message conventions, code style, PR checklist, and how to report bugs or request features.
 
-- Backend features belong under `apps/api/src/<module>`.
-- Add DTOs and validation for new API inputs.
-- Add or update Swagger decorators for API endpoints.
-- Add modules to `AppModule` when creating new backend modules.
-- Frontend pages belong under `apps/web/app`.
-- Shared frontend API calls should use `apps/web/lib/api.ts`.
-- Keep role checks aligned between backend guards and `apps/web/middleware.ts`.
-- Add focused tests for business rules, security-sensitive paths, and regressions.
-- Update this README when scripts, routes, env vars, Docker services, or behavior changes.
+Summary of conventions verified in `CONTRIBUTING.md`:
 
-Conventions from `CONTRIBUTING.md`:
+- Use TypeScript for all code.
+- Follow the existing ESLint and Prettier configurations.
+- Use descriptive branch names: `feature/...`, `fix/...`, `docs/...`, `refactor/...`.
+- Use conventional commit messages: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`.
 
-- Use TypeScript.
-- Follow ESLint and Prettier configuration.
-- Use descriptive branch names such as `feature/...`, `fix/...`, `docs/...`, and `refactor/...`.
-- Use conventional commit-style messages such as `feat: ...`, `fix: ...`, `docs: ...`, `refactor: ...`, and `test: ...`.
-
-Recommended pre-PR checks:
+Recommended pre-PR verification:
 
 ```bash
 npm run typecheck:api
@@ -1052,3 +1264,16 @@ npm run typecheck:web
 cd apps/api && npm run lint
 cd ../web && npm run lint
 ```
+
+Architecture conventions:
+
+- Backend features belong under `apps/api/src/<module>`.
+- Add DTOs and `class-validator` decorators for new API inputs.
+- Add Swagger decorators for new API endpoints.
+- Register new backend modules in `AppModule`.
+- Frontend pages belong under `apps/web/app`.
+- Shared frontend API calls should use `apps/web/lib/api.ts`.
+- Keep role checks aligned between backend guards and `apps/web/middleware.ts`.
+- Add focused tests for business rules, security-sensitive paths, and regressions.
+- Update this README when scripts, routes, environment variables, Docker services, or
+  system behavior changes.

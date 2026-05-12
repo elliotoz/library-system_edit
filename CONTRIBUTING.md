@@ -1,6 +1,7 @@
 # Contributing to Library System
 
-Thank you for your interest in contributing to the Library Management System! This document provides guidelines for contributing.
+Thank you for your interest in contributing to the Library Management System!
+This document provides guidelines for contributing.
 
 ## 🚀 Getting Started
 

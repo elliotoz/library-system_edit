@@ -4,7 +4,10 @@ Use this only when Prisma migration history is blocked but the schema change is 
 
 ## Local case fixed on 2026-05-04
 
-The local `library_system` database already had the material-indexing schema from `20260503000001_add_material_indexing`, but `_prisma_migrations` still contained failed entries for that migration. That blocked later migrations, including `20260504093000_add_book_pdf_indexing`.
+The local `library_system` database already had the material-indexing schema from
+`20260503000001_add_material_indexing`, but `_prisma_migrations` still contained
+failed entries for that migration. That blocked later migrations, including
+`20260504093000_add_book_pdf_indexing`.
 
 ## Symptoms
 

@@ -14,7 +14,9 @@ Use this checklist to verify all features work correctly before deployment.
 - [MANUAL] Page loads at `/login`
 - [MANUAL] Form shows validation errors for empty fields
 - [MANUAL] Invalid credentials show error message
-- [MANUAL] Successful login redirects to correct dashboard by role (ADMIN→`/dashboard/admin`, STUDENT→`/dashboard/student`, INSTRUCTOR→`/dashboard/instructor`, STAFF→`/dashboard/staff`)
+- [MANUAL] Successful login redirects to correct dashboard by role:
+  ADMIN→`/dashboard/admin`, STUDENT→`/dashboard/student`,
+  INSTRUCTOR→`/dashboard/instructor`, STAFF→`/dashboard/staff`
 - [MANUAL] `access_token` httpOnly cookie is set after login
 
 ### Logout
@@ -26,13 +28,19 @@ Use this checklist to verify all features work correctly before deployment.
 - [MANUAL] Forged/expired token on any `/dashboard/*` redirects to `/login` (JWT signature verified with HS256)
 - [MANUAL] STUDENT/INSTRUCTOR/STAFF requesting `/dashboard/admin` redirects to their own dashboard
 - [MANUAL] ADMIN can access all `/dashboard/admin/*` routes
-- [MANUAL] STAFF can access `/dashboard/staff`, `/dashboard/catalog`, `/dashboard/borrowed`, `/dashboard/reservations`, `/dashboard/ai-assistant`, `/dashboard/profile`, `/dashboard/notifications`
+- [MANUAL] STAFF can access `/dashboard/staff`, `/dashboard/catalog`,
+  `/dashboard/borrowed`, `/dashboard/reservations`, `/dashboard/ai-assistant`,
+  `/dashboard/profile`, `/dashboard/notifications`
 - [MANUAL] STAFF cannot reach any `/dashboard/admin/*` route
-- [MANUAL] `/dashboard/fines`, `/dashboard/history`, `/dashboard/materials` are not in `ROUTE_PERMISSIONS` — any authenticated user can navigate to them. Backend data-scoping prevents cross-user data exposure, but cross-role UX access is possible (low-priority; not a security gap)
+- [MANUAL] `/dashboard/fines`, `/dashboard/history`, `/dashboard/materials` are
+  not in `ROUTE_PERMISSIONS` — any authenticated user can navigate to them.
+  Backend data-scoping prevents cross-user data exposure, but cross-role UX access
+  is possible (low-priority; not a security gap)
 
 ### Route protection — backend guards
 - [AUTO] `GET /ai/status` returns 401 without auth, 200 with student cookie (`security.e2e-spec.ts`)
-- [AUTO] Admin-only reservation actions (approve, reject, mark-ready, collect) return 403 for non-admin (`reservations.e2e-spec.ts`)
+- [AUTO] Admin-only reservation actions (approve, reject, mark-ready, collect)
+  return 403 for non-admin (`reservations.e2e-spec.ts`)
 - [AUTO] `GET /users/:id` returns 403 when a non-admin requests another user's record (`users.controller.spec.ts`)
 
 ### Email verification
@@ -76,7 +84,8 @@ Use this checklist to verify all features work correctly before deployment.
 - [MANUAL] Filter tabs (All, Active, Returned) work
 
 ### My Reservations (`/dashboard/reservations`)
-- [MANUAL] Lists reservations with correct status badges: PENDING, APPROVED, READY_FOR_PICKUP, COLLECTED, CANCELLED, EXPIRED
+- [MANUAL] Lists reservations with correct status badges: PENDING, APPROVED,
+  READY_FOR_PICKUP, COLLECTED, CANCELLED, EXPIRED
 - [MANUAL] APPROVED state shows as active (not collectable by user)
 - [MANUAL] READY_FOR_PICKUP shows pickup deadline alert
 - [MANUAL] Cancel button works for PENDING reservations
@@ -89,7 +98,9 @@ Use this checklist to verify all features work correctly before deployment.
 - [MANUAL] "Mark all as read" button clears unread count
 - [MANUAL] Delete individual notification works
 - [MANUAL] "Clear read" button appears only when read notifications exist; deletes only read ones
-- [MANUAL] NotificationType enum values (e.g. `BORROW_DUE_SOON`, `RESERVATION_APPROVED`) map to correct display types (warning/success/error/info)
+- [MANUAL] NotificationType enum values (e.g. `BORROW_DUE_SOON`,
+  `RESERVATION_APPROVED`) map to correct display types
+  (warning/success/error/info)
 
 ### AI Assistant (`/dashboard/ai-assistant`)
 - [MANUAL] Chat interface loads
@@ -267,7 +278,8 @@ These should all return 400:
 ## Scheduler (automated background jobs)
 
 - [AUTO] Overdue borrows transition to `OVERDUE` status (`borrow-scheduler.service.spec.ts`)
-- [AUTO] Stale PENDING/APPROVED reservations expire by `expiresAt`; READY_FOR_PICKUP by `pickupDeadline` (`borrow-scheduler.service.spec.ts`)
+- [AUTO] Stale PENDING/APPROVED reservations expire by `expiresAt`;
+  READY_FOR_PICKUP by `pickupDeadline` (`borrow-scheduler.service.spec.ts`)
 - [MANUAL] After scheduler run: expired reservations show EXPIRED in user's list; reserved copies return to AVAILABLE
 
 ---
@@ -285,16 +297,16 @@ These should all return 400:
 ## Notes
 
 ### Automated Test Coverage Summary
-| Suite | Tests | Scope |
-|---|---|---|
-| `reservations.e2e-spec.ts` | 20 | Full reservation lifecycle |
-| `borrows.e2e-spec.ts` | 8 | Extend, return, overdue fine |
-| `security.e2e-spec.ts` | 18 | Auth guards, password policy, rate limits, query validation |
-| `users.service.spec.ts` | — | Safe select, interests |
-| `users.controller.spec.ts` | — | GET /users/:id access control |
-| `reservations.service.spec.ts` | — | Service-layer concurrency |
-| `borrow-scheduler.service.spec.ts` | — | Overdue + expiry scheduler |
-| `global-exception.filter.spec.ts` | — | Error contract shape |
+| Suite                              | Tests | Scope                                                       |
+| ---------------------------------- | ----- | ----------------------------------------------------------- |
+| `reservations.e2e-spec.ts`         | 20    | Full reservation lifecycle                                  |
+| `borrows.e2e-spec.ts`              | 8     | Extend, return, overdue fine                                |
+| `security.e2e-spec.ts`             | 18    | Auth guards, password policy, rate limits, query validation |
+| `users.service.spec.ts`            | —     | Safe select, interests                                      |
+| `users.controller.spec.ts`         | —     | GET /users/:id access control                               |
+| `reservations.service.spec.ts`     | —     | Service-layer concurrency                                   |
+| `borrow-scheduler.service.spec.ts` | —     | Overdue + expiry scheduler                                  |
+| `global-exception.filter.spec.ts`  | —     | Error contract shape                                        |
 
 ### Known Issues
 - (List any issues found during manual pass here)
