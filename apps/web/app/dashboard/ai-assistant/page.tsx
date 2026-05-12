@@ -38,7 +38,7 @@ interface ConversationModeState {
 interface ConversationModelState {
   manualModel: string | null;
   lastResolvedModel: string | null;
-  lastModelSelectionSource: 'auto' | 'manual' | 'fallback' | null;
+  lastModelSelectionSource: 'auto' | 'manual' | 'capability_fallback' | 'rate_limit_fallback' | null;
   activeModel: string | null;
   reason?: string | null;
 }
@@ -318,6 +318,20 @@ export default function AIAssistantPage() {
     } catch { /* non-critical */ }
   }, []);
 
+  const handleSelectedModelChange = useCallback(async (model: string) => {
+    setSelectedModel(model);
+    const convId = activeConvRef.current;
+    if (!convId) return;
+    try {
+      await fetch(`/api/ai/conversations/${convId}/model`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ model }),
+      });
+    } catch { /* non-critical */ }
+  }, []);
+
   const handleModeToggle = useCallback(async (mode: DisplayAiMode) => {
     if (mode === 'normal') {
       await persistManualModes([]);
@@ -479,11 +493,14 @@ export default function AIAssistantPage() {
   const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId) ?? null;
   const currentIsStudySession = isStudySession || !!activeConversation?.studyBookId;
   const activeModelLabel = getAiModelLabel(activeModelState.activeModel ?? selectedModel);
-  const activeModelSourceLabel = activeModelState.lastModelSelectionSource === 'manual'
-    ? 'Manual'
-    : activeModelState.lastModelSelectionSource === 'fallback'
-      ? 'Fallback'
-      : 'Auto';
+  const activeModelSourceLabel =
+    activeModelState.lastModelSelectionSource === 'manual' ? 'Manual' :
+    activeModelState.lastModelSelectionSource === 'capability_fallback' ? 'Cap. fallback' :
+    activeModelState.lastModelSelectionSource === 'rate_limit_fallback' ? 'Rate fallback' :
+    'Auto';
+  const activeModelReason = activeModelState.reason ?? null;
+  const isCapabilityFallback = activeModelState.lastModelSelectionSource === 'capability_fallback';
+  const isRateLimitFallback = activeModelState.lastModelSelectionSource === 'rate_limit_fallback';
   const suggestions = getSuggestions(user?.role, user?.facultyName);
   const showSuggestions = historyLoaded && messages.length === 0 && !currentIsStudySession;
 
@@ -632,10 +649,28 @@ export default function AIAssistantPage() {
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-xs text-gray-500 dark:text-gray-400 mr-0.5 flex-shrink-0">Model:</span>
-          <span className="px-3 py-1 rounded-full text-xs font-medium border inline-flex items-center gap-1.5 bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/50 shadow-sm shadow-purple-500/15">
+          {activeModelState.manualModel && activeModelState.manualModel !== activeModelState.activeModel && (
+            <span className="px-2.5 py-1 rounded-full text-xs font-medium border inline-flex items-center gap-1 border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400">
+              <span>{getAiModelLabel(activeModelState.manualModel)}</span>
+              <span className="text-[10px] opacity-60">Preferred</span>
+            </span>
+          )}
+          <span className={cn(
+            'px-3 py-1 rounded-full text-xs font-medium border inline-flex items-center gap-1.5',
+            isCapabilityFallback || isRateLimitFallback
+              ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40'
+              : 'bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/50 shadow-sm shadow-purple-500/15',
+          )}>
             <span>{activeModelLabel}</span>
             <span className="text-[10px] uppercase tracking-wide opacity-80">{activeModelSourceLabel}</span>
           </span>
+          {(isCapabilityFallback || isRateLimitFallback) && activeModelReason && (
+            <span className="text-[11px] text-amber-600 dark:text-amber-400">
+              {isCapabilityFallback && activeModelReason === 'image_required' && '— image not supported by preferred model'}
+              {isCapabilityFallback && activeModelReason === 'tools_required' && '— tools not supported by preferred model'}
+              {isRateLimitFallback && '— preferred model rate limited'}
+            </span>
+          )}
         </div>
         <p className="text-[11px] text-gray-500 dark:text-gray-400">
           OZ can activate modes automatically while you chat. Click a mode to pin or unpin it manually.
@@ -752,6 +787,8 @@ export default function AIAssistantPage() {
             onSendMessage={handleChatSend}
             disabled={isStreaming}
             placeholder={currentIsStudySession ? 'Ask about this book…' : 'Ask me anything about books…'}
+            selectedModel={selectedModel}
+            onSelectedModelChange={handleSelectedModelChange}
           />
         </div>
       </div>

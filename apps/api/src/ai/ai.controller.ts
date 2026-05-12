@@ -11,6 +11,8 @@ import { OpenRouterProvider } from './providers/openrouter.provider';
 import { TokenTrackerService, TokenUsageSummary } from './session/token-tracker.service';
 import { UpdateInterestsDto } from './dto/update-interests.dto';
 import { ScanCoverDto } from './dto/scan-cover.dto';
+import { ChatDto } from './dto/chat.dto';
+import { UpdateModelPreferenceDto } from './dto/update-model-preference.dto';
 import { Role } from '@prisma/client';
 import { Request, Response } from 'express';
 
@@ -117,6 +119,27 @@ export class AiController {
     await this.agentService.updateConversationMode(id, userId, body.manualModes ?? body.mode);
   }
 
+  @Get('models')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List available AI models for selection' })
+  getModels() {
+    return this.agentService.getAvailableModels();
+  }
+
+  @Patch('conversations/:id/model')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Update the manual model preference for a conversation' })
+  async updateConversationModel(
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateModelPreferenceDto,
+  ) {
+    await this.agentService.updateConversationModel(id, userId, dto.model);
+  }
+
   @Post('chat')
   @UseGuards(JwtAuthGuard, ThrottlerGuard)
   @Throttle({ default: { ttl: 60000, limit: 15 } })
@@ -125,16 +148,7 @@ export class AiController {
   @ApiOperation({ summary: 'Send a message to the agentic AI assistant (SSE streaming)' })
   async chat(
     @CurrentUser('id') userId: string,
-    @Body() body: {
-      message: string;
-      history?: { role: string; content: string }[];
-      hasImage?: boolean;
-      imageBase64?: string;
-      conversationId?: string;
-      model?: string;
-      mode?: string;
-      manualModes?: string[];
-    },
+    @Body() body: ChatDto & { imageBase64?: string; mode?: string },
     @Req() req: Request,
     @Res() res: Response,
   ) {

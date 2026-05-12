@@ -1,14 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { LlmProvider, ProviderMessage, ProviderResponse, ProviderTool } from './provider.interface';
+import { MODEL_REGISTRY } from '../model-registry';
 
 // ── Model tiers ──────────────────────────────────────────────────
 // All AI goes through OpenRouter. Pick the cheapest tier that fits the task.
+const [FREE_MODEL, CHEAP_MODEL, SMART_MODEL] = MODEL_REGISTRY.map((m) => m.id) as [string, string, string];
+
 export const OPENROUTER_MODELS = {
-  FREE: 'google/gemma-4-31b-it:free',                // $0 — greetings, simple Q&A
-  CHEAP: 'google/gemini-3.1-flash-lite-preview',                   // ~$0.25/M — tool-calling, catalog queries
-  SMART: 'anthropic/claude-3-haiku',                 // $0.50/M — deep reasoning, complex analysis
-  STUDY: 'anthropic/claude-3-haiku',                 // study sessions — same tier as SMART, structured guides
+  FREE: FREE_MODEL,    // $0 — greetings, simple Q&A
+  CHEAP: CHEAP_MODEL,  // ~$0.25/M — tool-calling, catalog queries
+  SMART: SMART_MODEL,  // $0.50/M — deep reasoning, complex analysis
+  STUDY: SMART_MODEL,  // study sessions — same tier as SMART, structured guides
 } as const;
 
 export type ModelTier = keyof typeof OPENROUTER_MODELS;

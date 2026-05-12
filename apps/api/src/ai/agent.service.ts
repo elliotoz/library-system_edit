@@ -9,6 +9,7 @@ import { TokenTrackerService } from './session/token-tracker.service';
 import { MaterialSearchService } from '../materials/material-search.service';
 import { BookDocumentService, BookPdfContent } from '../books/book-document.service';
 import { OPENROUTER_MODELS } from './providers/openrouter.provider';
+import { AUTO_MODEL_ID, getModelEntry, getPublicModelList } from './model-registry';
 import { AiModeState, buildAiModeState, buildModeInstructionBlock, getDefaultAutoModes, inferAutoModes, normalizeAiModes } from './ai-modes';
 
 export interface BookCitation {
@@ -18,7 +19,7 @@ export interface BookCitation {
   copies: string;
 }
 
-export type ModelSelectionSource = 'auto' | 'manual' | 'fallback';
+export type ModelSelectionSource = 'auto' | 'manual' | 'capability_fallback' | 'rate_limit_fallback';
 
 export interface ConversationModelState {
   manualModel: string | null;
@@ -166,10 +167,36 @@ export class AgentService {
     };
   }
 
-  private resolveModelSelection(message: string, hasImage: boolean, manualModel?: string | null): ConversationModelState {
+  private resolveModelSelection(
+    message: string,
+    hasImage: boolean,
+    manualModel?: string | null,
+    isStudySession?: boolean,
+  ): ConversationModelState {
     const normalizedManualModel = this.normalizeManualModel(manualModel);
+    const requiresTools = !hasImage && !this.isSimpleMessage(message);
+    const requiresImage = hasImage;
 
     if (normalizedManualModel) {
+      const entry = getModelEntry(normalizedManualModel);
+      if (requiresImage && entry && !entry.capabilities.supportsImages) {
+        return {
+          manualModel: normalizedManualModel,
+          lastResolvedModel: OPENROUTER_MODELS.CHEAP,
+          lastModelSelectionSource: 'capability_fallback',
+          activeModel: OPENROUTER_MODELS.CHEAP,
+          reason: 'image_required',
+        };
+      }
+      if (requiresTools && entry && !entry.capabilities.supportsTools) {
+        return {
+          manualModel: normalizedManualModel,
+          lastResolvedModel: OPENROUTER_MODELS.CHEAP,
+          lastModelSelectionSource: 'capability_fallback',
+          activeModel: OPENROUTER_MODELS.CHEAP,
+          reason: 'tools_required',
+        };
+      }
       return {
         manualModel: normalizedManualModel,
         lastResolvedModel: normalizedManualModel,
@@ -179,15 +206,16 @@ export class AgentService {
       };
     }
 
+    // Auto mode
     let resolvedModel: string = OPENROUTER_MODELS.CHEAP;
     let reason = 'default_tools';
 
     if (hasImage) {
       resolvedModel = OPENROUTER_MODELS.CHEAP;
       reason = 'image';
-    } else if (this.isDeepQuery(message)) {
+    } else if (isStudySession || this.isDeepQuery(message)) {
       resolvedModel = OPENROUTER_MODELS.SMART;
-      reason = 'deep_query';
+      reason = isStudySession ? 'study_session' : 'deep_query';
     } else if (this.isSimpleMessage(message)) {
       resolvedModel = OPENROUTER_MODELS.FREE;
       reason = 'simple_query';
@@ -404,6 +432,18 @@ Be concise, practical, and encouraging. Base everything on the book details prov
       where: { id, userId },
       data: { manualModes: normalizeAiModes(requestedManualModes) },
     });
+  }
+
+  async updateConversationModel(id: string, userId: string, model: string): Promise<void> {
+    const manualModel = model === AUTO_MODEL_ID ? null : model;
+    await this.prisma.aiConversation.updateMany({
+      where: { id, userId },
+      data: { manualModel },
+    });
+  }
+
+  getAvailableModels() {
+    return getPublicModelList();
   }
   // ── Tools ──────────────────────────────────────────────────────
 
@@ -1217,7 +1257,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
       lastAutoModes: autoModes,
       isStudySession: !!conversation?.studyBookId,
     });
-    let modelState = this.resolveModelSelection(message, hasImage, manualModel);
+    let modelState = this.resolveModelSelection(message, hasImage, manualModel, !!conversation?.studyBookId);
 
     const systemPrompt = `${buildModeInstructionBlock(modeState.activeModes)}${buildSystemPromptFromModule(promptContext)}`;
 
@@ -1315,9 +1355,9 @@ Be concise, practical, and encouraging. Base everything on the book details prov
           modelState = {
             ...modelState,
             lastResolvedModel: model,
-            lastModelSelectionSource: 'fallback',
+            lastModelSelectionSource: 'rate_limit_fallback',
             activeModel: model,
-            reason: 'rate_limit_fallback',
+            reason: 'rate_limit',
           };
           if (conversationId) {
             await this.prisma.aiConversation.update({
