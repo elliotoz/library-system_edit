@@ -9,7 +9,7 @@ import { AiService } from './ai.service';
 import { AgentService, ChatChunk } from './agent.service';
 import { OpenRouterProvider } from './providers/openrouter.provider';
 import { TokenTrackerService, TokenUsageSummary } from './session/token-tracker.service';
-import { UpdateInterestsDto } from './dto/update-interests.dto';
+import { UpdateAiInterestsDto } from './dto/update-interests.dto';
 import { ScanCoverDto } from './dto/scan-cover.dto';
 import { ChatDto } from './dto/chat.dto';
 import { UpdateModelPreferenceDto } from './dto/update-model-preference.dto';
@@ -201,7 +201,7 @@ export class AiController {
   @ApiResponse({ status: 200, description: 'Interests updated' })
   updateInterests(
     @CurrentUser('id') userId: string,
-    @Body() dto: UpdateInterestsDto,
+    @Body() dto: UpdateAiInterestsDto,
   ) {
     return this.aiService.updateInterests(userId, dto.interests);
   }
