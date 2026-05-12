@@ -60,15 +60,8 @@ interface AIGraphProps {
 export function AIGraph({ raw }: AIGraphProps) {
   const spec = useMemo(() => parseGraphSpec(raw), [raw]);
 
-  if (!spec) {
-    return (
-      <pre className="bg-gray-100 dark:bg-white/[0.06] rounded p-3 text-xs font-mono overflow-x-auto whitespace-pre-wrap text-gray-600 dark:text-gray-400">
-        {raw}
-      </pre>
-    );
-  }
-
   const traces: Plotly.Data[] = useMemo(() => {
+    if (!spec) return [];
     if (spec.type === 'function' && spec.expression) {
       const xMin = spec.xMin ?? -10;
       const xMax = spec.xMax ?? 10;
@@ -89,9 +82,9 @@ export function AIGraph({ raw }: AIGraphProps) {
     return [];
   }, [spec]);
 
-  if (traces.length === 0) {
+  if (!spec || traces.length === 0) {
     return (
-      <pre className="bg-gray-100 dark:bg-white/[0.06] rounded p-3 text-xs font-mono overflow-x-auto text-gray-600 dark:text-gray-400">
+      <pre className="bg-gray-100 dark:bg-white/[0.06] rounded p-3 text-xs font-mono overflow-x-auto whitespace-pre-wrap text-gray-600 dark:text-gray-400">
         {raw}
       </pre>
     );
