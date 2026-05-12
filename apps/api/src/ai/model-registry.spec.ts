@@ -1,4 +1,4 @@
-import { AUTO_MODEL_ID, MODEL_REGISTRY, SELECTABLE_MODEL_IDS, getModelEntry, isAllowlistedModel, getPublicModelList } from './model-registry';
+import { AUTO_MODEL_ID, MODEL_REGISTRY, SELECTABLE_MODEL_IDS, getModelEntry, isAllowlistedModel, getPublicModelList, getModelByTier } from './model-registry';
 import { OPENROUTER_MODELS } from './providers/openrouter.provider';
 import { AgentService } from './agent.service';
 
@@ -41,6 +41,20 @@ describe('isAllowlistedModel', () => {
     expect(isAllowlistedModel('openai/gpt-4o')).toBe(false);
     expect(isAllowlistedModel('')).toBe(false);
     expect(isAllowlistedModel('auto-extra')).toBe(false);
+  });
+});
+
+describe('getModelByTier', () => {
+  it('resolves tier to the correct model ID', () => {
+    expect(getModelByTier('free').id).toBe(OPENROUTER_MODELS.FREE);
+    expect(getModelByTier('tool').id).toBe(OPENROUTER_MODELS.CHEAP);
+    expect(getModelByTier('smart').id).toBe(OPENROUTER_MODELS.SMART);
+  });
+
+  it('OPENROUTER_MODELS is order-independent — matches tier lookup', () => {
+    expect(OPENROUTER_MODELS.FREE).toBe(MODEL_REGISTRY.find(m => m.tier === 'free')?.id);
+    expect(OPENROUTER_MODELS.CHEAP).toBe(MODEL_REGISTRY.find(m => m.tier === 'tool')?.id);
+    expect(OPENROUTER_MODELS.SMART).toBe(MODEL_REGISTRY.find(m => m.tier === 'smart')?.id);
   });
 });
 
@@ -156,5 +170,49 @@ describe('AgentService.resolveModelSelection', () => {
       expect(state.manualModel).toBeNull();
       expect(state.lastModelSelectionSource).toBe('auto');
     });
+
+    it('treats unknown/stale stored model ID as Auto (falls back to auto)', () => {
+      const state = resolve('hello', false, 'some/unknown-old-model');
+      expect(state.manualModel).toBeNull();
+      expect(state.lastModelSelectionSource).toBe('auto');
+    });
+  });
+});
+
+describe('AgentService.updateConversationModel', () => {
+  it('throws NotFoundException when no conversation matched', async () => {
+    const prisma = {
+      aiConversation: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+    };
+    const service = new AgentService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    await expect(service.updateConversationModel('missing-id', 'user-1', 'auto'))
+      .rejects.toThrow('Conversation not found');
+  });
+
+  it('resolves without error when conversation exists', async () => {
+    const prisma = {
+      aiConversation: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    const service = new AgentService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    await expect(service.updateConversationModel('conv-1', 'user-1', 'auto'))
+      .resolves.toBeUndefined();
   });
 });

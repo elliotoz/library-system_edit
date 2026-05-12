@@ -11,11 +11,22 @@ export class ChatDto {
   @MaxLength(1000)
   message: string;
 
-  @ApiPropertyOptional({ description: 'Base64-encoded image to include with the message' })
+  @ApiPropertyOptional({ description: 'Base64-encoded image (legacy field name)' })
   @IsOptional()
   @IsString()
   @MaxLength(2000000)
   image?: string;
+
+  @ApiPropertyOptional({ description: 'Base64-encoded image to include with the message' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000000)
+  imageBase64?: string | null;
+
+  @ApiPropertyOptional({ description: 'Legacy single-mode string' })
+  @IsOptional()
+  @IsString()
+  mode?: string;
 
   @ApiPropertyOptional({ description: 'Model ID to use (auto or allowlisted model ID)', enum: ALLOWED_MODELS })
   @IsOptional()

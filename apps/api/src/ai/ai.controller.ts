@@ -148,7 +148,7 @@ export class AiController {
   @ApiOperation({ summary: 'Send a message to the agentic AI assistant (SSE streaming)' })
   async chat(
     @CurrentUser('id') userId: string,
-    @Body() body: ChatDto & { imageBase64?: string; mode?: string },
+    @Body() body: ChatDto,
     @Req() req: Request,
     @Res() res: Response,
   ) {

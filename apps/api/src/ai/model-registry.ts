@@ -53,6 +53,12 @@ export function isAllowlistedModel(id: string): boolean {
   return id === AUTO_MODEL_ID || SELECTABLE_MODEL_IDS.includes(id);
 }
 
+export function getModelByTier(tier: ModelRegistryEntry['tier']): ModelRegistryEntry {
+  const entry = MODEL_REGISTRY.find((m) => m.tier === tier);
+  if (!entry) throw new Error(`No model registered for tier: ${tier}`);
+  return entry;
+}
+
 /** Returns frontend-safe model metadata (no internals). */
 export function getPublicModelList(): Array<{ id: string; label: string; description: string; badge?: string }> {
   const auto = { id: AUTO_MODEL_ID, label: 'Auto', description: 'OZ chooses the best model for each request', badge: 'Default' };

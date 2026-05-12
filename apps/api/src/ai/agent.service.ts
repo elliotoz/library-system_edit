@@ -9,7 +9,7 @@ import { TokenTrackerService } from './session/token-tracker.service';
 import { MaterialSearchService } from '../materials/material-search.service';
 import { BookDocumentService, BookPdfContent } from '../books/book-document.service';
 import { OPENROUTER_MODELS } from './providers/openrouter.provider';
-import { AUTO_MODEL_ID, getModelEntry, getPublicModelList } from './model-registry';
+import { AUTO_MODEL_ID, getModelEntry, getPublicModelList, isAllowlistedModel } from './model-registry';
 import { AiModeState, buildAiModeState, buildModeInstructionBlock, getDefaultAutoModes, inferAutoModes, normalizeAiModes } from './ai-modes';
 
 export interface BookCitation {
@@ -145,8 +145,8 @@ export class AgentService {
   }
 
   private normalizeManualModel(model?: string | null): string | null {
-    if (!model || model === 'auto') return null;
-    return model;
+    if (!model || model === AUTO_MODEL_ID) return null;
+    return isAllowlistedModel(model) ? model : null;
   }
 
   private buildConversationModelState(conversation: {
@@ -436,10 +436,13 @@ Be concise, practical, and encouraging. Base everything on the book details prov
 
   async updateConversationModel(id: string, userId: string, model: string): Promise<void> {
     const manualModel = model === AUTO_MODEL_ID ? null : model;
-    await this.prisma.aiConversation.updateMany({
+    const result = await this.prisma.aiConversation.updateMany({
       where: { id, userId },
       data: { manualModel },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Conversation not found');
+    }
   }
 
   getAvailableModels() {
