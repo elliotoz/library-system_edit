@@ -52,6 +52,7 @@ Primary local ports:
 | Web app    | `3000` | `apps/web/package.json`, `apps/web/Dockerfile`   |
 | API        | `3001` | `apps/api/.env.example`, `apps/api/Dockerfile`   |
 | PostgreSQL | `5432` | `docker-compose.yml`                             |
+| Python runner | internal | `apps/python-runner`, `docker-compose.yml`       |
 | pgAdmin    | `5050` | `docker-compose.yml`                             |
 
 ---
@@ -393,15 +394,18 @@ All model requests go through OpenRouter regardless of the underlying model prov
   queries, and image fallback.
 - `smart`: `anthropic/claude-3-haiku` for deep analytical queries and
   study-session guides.
-- `technical`: `openai/gpt-5.1-codex-mini` for manual technical, coding,
-  and structured reasoning.
+- `technical`: `openai/gpt-5.1-codex-mini` for Auto or manual technical,
+  coding, scientific, graphing, and structured reasoning.
 
-`OPENROUTER_MODELS` still exposes `FREE`, `CHEAP`, `SMART`, and `STUDY`
-constants. The IDs come from `apps/api/src/ai/model-registry.ts`.
+`OPENROUTER_MODELS` exposes `FREE`, `CHEAP`, `SMART`, `TECHNICAL`, and
+`STUDY` constants. The IDs come from `apps/api/src/ai/model-registry.ts`.
 
 Auto model selection logic in `AgentService.resolveModelSelection()`:
 
 - image attached: use the tool/vision-capable standby model
+- technical image: use Codex Mini
+- coding, math, graphing, engineering, or numerical method request: use
+  Codex Mini
 - study session or deep query: use the smart model
 - simple greeting or short message: use the free model
 - other tool/catalog requests: use the tool-capable standby model
@@ -431,6 +435,7 @@ Assistant messages render through `AIMessage` with:
 
 - Markdown and GitHub-flavored Markdown tables
 - KaTeX math via `$...$` and `$$...$$`
+- safe normalization of `\(...\)` and `\[...\]` outside fenced code blocks
 - syntax-highlighted code blocks with a copy button
 - interactive Plotly graph blocks from fenced `graph` JSON
 - Mermaid diagrams from fenced `mermaid` blocks
@@ -438,6 +443,33 @@ Assistant messages render through `AIMessage` with:
 
 Scientific output guidance is added to the system prompt when the user's
 message asks for math, science, engineering, graphing, code, or diagrams.
+
+Graph blocks are validated before rendering. Supported graph types are
+`function`, `multi-function`, `scatter`, `line`, `bar`, and `histogram`.
+Versioned graph JSON may use `schemaVersion: 1`, `points`, `functions`,
+axis labels, and axis ranges. Legacy `xValues`, `yValues`, and `labels`
+remain supported.
+
+### Python Scientific Runner
+
+The optional Python runner is a separate FastAPI service under
+`apps/python-runner`. The API exposes it to OZ as a bounded `run_python` tool
+only when `PYTHON_RUNNER_URL` is configured.
+
+The runner is intended for scientific computation, symbolic math, numerical
+methods, matrices, statistics, dataframe work, and graph data generation. It is
+not used for live library catalog data; library questions still use the
+existing catalog, borrow, reading-list, and study-material tools.
+
+Initial runner safeguards:
+
+- separate process and Docker service
+- non-root container user
+- `python -I`
+- temporary working directory per request
+- blocked common unsafe imports and runtime calls
+- execution timeout
+- truncated stdout and stderr
 
 ### Conversation Features
 
@@ -528,7 +560,8 @@ The system prompt is built by `buildSystemPrompt()` in
 | Service | Image / Build | Container | Port | Notes |
 | ------- | ------------- | --------- | ----: | ----- |
 | `postgres` | `postgres:15-alpine` | `library_db` | `5432` | External named volume |
-| `api` | `./apps/api` target `development` | `library_api` | `3001` | Depends on healthy Postgres |
+| `python-runner` | `./apps/python-runner` | `library_python_runner` | internal | Scientific Python execution |
+| `api` | `./apps/api` target `development` | `library_api` | `3001` | Depends on Postgres and Python runner |
 | `web` | `./apps/web` target `development` | `library_web` | `3000` | Depends on API |
 | `pgadmin` | `dpage/pgadmin4:latest` | `library_pgadmin` | `5050` | Default email `admin@uskudar.edu.tr` |
 
@@ -692,6 +725,8 @@ Additional script `apps/api/prisma/add-books.ts` adds or updates 8 test books wh
 | `FRONTEND_URL` | Canonical frontend URL for OAuth redirects and email links |
 | `UPLOAD_DIR` | Upload directory path (static serving uses `./uploads` relative to API cwd) |
 | `OPENROUTER_API_KEY` | Required by the active OpenRouter AI provider |
+| `PYTHON_RUNNER_URL` | Optional internal URL for the scientific Python runner |
+| `PYTHON_RUNNER_TIMEOUT_MS` | Python runner execution timeout; default `3000` |
 | `AI_SEMANTIC_MODE` | `keyword`, `hybrid`, or `embedding`; default `hybrid`; hybrid falls back to keyword |
 | `STORAGE_PROVIDER` | `local` or `s3` |
 | `AWS_REGION` | S3 region; required when `STORAGE_PROVIDER=s3` |
@@ -814,6 +849,7 @@ Open in your browser:
 | `test:api` | `cd apps/api && npm run test:unit` |
 | `test:api:critical` | `cd apps/api && npm run test:critical` |
 | `test:api:e2e` | `cd apps/api && npm run test:e2e` |
+| `test:web` | `cd apps/web && npm run test` |
 | `db:start` | `docker-compose up -d postgres` |
 | `db:stop` | `docker-compose down` |
 | `db:studio` | `cd apps/api && npx prisma studio` |
@@ -1166,7 +1202,8 @@ Operational security notes:
 - Set `NODE_ENV=production` so auth cookies use production `secure`/`sameSite` behavior.
 - Configure real SMTP for verification and reset emails in production.
 - Configure production CORS origins explicitly in `CORS_ORIGIN`.
-- Do not expose pgAdmin publicly without additional access controls.
+- Do not expose pgAdmin or the Python runner publicly without additional
+  access controls.
 - Review S3 bucket permissions and public URL behavior before enabling `STORAGE_PROVIDER=s3`.
 - `OPENROUTER_API_KEY`, AWS credentials, SMTP credentials, Google OAuth secrets, and
   `JWT_SECRET` must never be committed to version control.
@@ -1203,7 +1240,7 @@ Production checklist:
 4. Only seed if intentionally deploying sample data.
 5. Configure `FRONTEND_URL`, `CORS_ORIGIN`, SMTP, storage provider, and `OPENROUTER_API_KEY`.
 6. Confirm `GET /health/ready` returns `"status": "ready"`.
-7. Restrict database and pgAdmin network access.
+7. Restrict database, pgAdmin, and Python runner network access.
 
 ---
 

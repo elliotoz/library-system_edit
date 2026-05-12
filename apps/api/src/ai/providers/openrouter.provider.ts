@@ -9,6 +9,7 @@ export const OPENROUTER_MODELS = {
   FREE: getModelByTier('free').id,    // $0 — greetings, simple Q&A
   CHEAP: getModelByTier('tool').id,   // ~$0.25/M — tool-calling, catalog queries
   SMART: getModelByTier('smart').id,  // $0.50/M — deep reasoning, complex analysis
+  TECHNICAL: getModelByTier('technical').id, // technical, coding, scientific reasoning
   STUDY: getModelByTier('smart').id,  // study sessions — same tier as SMART, structured guides
 } as const;
 

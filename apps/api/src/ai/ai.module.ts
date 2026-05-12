@@ -15,9 +15,10 @@ import { UsersModule } from '../users/users.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { MaterialsModule } from '../materials/materials.module';
 import { BooksModule } from '../books/books.module';
+import { PythonExecutionModule } from './python/python-execution.module';
 
 @Module({
-  imports: [UsersModule, PrismaModule, MaterialsModule, BooksModule],
+  imports: [UsersModule, PrismaModule, MaterialsModule, BooksModule, PythonExecutionModule],
   controllers: [AiController],
   providers: [
     AiService,

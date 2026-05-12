@@ -1,25 +1,13 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { evaluate } from 'mathjs';
+import { NormalizedGraphSpec, parseGraphSpec } from './ai-graph-parser';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 const MAX_SAMPLES = 500;
-const MAX_RANGE = 1000;
-
-interface GraphSpec {
-  type: 'function' | 'scatter' | 'line' | 'bar';
-  title?: string;
-  expression?: string;
-  xMin?: number;
-  xMax?: number;
-  xValues?: number[];
-  yValues?: number[];
-  labels?: string[];
-}
-
 function sampleFunction(expr: string, xMin: number, xMax: number): { x: number[]; y: number[] } {
   const x: number[] = [];
   const y: number[] = [];
@@ -39,47 +27,26 @@ function sampleFunction(expr: string, xMin: number, xMax: number): { x: number[]
   return { x, y };
 }
 
-function parseGraphSpec(raw: string): GraphSpec | null {
-  try {
-    const spec = JSON.parse(raw) as GraphSpec;
-    if (!spec.type) return null;
-    if (spec.xMin !== undefined && spec.xMax !== undefined) {
-      const range = Math.abs(spec.xMax - spec.xMin);
-      if (range > MAX_RANGE) return null;
-    }
-    return spec;
-  } catch {
-    return null;
-  }
-}
-
 interface AIGraphProps {
   raw: string;
 }
 
 export function AIGraph({ raw }: AIGraphProps) {
   const spec = useMemo(() => parseGraphSpec(raw), [raw]);
+  const [dark, setDark] = useState(false);
+
+  useEffect(() => {
+    setDark(document.documentElement.classList.contains('dark'));
+    const observer = new MutationObserver(() => {
+      setDark(document.documentElement.classList.contains('dark'));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   const traces: Plotly.Data[] = useMemo(() => {
     if (!spec) return [];
-    if (spec.type === 'function' && spec.expression) {
-      const xMin = spec.xMin ?? -10;
-      const xMax = spec.xMax ?? 10;
-      const { x, y } = sampleFunction(spec.expression, xMin, xMax);
-      return [{ type: 'scatter', mode: 'lines', x, y, name: spec.expression } as Plotly.Data];
-    }
-    if ((spec.type === 'scatter' || spec.type === 'line') && spec.xValues && spec.yValues) {
-      return [{
-        type: 'scatter',
-        mode: spec.type === 'line' ? 'lines' : 'markers',
-        x: spec.xValues,
-        y: spec.yValues,
-      } as Plotly.Data];
-    }
-    if (spec.type === 'bar' && spec.labels && spec.yValues) {
-      return [{ type: 'bar', x: spec.labels, y: spec.yValues } as Plotly.Data];
-    }
-    return [];
+    return buildTraces(spec);
   }, [spec]);
 
   if (!spec || traces.length === 0) {
@@ -96,7 +63,19 @@ export function AIGraph({ raw }: AIGraphProps) {
     margin: { t: spec.title ? 40 : 20, r: 20, b: 40, l: 50 },
     paper_bgcolor: 'transparent',
     plot_bgcolor: 'transparent',
-    font: { size: 11 },
+    font: { size: 11, color: dark ? '#e5e7eb' : '#374151' },
+    xaxis: {
+      title: spec.xLabel ? { text: spec.xLabel } : undefined,
+      range: spec.xMin !== undefined && spec.xMax !== undefined ? [spec.xMin, spec.xMax] : undefined,
+      gridcolor: dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
+      zerolinecolor: dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
+    },
+    yaxis: {
+      title: spec.yLabel ? { text: spec.yLabel } : undefined,
+      range: spec.yMin !== undefined && spec.yMax !== undefined ? [spec.yMin, spec.yMax] : undefined,
+      gridcolor: dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
+      zerolinecolor: dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
+    },
   };
 
   return (
@@ -110,4 +89,47 @@ export function AIGraph({ raw }: AIGraphProps) {
       />
     </div>
   );
+}
+
+function buildTraces(spec: NormalizedGraphSpec): Plotly.Data[] {
+  if (spec.type === 'function' && spec.expression) {
+    return [buildFunctionTrace(spec.expression, spec.xMin, spec.xMax)];
+  }
+
+  if (spec.type === 'multi-function' && spec.functions) {
+    return spec.functions.map((expr) => buildFunctionTrace(expr, spec.xMin, spec.xMax));
+  }
+
+  if ((spec.type === 'scatter' || spec.type === 'line') && spec.points) {
+    return [{
+      type: 'scatter',
+      mode: spec.type === 'line' ? 'lines' : 'markers',
+      x: spec.points.map((point) => point.x),
+      y: spec.points.map((point) => point.y),
+    } as Plotly.Data];
+  }
+
+  if ((spec.type === 'scatter' || spec.type === 'line') && spec.xValues && spec.yValues) {
+    return [{
+      type: 'scatter',
+      mode: spec.type === 'line' ? 'lines' : 'markers',
+      x: spec.xValues,
+      y: spec.yValues,
+    } as Plotly.Data];
+  }
+
+  if (spec.type === 'bar' && spec.labels && spec.yValues) {
+    return [{ type: 'bar', x: spec.labels, y: spec.yValues } as Plotly.Data];
+  }
+
+  if (spec.type === 'histogram') {
+    return [{ type: 'histogram', x: spec.values ?? spec.xValues } as Plotly.Data];
+  }
+
+  return [];
+}
+
+function buildFunctionTrace(expr: string, xMin = -10, xMax = 10): Plotly.Data {
+  const { x, y } = sampleFunction(expr, xMin, xMax);
+  return { type: 'scatter', mode: 'lines', x, y, name: expr } as Plotly.Data;
 }

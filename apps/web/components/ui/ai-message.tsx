@@ -11,6 +11,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Copy, Check } from 'lucide-react';
 import { AIGraph } from './ai-graph';
 import { AIMermaid } from './ai-mermaid';
+import { normalizeMathDelimiters } from './ai-markdown-normalizer';
 
 interface CodeBlockProps {
   language: string;
@@ -68,6 +69,8 @@ interface AIMessageProps {
 }
 
 export function AIMessage({ content }: AIMessageProps) {
+  const normalizedContent = normalizeMathDelimiters(content);
+
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none leading-relaxed ai-message">
       <ReactMarkdown
@@ -136,7 +139,7 @@ export function AIMessage({ content }: AIMessageProps) {
           },
         }}
       >
-        {content}
+        {normalizedContent}
       </ReactMarkdown>
     </div>
   );

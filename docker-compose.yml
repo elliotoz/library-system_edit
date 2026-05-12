@@ -38,12 +38,27 @@ services:
       NODE_ENV: development
       CORS_ORIGIN: http://localhost:3000
       DOCKER_ENV: "true"
+      PYTHON_RUNNER_URL: http://python-runner:8000
+      PYTHON_RUNNER_TIMEOUT_MS: 3000
     volumes:
       - ./apps/api:/app
       - /app/node_modules
     depends_on:
       postgres:
         condition: service_healthy
+      python-runner:
+        condition: service_started
+    networks:
+      - library_network
+
+  python-runner:
+    build:
+      context: ./apps/python-runner
+      dockerfile: Dockerfile
+    container_name: library_python_runner
+    restart: unless-stopped
+    expose:
+      - "8000"
     networks:
       - library_network
 

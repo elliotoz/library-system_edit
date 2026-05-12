@@ -110,16 +110,23 @@ Use this checklist to verify all features work correctly before deployment.
 - [MANUAL] New chat starts with model selector set to Auto
 - [MANUAL] `GET /ai/models` returns Auto plus the four selectable models
 - [MANUAL] Manual Codex Mini selection persists on conversation switch
+- [MANUAL] Auto selects Codex Mini for coding/scientific questions
+- [MANUAL] Manual Claude remains active for technical prompts when selected
 - [MANUAL] Gemma Free plus an image request shows capability fallback
 - [MANUAL] Gemma Free plus a catalog/tool request shows capability fallback
 - [MANUAL] Capability fallback does not overwrite the saved manual model
 - [MANUAL] Markdown tables, lists, and blockquotes render in assistant replies
 - [MANUAL] Math renders with KaTeX for inline and display equations
+- [MANUAL] `\(...\)` and `\[...\]` math delimiters render correctly
 - [MANUAL] Code blocks render with syntax highlighting and copy button
 - [MANUAL] Fenced `graph` JSON renders an interactive Plotly chart
+- [MANUAL] Fenced `multi-function` graph renders multiple equations
+- [MANUAL] Fenced scatter graph with `points` renders coordinates
 - [MANUAL] Invalid `graph` JSON falls back to source text
 - [MANUAL] Fenced `mermaid` content renders a diagram
 - [MANUAL] Invalid Mermaid content falls back to source text
+- [MANUAL] Python runner computes a simple numerical result when configured
+- [MANUAL] Python runner timeout returns a safe assistant message
 - [MANUAL] Chat is rate-limited (15 messages / 60s)
 - [AUTO] `GET /ai/status` requires auth (`security.e2e-spec.ts`)
 
@@ -321,7 +328,9 @@ These should all return 400:
 | `users.controller.spec.ts`         | —     | GET /users/:id access control                               |
 | `reservations.service.spec.ts`     | —     | Service-layer concurrency                                   |
 | `borrow-scheduler.service.spec.ts` | —     | Overdue + expiry scheduler                                  |
-| `model-registry.spec.ts`           | 31    | AI model registry and fallback behavior                     |
+| `model-registry.spec.ts`           | —     | AI model registry and fallback behavior                     |
+| `system-prompt-builder.spec.ts`    | —     | AI scientific prompt rules                                  |
+| `python-execution.service.spec.ts` | —     | Python runner API client behavior                           |
 | `global-exception.filter.spec.ts`  | —     | Error contract shape                                        |
 
 ### Known Issues

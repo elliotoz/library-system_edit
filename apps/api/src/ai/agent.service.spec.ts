@@ -7,6 +7,7 @@ describe('AgentService read_ebook', () => {
     const toolHooks = {};
     const tokenTracker = {};
     const materialSearch = {};
+    const pythonExecution = { isAvailable: jest.fn().mockReturnValue(false) };
     const bookDocumentService = {
       getPdfDocumentContent: jest.fn().mockResolvedValue({
         title: 'Clean Architecture',
@@ -27,6 +28,7 @@ describe('AgentService read_ebook', () => {
       tokenTracker as never,
       materialSearch as never,
       bookDocumentService as never,
+      pythonExecution as never,
     );
 
     const result = await service['executeToolInner'](
@@ -51,6 +53,7 @@ describe('AgentService read_ebook structure questions', () => {
     const toolHooks = {};
     const tokenTracker = {};
     const materialSearch = {};
+    const pythonExecution = { isAvailable: jest.fn().mockReturnValue(false) };
     const bookDocumentService = {
       getPdfDocumentContent: jest.fn().mockResolvedValue({
         title: 'The Linux Command Line',
@@ -80,6 +83,7 @@ describe('AgentService read_ebook structure questions', () => {
       tokenTracker as never,
       materialSearch as never,
       bookDocumentService as never,
+      pythonExecution as never,
     );
 
     const result = await service['executeToolInner'](

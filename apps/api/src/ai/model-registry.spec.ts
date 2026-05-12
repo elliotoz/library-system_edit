@@ -13,6 +13,7 @@ describe('MODEL_REGISTRY', () => {
     expect(MODEL_REGISTRY.find(m => m.tier === 'free')?.id).toBe(OPENROUTER_MODELS.FREE);
     expect(MODEL_REGISTRY.find(m => m.tier === 'tool')?.id).toBe(OPENROUTER_MODELS.CHEAP);
     expect(MODEL_REGISTRY.find(m => m.tier === 'smart')?.id).toBe(OPENROUTER_MODELS.SMART);
+    expect(MODEL_REGISTRY.find(m => m.tier === 'technical')?.id).toBe(OPENROUTER_MODELS.TECHNICAL);
   });
 
   it('free tier model has no image or tool support', () => {
@@ -53,12 +54,14 @@ describe('getModelByTier', () => {
     expect(getModelByTier('free').id).toBe(OPENROUTER_MODELS.FREE);
     expect(getModelByTier('tool').id).toBe(OPENROUTER_MODELS.CHEAP);
     expect(getModelByTier('smart').id).toBe(OPENROUTER_MODELS.SMART);
+    expect(getModelByTier('technical').id).toBe(OPENROUTER_MODELS.TECHNICAL);
   });
 
   it('OPENROUTER_MODELS is order-independent — matches tier lookup', () => {
     expect(OPENROUTER_MODELS.FREE).toBe(MODEL_REGISTRY.find(m => m.tier === 'free')?.id);
     expect(OPENROUTER_MODELS.CHEAP).toBe(MODEL_REGISTRY.find(m => m.tier === 'tool')?.id);
     expect(OPENROUTER_MODELS.SMART).toBe(MODEL_REGISTRY.find(m => m.tier === 'smart')?.id);
+    expect(OPENROUTER_MODELS.TECHNICAL).toBe(MODEL_REGISTRY.find(m => m.tier === 'technical')?.id);
   });
 });
 
@@ -89,6 +92,7 @@ describe('getPublicModelList', () => {
 
 function makeService() {
   return new AgentService(
+    {} as never,
     {} as never,
     {} as never,
     {} as never,
@@ -138,6 +142,25 @@ describe('AgentService.resolveModelSelection', () => {
       expect(state.activeModel).toBe(OPENROUTER_MODELS.SMART);
       expect(state.reason).toBe('study_session');
     });
+
+    it('resolves coding requests to Codex Mini', () => {
+      const state = resolve('debug this TypeScript algorithm', false);
+      expect(state.lastModelSelectionSource).toBe('auto');
+      expect(state.activeModel).toBe(OPENROUTER_MODELS.TECHNICAL);
+      expect(state.reason).toBe('technical_scientific_query');
+    });
+
+    it('resolves scientific computation requests to Codex Mini', () => {
+      const state = resolve('solve this matrix using LU decomposition', false);
+      expect(state.activeModel).toBe(OPENROUTER_MODELS.TECHNICAL);
+      expect(state.reason).toBe('technical_scientific_query');
+    });
+
+    it('resolves technical image requests to Codex Mini', () => {
+      const state = resolve('solve the circuit equation in this image', true);
+      expect(state.activeModel).toBe(OPENROUTER_MODELS.TECHNICAL);
+      expect(state.reason).toBe('technical_image');
+    });
   });
 
   describe('Manual mode', () => {
@@ -152,6 +175,12 @@ describe('AgentService.resolveModelSelection', () => {
       const state = resolve('analyze this research paper', false, OPENROUTER_MODELS.CHEAP);
       expect(state.lastModelSelectionSource).toBe('manual');
       expect(state.activeModel).toBe(OPENROUTER_MODELS.CHEAP);
+    });
+
+    it('respects manual SMART model for a technical request', () => {
+      const state = resolve('solve this matrix using LU decomposition', false, OPENROUTER_MODELS.SMART);
+      expect(state.lastModelSelectionSource).toBe('manual');
+      expect(state.activeModel).toBe(OPENROUTER_MODELS.SMART);
     });
 
     it('falls back to CHEAP for image when FREE (no image support) is manual', () => {
@@ -242,6 +271,7 @@ describe('AgentService.updateConversationModel', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
     await expect(service.updateConversationModel('missing-id', 'user-1', 'auto'))
       .rejects.toThrow('Conversation not found');
@@ -255,6 +285,7 @@ describe('AgentService.updateConversationModel', () => {
     };
     const service = new AgentService(
       prisma as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,

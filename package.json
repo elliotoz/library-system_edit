@@ -19,6 +19,7 @@
     "test:api": "cd apps/api && npm run test:unit",
     "test:api:critical": "cd apps/api && npm run test:critical",
     "test:api:e2e": "cd apps/api && npm run test:e2e",
+    "test:web": "cd apps/web && npm run test",
     "db:start": "docker-compose up -d postgres",
     "db:stop": "docker-compose down",
     "db:studio": "cd apps/api && npx prisma studio",

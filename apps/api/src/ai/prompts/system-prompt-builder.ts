@@ -20,6 +20,7 @@ export interface PromptContext {
   currentDate: string;
   responseIntent?: ResponseIntent;
   scientificOutput?: boolean;
+  pythonExecutionAvailable?: boolean;
 }
 
 export function buildSystemPrompt(context: PromptContext): string {
@@ -82,7 +83,7 @@ ${examples}
 - **Total Books:** ${context.catalogTotalBooks}
 - **Available Copies:** ${context.catalogAvailableCopies}
 - **Published Reading Lists:** ${context.publishedReadingLists}
-- Indexed study materials available for AI reading: ${context.indexedMaterials ?? 0}${buildResponseStyleBlock(context.responseIntent)}${buildScientificOutputBlock(context.scientificOutput)}`;
+- Indexed study materials available for AI reading: ${context.indexedMaterials ?? 0}${buildResponseStyleBlock(context.responseIntent)}${buildScientificWorkspaceBlock(context.scientificOutput, context.pythonExecutionAvailable)}`;
 }
 
 function buildResponseStyleBlock(intent?: ResponseIntent): string {
@@ -94,19 +95,30 @@ function buildResponseStyleBlock(intent?: ResponseIntent): string {
   return '\n\n## Response Style\n\nThis message asks you to produce or format something. Use structured output: numbered steps, bullet lists, tables, or code blocks as appropriate.';
 }
 
-function buildScientificOutputBlock(scientific?: boolean): string {
+export function buildScientificWorkspaceBlock(scientific?: boolean, pythonAvailable?: boolean): string {
   if (!scientific) return '';
+  const pythonRule = pythonAvailable
+    ? '- Use the Python calculation tool for computation-heavy scientific work when it improves accuracy.'
+    : '- Do not claim Python execution support. Provide reproducible Python code only when helpful.';
+
   return `
 
-## Scientific Output Format
+## Scientific Workspace Output
 
-- Format math and science answers with Markdown.
-- Use \`$...$\` for inline math (e.g. \`$E = mc^2$\`).
-- Use \`$$...$$\` for display math on its own line.
-- Use fenced code blocks with a language tag for all code.
-- For graph data, use a \`\`\`graph fenced block with JSON matching: \`{ "type": "function"|"scatter"|"line"|"bar", "title": "...", "expression": "...", "xMin": n, "xMax": n }\`.
-- For diagrams, use a \`\`\`mermaid fenced block.
-- Show step-by-step reasoning, formulas, assumptions, and final answers in visible text.`;
+- Use clean Markdown with headings, numbered steps, bullets, and tables when helpful.
+- Define variables before using them.
+- Explain formulas before applying them.
+- Show visible educational steps, assumptions, checks, and final answers.
+- Do not reveal hidden chain-of-thought.
+- Use \`$...$\` for inline math and \`$$...$$\` for display math.
+- Matrix math must use LaTeX matrix environments such as \`bmatrix\`.
+- Use fenced code blocks with a language tag for code.
+- Use \`\`\`graph fenced blocks only for supported graph schemas.
+- Supported graph types: \`function\`, \`multi-function\`, \`scatter\`, \`line\`, \`bar\`, and \`histogram\`.
+- Graph JSON may use \`schemaVersion: 1\`, \`xLabel\`, \`yLabel\`, \`yMin\`, \`yMax\`, \`points\`, \`xValues\`, \`yValues\`, \`labels\`, or \`functions\`.
+- Use \`\`\`mermaid fenced blocks for flowcharts, sequence diagrams, ER diagrams, class diagrams, and state diagrams.
+- Close all Markdown fences and math blocks before finishing.
+${pythonRule}`;
 }
 
 function buildExamples(role: Role): string {
@@ -124,7 +136,5 @@ ${ex.response}`,
     )
     .join('\n\n');
 }
-
-
 
 

@@ -11,6 +11,7 @@ import { BookDocumentService, BookPdfContent } from '../books/book-document.serv
 import { OPENROUTER_MODELS } from './providers/openrouter.provider';
 import { AUTO_MODEL_ID, getModelEntry, getPublicModelList, isAllowlistedModel } from './model-registry';
 import { AiModeState, buildAiModeState, buildModeInstructionBlock, getDefaultAutoModes, inferAutoModes, normalizeAiModes } from './ai-modes';
+import { PythonExecutionService } from './python/python-execution.service';
 
 export interface BookCitation {
   title: string;
@@ -58,6 +59,7 @@ export class AgentService {
     private readonly tokenTrackerService: TokenTrackerService,
     private readonly materialSearch: MaterialSearchService,
     private readonly bookDocumentService: BookDocumentService,
+    private readonly pythonExecution: PythonExecutionService,
   ) {}
 
   // ── Status ─────────────────────────────────────────────────────
@@ -142,11 +144,22 @@ export class AgentService {
   private detectScientificOutput(message: string): boolean {
     const lower = message.toLowerCase();
     return (
-      /equation|matrix|derivative|integral|solve|proof/.test(lower) ||
-      /physics|chemistry|biology|lab|statistics/.test(lower) ||
-      /circuit|force|beam|algorithm|simulation/.test(lower) ||
+      this.isTechnicalOrScientificQuery(message) ||
       /\bplot\b|\bgraph\b|\bchart\b|visuali[sz]e/.test(lower) ||
       /flowchart|sequence diagram|er diagram|architecture diagram/.test(lower)
+    );
+  }
+
+  private isTechnicalOrScientificQuery(message: string): boolean {
+    const lower = message.toLowerCase();
+    return (
+      /typescript|javascript|python|sql|debug|compile|refactor|algorithm/.test(lower) ||
+      /equation|matrix|derivative|integral|solve|proof|theorem/.test(lower) ||
+      /gauss.?seidel|gaussian elimination|lu decomposition|cholesky|newton.?raphson/.test(lower) ||
+      /interpolation|numerical integration|differential equation|linear algebra/.test(lower) ||
+      /physics|chemistry|biology|lab|statistics|probability|regression/.test(lower) ||
+      /circuit|force|beam|simulation|engineering|thermodynamics|kinematics/.test(lower) ||
+      /\bplot\b|\bgraph\b|\bchart\b|visuali[sz]e|dataframe/.test(lower)
     );
   }
 
@@ -243,9 +256,15 @@ export class AgentService {
     let resolvedModel: string = OPENROUTER_MODELS.CHEAP;
     let reason = 'default_tools';
 
-    if (hasImage) {
+    if (hasImage && this.isTechnicalOrScientificQuery(message)) {
+      resolvedModel = OPENROUTER_MODELS.TECHNICAL;
+      reason = 'technical_image';
+    } else if (hasImage) {
       resolvedModel = OPENROUTER_MODELS.CHEAP;
       reason = 'image';
+    } else if (this.isTechnicalOrScientificQuery(message)) {
+      resolvedModel = OPENROUTER_MODELS.TECHNICAL;
+      reason = 'technical_scientific_query';
     } else if (isStudySession || this.isDeepQuery(message)) {
       resolvedModel = OPENROUTER_MODELS.SMART;
       reason = isStudySession ? 'study_session' : 'deep_query';
@@ -670,6 +689,21 @@ Be concise, practical, and encouraging. Base everything on the book details prov
           },
         },
       },
+      ...(this.pythonExecution.isAvailable() ? [{
+        type: 'function' as const,
+        function: {
+          name: 'run_python',
+          description: 'Run bounded Python for scientific calculations, symbolic math, numerical methods, matrices, statistics, dataframe work, and graph data. Never use this for live library catalog data.',
+          parameters: {
+            type: 'object',
+            properties: {
+              code: { type: 'string', description: 'Python code to execute' },
+              purpose: { type: 'string', description: 'Why this calculation is needed' },
+            },
+            required: ['code', 'purpose'],
+          },
+        },
+      }] : []),
     ];
   }
 
@@ -1188,6 +1222,19 @@ Be concise, practical, and encouraging. Base everything on the book details prov
           return { result: `MATERIAL OUTLINE:\n\n${formatted}`, citations: [] };
         }
 
+        case 'run_python': {
+          const code = String(args.code ?? '');
+          const execution = await this.pythonExecution.execute(code);
+          const status = execution.ok ? 'succeeded' : 'failed';
+          const parts = [
+            `Python execution ${status}.`,
+            execution.stdout ? `stdout:\n${execution.stdout}` : '',
+            execution.stderr ? `stderr:\n${execution.stderr}` : '',
+            execution.error ? `error: ${execution.error}` : '',
+          ].filter(Boolean);
+          return { result: parts.join('\n'), citations: [] };
+        }
+
         default:
           return { result: 'Unknown tool.', citations: [] };
       }
@@ -1259,6 +1306,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
       }),
       responseIntent: this.detectResponseIntent(message),
       scientificOutput: this.detectScientificOutput(message),
+      pythonExecutionAvailable: this.pythonExecution.isAvailable(),
     };
 
     const hasManualModeOverride = typeof manualModesInput === 'string' || Array.isArray(manualModesInput);
@@ -1555,11 +1603,6 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     await this.saveMessage(userId, 'assistant', fallback, conversationId);
   }
 }
-
-
-
-
-
 
 
 

@@ -50,6 +50,7 @@ From repo root:
 ```powershell
 npm run typecheck:api
 npm run typecheck:web
+npm run test:web
 npm run test:api
 npm run test:api:critical
 ```
@@ -70,6 +71,8 @@ Targeted AI model-selection tests:
 ```powershell
 cd apps/api
 npx jest --runInBand src/ai/model-registry.spec.ts
+npx jest --runInBand src/ai/prompts/system-prompt-builder.spec.ts
+npx jest --runInBand src/ai/python/python-execution.service.spec.ts
 ```
 
 ---
@@ -107,7 +110,15 @@ For frontend AI renderer changes, also run:
 
 ```powershell
 cd apps/web
+npm run test
 npm run build
+```
+
+For Python runner changes, also run:
+
+```powershell
+cd apps/python-runner
+python -m pytest
 ```
 
 ---
@@ -149,6 +160,8 @@ They do **not** yet prove:
 - real database behavior under concurrency
 - frontend behavior
 - visual correctness of Markdown, KaTeX, Plotly, or Mermaid rendering
+- container-level Python sandboxing beyond the runner's application-level
+  validation and subprocess timeout
 
 Those would require integration and end-to-end tests later.
 
