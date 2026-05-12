@@ -43,6 +43,16 @@ export class AgentService {
   private readonly chatMaxTokens = 2048;
   private readonly studyGuideMaxTokens = 1536;
 
+  private static readonly MEMORY_RECALL_LIMITS = {
+    recentContextMessages: 50,
+    directRecallMaxMessages: 60,
+    maxMessagesProcessedPerRecall: 300,
+    chunkSizeMessages: 30,
+    maxChunksPerRecall: 10,
+    maxSummaryTokensPerChunk: 350,
+    maxFinalSummaryTokens: 900,
+  } as const;
+
   private static readonly FINAL_PROVIDER_FAILURE_MESSAGES: Record<number, string> = {
     402: 'OZ AI is out of credits for this session. Your conversation has been saved. Please try again later.',
     429: 'OZ AI is being rate limited. Please wait a moment and try your message again.',
@@ -161,6 +171,23 @@ export class AgentService {
       /circuit|force|beam|simulation|engineering|thermodynamics|kinematics/.test(lower) ||
       /\bplot\b|\bgraph\b|\bchart\b|visuali[sz]e|dataframe/.test(lower)
     );
+  }
+
+  private detectFullRecall(message: string): boolean {
+    return (
+      /what (have|did) we (discuss|talk|cover|do)/i.test(message) ||
+      /recall (this|the|our|full|entire) (chat|session|conversation|history)/i.test(message) ||
+      /summarize (the|this|our|full|entire) (session|chat|conversation|history)/i.test(message) ||
+      /show (me |us )?(the |our )?(full |entire |all |complete )?(chat|session|conversation) history/i.test(message) ||
+      /what did (we|i) (do|discuss|cover|say|ask) (so far|in this|today)/i.test(message) ||
+      /show (earlier|previous|past) discussion/i.test(message)
+    );
+  }
+
+  private formatMessagesForRecall(messages: { role: string; content: string }[]): string {
+    return messages
+      .map((m) => `${m.role === 'user' ? 'User' : 'OZ'}: ${m.content}`)
+      .join('\n');
   }
 
   private detectResponseIntent(message: string): ResponseIntent {
@@ -370,7 +397,7 @@ export class AgentService {
 
   async getHistory(userId: string, conversationId?: string) {
     return this.prisma.aiMessage.findMany({
-      where: conversationId ? { conversationId } : { userId, conversationId: null },
+      where: conversationId ? { userId, conversationId } : { userId, conversationId: null },
       orderBy: { createdAt: 'asc' },
       take: 50,
       select: { id: true, role: true, content: true, createdAt: true },
@@ -1333,8 +1360,20 @@ Be concise, practical, and encouraging. Base everything on the book details prov
 
     let messageCount = 0;
     if (conversationId) {
-      messageCount = await this.prisma.aiMessage.count({ where: { conversationId } });
+      messageCount = await this.prisma.aiMessage.count({ where: { userId, conversationId } });
     }
+
+    // DB is the source of truth for conversation context.
+    // When a conversationId is present, fetch the last 50 messages from PostgreSQL.
+    // The frontend-supplied history array is only used as a fallback for conversations without an ID.
+    const dbHistory = conversationId
+      ? await this.prisma.aiMessage.findMany({
+          where: { userId, conversationId },
+          orderBy: { createdAt: 'asc' },
+          take: AgentService.MEMORY_RECALL_LIMITS.recentContextMessages,
+          select: { role: true, content: true },
+        })
+      : history;
 
     const storedModeState = this.buildConversationModeState(conversation ?? {});
     const storedModelState = this.buildConversationModelState(conversation ?? {});
@@ -1346,7 +1385,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
       : storedModelState.manualModel;
     const autoModes = inferAutoModes({
       message,
-      history,
+      history: dbHistory,
       isStudySession: !!conversation?.studyBookId,
     });
     const modeState = buildAiModeState({
@@ -1381,7 +1420,183 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     yield { type: 'mode_state', modeState };
     yield { type: 'model_state', modelState };
 
-    // Build messages — OpenRouter uses OpenAI-compatible message format
+    // ── Full-recall path ───────────────────────────────────────────────────────
+    // Handles: "what did we discuss?", "recall this session", "summarize the chat", etc.
+    // Fetches all messages using { userId, conversationId } — never by userId alone.
+
+    if (conversationId && this.detectFullRecall(message)) {
+      const {
+        directRecallMaxMessages,
+        maxMessagesProcessedPerRecall,
+        chunkSizeMessages,
+        maxChunksPerRecall,
+        maxSummaryTokensPerChunk,
+        maxFinalSummaryTokens,
+      } = AgentService.MEMORY_RECALL_LIMITS;
+
+      const recallStart = Date.now();
+
+      const allMessages = await this.prisma.aiMessage.findMany({
+        where: { userId, conversationId },
+        orderBy: { createdAt: 'asc' },
+        select: { role: true, content: true },
+      });
+
+      const totalCount = allMessages.length;
+
+      if (totalCount === 0) {
+        const noHistoryText = 'There are no saved messages in this conversation yet.';
+        yield { type: 'text', text: noHistoryText };
+        await this.saveMessage(userId, 'user', message, conversationId);
+        await this.saveMessage(userId, 'assistant', noHistoryText, conversationId);
+        return;
+      }
+
+      // Apply hard cap — process only the most recent 300 messages
+      let processedMessages = allMessages;
+      let truncated = false;
+
+      if (totalCount > maxMessagesProcessedPerRecall) {
+        processedMessages = allMessages.slice(-maxMessagesProcessedPerRecall);
+        truncated = true;
+        this.logger.warn(
+          `[recall] userId=${userId} convId=${conversationId} totalMessages=${totalCount} truncatedTo=${maxMessagesProcessedPerRecall}`,
+        );
+      }
+
+      const truncationNote = truncated
+        ? `\n\n> Note: this conversation has ${totalCount} messages. Only the most recent ${maxMessagesProcessedPerRecall} were included in this summary.`
+        : '';
+
+      // ── Direct recall (≤60 messages) ────────────────────────────────────────
+      if (processedMessages.length <= directRecallMaxMessages) {
+        this.logger.log(
+          `[recall] mode=direct userId=${userId} convId=${conversationId} messageCount=${processedMessages.length} totalCount=${totalCount}`,
+        );
+
+        const formatted = this.formatMessagesForRecall(processedMessages);
+        const recallPrompt =
+          `The user asked to recall this conversation. Full message history:\n\n${formatted}` +
+          `${truncationNote}\n\nProvide a clear, concise summary of what was discussed.`;
+
+        const recallRes = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: this.openRouterHeaders,
+          body: JSON.stringify({
+            model: modelState.activeModel ?? OPENROUTER_MODELS.CHEAP,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: recallPrompt },
+            ],
+            stream: false,
+            max_tokens: maxFinalSummaryTokens,
+          }),
+        });
+
+        const recallText = recallRes.ok
+          ? ((await recallRes.json() as { choices: Array<{ message: { content: string | null } }> })
+              .choices[0]?.message?.content?.trim() ?? 'I was unable to generate a summary.')
+          : 'I was unable to retrieve the conversation history right now.';
+
+        this.logger.log(
+          `[recall] mode=direct completed userId=${userId} convId=${conversationId} durationMs=${Date.now() - recallStart}`,
+        );
+
+        yield { type: 'text', text: recallText };
+        await this.saveMessage(userId, 'user', message, conversationId);
+        await this.saveMessage(userId, 'assistant', recallText, conversationId);
+        return;
+      }
+
+      // ── Chunked recall (>60 messages) ───────────────────────────────────────
+      // Each chunk is summarized with a separate API call.
+      // Chunk summaries are then combined in a final API call.
+
+      const allChunks: { role: string; content: string }[][] = [];
+      for (let i = 0; i < processedMessages.length; i += chunkSizeMessages) {
+        allChunks.push(processedMessages.slice(i, i + chunkSizeMessages));
+      }
+
+      const chunksToProcess = allChunks.length > maxChunksPerRecall
+        ? allChunks.slice(-maxChunksPerRecall)
+        : allChunks;
+
+      this.logger.log(
+        `[recall] mode=chunked userId=${userId} convId=${conversationId} totalCount=${totalCount} processedMessages=${processedMessages.length} chunks=${chunksToProcess.length} truncated=${truncated}`,
+      );
+
+      const chunkSummaries: string[] = [];
+
+      for (let i = 0; i < chunksToProcess.length; i++) {
+        const chunkStart = Date.now();
+        const chunkText = this.formatMessagesForRecall(chunksToProcess[i]);
+        const chunkPrompt =
+          `Summarize this portion of a conversation (part ${i + 1} of ${chunksToProcess.length}). ` +
+          `Be concise. Do not add information not present in the messages:\n\n${chunkText}`;
+
+        const chunkRes = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: this.openRouterHeaders,
+          body: JSON.stringify({
+            model: modelState.activeModel ?? OPENROUTER_MODELS.CHEAP,
+            messages: [
+              {
+                role: 'system',
+                content: 'You summarize sections of a conversation accurately and concisely. Never add information not present in the provided messages.',
+              },
+              { role: 'user', content: chunkPrompt },
+            ],
+            stream: false,
+            max_tokens: maxSummaryTokensPerChunk,
+          }),
+        });
+
+        const chunkSummary = chunkRes.ok
+          ? ((await chunkRes.json() as { choices: Array<{ message: { content: string | null } }> })
+              .choices[0]?.message?.content?.trim() ?? `[Part ${i + 1}: summary unavailable]`)
+          : `[Part ${i + 1}: summary unavailable]`;
+
+        chunkSummaries.push(`[Part ${i + 1}] ${chunkSummary}`);
+        this.logger.log(
+          `[recall] chunk ${i + 1}/${chunksToProcess.length} userId=${userId} convId=${conversationId} durationMs=${Date.now() - chunkStart}`,
+        );
+      }
+
+      const finalPrompt =
+        `The user asked to recall this conversation. It was divided into ${chunksToProcess.length} parts. ` +
+        `Here are the summaries of each part:\n\n${chunkSummaries.join('\n\n')}` +
+        `${truncationNote}\n\nProvide a coherent final summary of what was discussed across all parts.`;
+
+      const finalRes = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: this.openRouterHeaders,
+        body: JSON.stringify({
+          model: modelState.activeModel ?? OPENROUTER_MODELS.CHEAP,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: finalPrompt },
+          ],
+          stream: false,
+          max_tokens: maxFinalSummaryTokens,
+        }),
+      });
+
+      const finalText = finalRes.ok
+        ? ((await finalRes.json() as { choices: Array<{ message: { content: string | null } }> })
+            .choices[0]?.message?.content?.trim() ?? 'I was unable to generate a final summary.')
+        : 'I was unable to combine the conversation summaries right now.';
+
+      this.logger.log(
+        `[recall] mode=chunked completed userId=${userId} convId=${conversationId} chunks=${chunksToProcess.length} durationMs=${Date.now() - recallStart}`,
+      );
+
+      yield { type: 'text', text: finalText };
+      await this.saveMessage(userId, 'user', message, conversationId);
+      await this.saveMessage(userId, 'assistant', finalText, conversationId);
+      return;
+    }
+
+    // ── Build messages — OpenRouter uses OpenAI-compatible message format ──────
     type ChatMessage = Record<string, unknown>;
 
     let userContent: unknown;
@@ -1396,7 +1611,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
 
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
-      ...history.slice(-10).map((m) => ({
+      ...dbHistory.map((m) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
       })),

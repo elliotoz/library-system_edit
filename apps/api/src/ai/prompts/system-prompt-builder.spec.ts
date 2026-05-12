@@ -1,5 +1,5 @@
 import { Role } from '@prisma/client';
-import { buildScientificWorkspaceBlock, buildSystemPrompt, PromptContext } from './system-prompt-builder';
+import { buildMemoryRuleBlock, buildScientificWorkspaceBlock, buildSystemPrompt, PromptContext } from './system-prompt-builder';
 
 const baseContext: PromptContext = {
   userName: 'Ada',
@@ -53,7 +53,26 @@ describe('buildScientificWorkspaceBlock', () => {
   });
 });
 
+describe('buildMemoryRuleBlock', () => {
+  it('contains all required memory boundary rules', () => {
+    const block = buildMemoryRuleBlock();
+
+    expect(block).toContain('Conversation Memory');
+    expect(block).toContain('conversationId');
+    expect(block).toContain('Never mix different conversations');
+    expect(block).toContain('Never invent or guess earlier messages');
+    expect(block).toContain('recall was truncated');
+  });
+});
+
 describe('buildSystemPrompt', () => {
+  it('includes conversation memory boundary rule in every prompt', () => {
+    const prompt = buildSystemPrompt(baseContext);
+
+    expect(prompt).toContain('Conversation Memory');
+    expect(prompt).toContain('Never mix different conversations');
+  });
+
   it('preserves library tool rules when scientific output is enabled', () => {
     const prompt = buildSystemPrompt({ ...baseContext, scientificOutput: true });
 

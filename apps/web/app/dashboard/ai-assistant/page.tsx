@@ -406,7 +406,11 @@ export default function AIAssistantPage() {
     const assistantMsgId = `assistant-${Date.now() + 1}`;
     const assistantMsg: ChatMessage = { id: assistantMsgId, role: 'assistant', content: '' };
 
-    const history = messagesRef.current.slice(-10).map(m => ({ role: m.role, content: m.content }));
+    // When conversationId is present the backend fetches history from PostgreSQL directly.
+    // Only send fallback history for conversations without an ID.
+    const history = convId
+      ? []
+      : messagesRef.current.slice(-20).map(m => ({ role: m.role, content: m.content }));
 
     setMessages(prev => [...prev, userMsg, assistantMsg]);
     setIsStreaming(true);

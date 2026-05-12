@@ -83,7 +83,25 @@ ${examples}
 - **Total Books:** ${context.catalogTotalBooks}
 - **Available Copies:** ${context.catalogAvailableCopies}
 - **Published Reading Lists:** ${context.publishedReadingLists}
-- Indexed study materials available for AI reading: ${context.indexedMaterials ?? 0}${buildResponseStyleBlock(context.responseIntent)}${buildScientificWorkspaceBlock(context.scientificOutput, context.pythonExecutionAvailable)}`;
+- Indexed study materials available for AI reading: ${context.indexedMaterials ?? 0}${buildMemoryRuleBlock()}${buildResponseStyleBlock(context.responseIntent)}${buildScientificWorkspaceBlock(context.scientificOutput, context.pythonExecutionAvailable)}`;
+}
+
+export function buildMemoryRuleBlock(): string {
+  return `
+
+## Conversation Memory
+
+- You only know the messages explicitly provided in the current prompt context.
+- The backend may provide any of the following from PostgreSQL:
+  - recent conversation messages (normal active context)
+  - a full conversation summary (direct recall mode)
+  - chunk summaries combined into a final summary (chunked recall mode)
+- Treat \`conversationId\` as the strict boundary of memory. Each conversation is fully isolated.
+- Never claim to know messages from other chats or sessions not included here.
+- Never mix different conversations.
+- Never invent or guess earlier messages that were not provided.
+- If older context is unavailable, clearly say so — do not pretend to remember it.
+- If recall was truncated due to safety limits, clearly state that only recent messages were summarized.`;
 }
 
 function buildResponseStyleBlock(intent?: ResponseIntent): string {
