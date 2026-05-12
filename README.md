@@ -378,13 +378,11 @@ Note: `OPENROUTER_API_KEY` is not present in `apps/api/.env.example` but is chec
 `OpenRouterProvider`, `AgentService`, and `HealthController`. Add it to `apps/api/.env`
 when enabling AI features.
 
-### Provider Classes
+### Provider Class
 
 | Class | Status | Key Variable |
 | ----- | ------ | ------------ |
-| `OpenRouterProvider` | Active — wired into `AiModule` and `ProviderFactory` | `OPENROUTER_API_KEY` |
-| `GroqProvider` | Class present; not wired into `AiModule` or `ProviderFactory` | `GROQ_API_KEY` |
-| `GeminiProvider` | Class present; not wired into `AiModule` or `ProviderFactory` | `GEMINI_API_KEY` |
+| `OpenRouterProvider` | Active and wired into `AiModule` | `OPENROUTER_API_KEY` |
 
 ### Model Tiers
 
@@ -667,8 +665,6 @@ Additional script `apps/api/prisma/add-books.ts` adds or updates 8 test books wh
 | `ANTHROPIC_API_KEY` | Listed in example; active AI path uses OpenRouter, not Anthropic SDK directly |
 | `LLM_PROVIDER_PREFERENCE` | Listed in example; no active provider switching found in code |
 | `OPENROUTER_API_KEY` | Required by active AI provider; checked in code but absent from `.env.example` |
-| `GROQ_API_KEY` | Used only by the inactive `GroqProvider` class |
-| `GEMINI_API_KEY` | Used only by the inactive `GeminiProvider` class |
 | `AI_SEMANTIC_MODE` | `keyword`, `hybrid`, or `embedding`; default `hybrid`; hybrid falls back to keyword |
 | `AI_EMBEDDINGS_ENABLED` | Listed in example; no active code path found |
 | `STORAGE_PROVIDER` | `local` or `s3` |
