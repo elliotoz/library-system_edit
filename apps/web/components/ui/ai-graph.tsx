@@ -57,6 +57,7 @@ export function AIGraph({ raw }: AIGraphProps) {
     );
   }
 
+  const hasCartesianAxes = spec.type !== 'pie';
   const layout: Partial<Plotly.Layout> = {
     title: spec.title ? { text: spec.title, font: { size: 14 } } : undefined,
     autosize: true,
@@ -64,18 +65,31 @@ export function AIGraph({ raw }: AIGraphProps) {
     paper_bgcolor: 'transparent',
     plot_bgcolor: 'transparent',
     font: { size: 11, color: dark ? '#e5e7eb' : '#374151' },
-    xaxis: {
+    hovermode: hasCartesianAxes ? 'closest' : undefined,
+    hoverlabel: {
+      bgcolor: dark ? '#111827' : '#ffffff',
+      bordercolor: dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)',
+      font: { color: dark ? '#f9fafb' : '#111827' },
+    },
+    showlegend: spec.type === 'multi-function' || spec.type === 'pie',
+    legend: {
+      orientation: 'h',
+      x: 0,
+      y: -0.2,
+      font: { color: dark ? '#e5e7eb' : '#374151' },
+    },
+    xaxis: hasCartesianAxes ? {
       title: spec.xLabel ? { text: spec.xLabel } : undefined,
       range: spec.xMin !== undefined && spec.xMax !== undefined ? [spec.xMin, spec.xMax] : undefined,
       gridcolor: dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
       zerolinecolor: dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
-    },
-    yaxis: {
+    } : undefined,
+    yaxis: hasCartesianAxes ? {
       title: spec.yLabel ? { text: spec.yLabel } : undefined,
       range: spec.yMin !== undefined && spec.yMax !== undefined ? [spec.yMin, spec.yMax] : undefined,
       gridcolor: dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
       zerolinecolor: dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
-    },
+    } : undefined,
   };
 
   return (
@@ -103,23 +117,36 @@ function buildTraces(spec: NormalizedGraphSpec): Plotly.Data[] {
   if ((spec.type === 'scatter' || spec.type === 'line') && spec.points) {
     return [{
       type: 'scatter',
-      mode: spec.type === 'line' ? 'lines' : 'markers',
+      mode: getScatterMode(spec),
       x: spec.points.map((point) => point.x),
       y: spec.points.map((point) => point.y),
+      name: spec.title ?? spec.type,
     } as Plotly.Data];
   }
 
   if ((spec.type === 'scatter' || spec.type === 'line') && spec.xValues && spec.yValues) {
     return [{
       type: 'scatter',
-      mode: spec.type === 'line' ? 'lines' : 'markers',
+      mode: getScatterMode(spec),
       x: spec.xValues,
       y: spec.yValues,
+      name: spec.title ?? spec.type,
     } as Plotly.Data];
   }
 
   if (spec.type === 'bar' && spec.labels && spec.yValues) {
-    return [{ type: 'bar', x: spec.labels, y: spec.yValues } as Plotly.Data];
+    return [{ type: 'bar', x: spec.labels, y: spec.yValues, name: spec.title ?? 'Values' } as Plotly.Data];
+  }
+
+  if (spec.type === 'pie' && spec.labels) {
+    return [{
+      type: 'pie',
+      labels: spec.labels,
+      values: spec.values ?? spec.yValues,
+      name: spec.title ?? 'Proportion',
+      textinfo: 'label+percent',
+      hoverinfo: 'label+value+percent',
+    } as Plotly.Data];
   }
 
   if (spec.type === 'histogram') {
@@ -132,4 +159,9 @@ function buildTraces(spec: NormalizedGraphSpec): Plotly.Data[] {
 function buildFunctionTrace(expr: string, xMin = -10, xMax = 10): Plotly.Data {
   const { x, y } = sampleFunction(expr, xMin, xMax);
   return { type: 'scatter', mode: 'lines', x, y, name: expr } as Plotly.Data;
+}
+
+function getScatterMode(spec: NormalizedGraphSpec): 'lines' | 'markers' | 'lines+markers' {
+  if (spec.type === 'line') return 'lines';
+  return spec.connectPoints ? 'lines+markers' : 'markers';
 }

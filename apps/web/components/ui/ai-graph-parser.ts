@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 export const GRAPH_LIMITS = {
-  maxPoints: 1000,
-  maxFunctions: 4,
+  maxPoints: 500,
+  maxFunctions: 5,
   maxExpressionLength: 120,
   maxRange: 1000,
   maxLabelLength: 80,
@@ -14,6 +14,7 @@ const graphTypeSchema = z.enum([
   'scatter',
   'line',
   'bar',
+  'pie',
   'multi-function',
   'histogram',
 ]);
@@ -44,6 +45,7 @@ const graphSchema = z.object({
   yMax: finiteNumber.optional(),
   xLabel: label.optional(),
   yLabel: label.optional(),
+  connectPoints: z.boolean().optional(),
   xValues: z.array(finiteNumber).max(GRAPH_LIMITS.maxPoints).optional(),
   yValues: z.array(finiteNumber).max(GRAPH_LIMITS.maxPoints).optional(),
   labels: z.array(label).max(GRAPH_LIMITS.maxBars).optional(),
@@ -91,6 +93,16 @@ const graphSchema = z.object({
     });
   }
 
+  if (spec.type === 'pie') {
+    const values = spec.values ?? spec.yValues;
+    if (!spec.labels || !values || spec.labels.length !== values.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Pie charts need labels and values with matching lengths',
+      });
+    }
+  }
+
   if (spec.type === 'histogram' && !spec.values && !spec.xValues) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Histogram needs values or xValues' });
   }
@@ -110,6 +122,7 @@ export interface NormalizedGraphSpec {
   yMax?: number;
   xLabel?: string;
   yLabel?: string;
+  connectPoints?: boolean;
   xValues?: number[];
   yValues?: number[];
   labels?: string[];

@@ -114,8 +114,10 @@ export function buildScientificWorkspaceBlock(scientific?: boolean, pythonAvaila
 - Matrix math must use LaTeX matrix environments such as \`bmatrix\`.
 - Use fenced code blocks with a language tag for code.
 - Use \`\`\`graph fenced blocks only for supported graph schemas.
-- Supported graph types: \`function\`, \`multi-function\`, \`scatter\`, \`line\`, \`bar\`, and \`histogram\`.
-- Graph JSON may use \`schemaVersion: 1\`, \`xLabel\`, \`yLabel\`, \`yMin\`, \`yMax\`, \`points\`, \`xValues\`, \`yValues\`, \`labels\`, or \`functions\`.
+- Supported graph types: \`function\`, \`multi-function\`, \`scatter\`, \`line\`, \`bar\`, \`pie\`, and \`histogram\`.
+- Graph JSON may use \`schemaVersion: 1\`, \`xLabel\`, \`yLabel\`, \`xMin\`, \`xMax\`, \`yMin\`, \`yMax\`, \`points\`, \`xValues\`, \`yValues\`, \`labels\`, \`values\`, \`functions\`, or \`connectPoints\`.
+- Use \`scatter\` for coordinate points, \`function\` for one equation, \`multi-function\` for equation comparisons, \`line\` for trends, \`bar\` for category comparisons, \`pie\` for proportions, and \`histogram\` for distributions.
+- Never invent library or admin analytics data to make a chart. For admin statistics, call available tools first and create graph blocks only from returned tool/API/database data.
 - Use \`\`\`mermaid fenced blocks for flowcharts, sequence diagrams, ER diagrams, class diagrams, and state diagrams.
 - Close all Markdown fences and math blocks before finishing.
 ${pythonRule}`;
@@ -136,5 +138,4 @@ ${ex.response}`,
     )
     .join('\n\n');
 }
-
 

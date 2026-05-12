@@ -28,22 +28,105 @@ describe('parseGraphSpec', () => {
     expect(spec?.xLabel).toBe('x');
   });
 
+  it('accepts connected scatter graphs', () => {
+    const spec = parseGraphSpec(JSON.stringify({
+      type: 'scatter',
+      points: [{ x: 1, y: 2 }, { x: 2, y: 3 }],
+      connectPoints: true,
+    }));
+
+    expect(spec?.type).toBe('scatter');
+    expect(spec?.connectPoints).toBe(true);
+  });
+
   it('accepts multi-function graphs within limits', () => {
     const spec = parseGraphSpec(JSON.stringify({
       schemaVersion: 1,
       type: 'multi-function',
-      functions: ['x^2', '2*x + 1'],
+      functions: ['x^2', '2*x + 1', 'x^3', 'sqrt(x)', 'sin(x)'],
       xMin: -5,
       xMax: 5,
     }));
 
     expect(spec?.type).toBe('multi-function');
-    expect(spec?.functions).toEqual(['x^2', '2*x + 1']);
+    expect(spec?.functions).toHaveLength(GRAPH_LIMITS.maxFunctions);
+  });
+
+  it('accepts line graphs with legacy xValues and yValues', () => {
+    const spec = parseGraphSpec(JSON.stringify({
+      type: 'line',
+      xValues: [1, 2, 3],
+      yValues: [3, 4, 5],
+    }));
+
+    expect(spec?.type).toBe('line');
+    expect(spec?.xValues).toEqual([1, 2, 3]);
+  });
+
+  it('accepts bar charts with labels and yValues', () => {
+    const spec = parseGraphSpec(JSON.stringify({
+      type: 'bar',
+      labels: ['Engineering', 'Science'],
+      yValues: [8, 5],
+    }));
+
+    expect(spec?.type).toBe('bar');
+    expect(spec?.labels).toEqual(['Engineering', 'Science']);
+  });
+
+  it('accepts pie charts with labels and values', () => {
+    const spec = parseGraphSpec(JSON.stringify({
+      type: 'pie',
+      labels: ['Students', 'Staff'],
+      values: [80, 20],
+    }));
+
+    expect(spec?.type).toBe('pie');
+    expect(spec?.values).toEqual([80, 20]);
+  });
+
+  it('accepts pie charts with labels and legacy yValues', () => {
+    const spec = parseGraphSpec(JSON.stringify({
+      type: 'pie',
+      labels: ['Available', 'Borrowed'],
+      yValues: [60, 40],
+    }));
+
+    expect(spec?.type).toBe('pie');
+    expect(spec?.yValues).toEqual([60, 40]);
   });
 
   it('rejects oversized point arrays', () => {
     const points = Array.from({ length: GRAPH_LIMITS.maxPoints + 1 }, (_, x) => ({ x, y: x }));
     const spec = parseGraphSpec(JSON.stringify({ type: 'scatter', points }));
+
+    expect(spec).toBeNull();
+  });
+
+  it('rejects oversized function arrays', () => {
+    const spec = parseGraphSpec(JSON.stringify({
+      type: 'multi-function',
+      functions: Array.from({ length: GRAPH_LIMITS.maxFunctions + 1 }, (_, i) => `x+${i}`),
+    }));
+
+    expect(spec).toBeNull();
+  });
+
+  it('rejects mismatched xValues and yValues', () => {
+    const spec = parseGraphSpec(JSON.stringify({
+      type: 'scatter',
+      xValues: [1, 2],
+      yValues: [1],
+    }));
+
+    expect(spec).toBeNull();
+  });
+
+  it('rejects incomplete pie charts', () => {
+    const spec = parseGraphSpec(JSON.stringify({
+      type: 'pie',
+      labels: ['A', 'B'],
+    }));
 
     expect(spec).toBeNull();
   });

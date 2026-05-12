@@ -28,8 +28,21 @@ describe('buildScientificWorkspaceBlock', () => {
 
     expect(block).toContain('Scientific Workspace Output');
     expect(block).toContain('multi-function');
+    expect(block).toContain('pie');
     expect(block).toContain('points');
+    expect(block).toContain('connectPoints');
     expect(block).toContain('Do not claim Python execution support');
+  });
+
+  it('documents graph selection and admin data safety rules', () => {
+    const block = buildScientificWorkspaceBlock(true);
+
+    expect(block).toContain('scatter');
+    expect(block).toContain('coordinate points');
+    expect(block).toContain('pie');
+    expect(block).toContain('proportions');
+    expect(block).toContain('Never invent library or admin analytics data');
+    expect(block).toContain('call available tools first');
   });
 
   it('documents Python tool usage only when available', () => {

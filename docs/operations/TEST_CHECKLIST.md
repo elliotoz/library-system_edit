@@ -122,6 +122,10 @@ Use this checklist to verify all features work correctly before deployment.
 - [MANUAL] Fenced `graph` JSON renders an interactive Plotly chart
 - [MANUAL] Fenced `multi-function` graph renders multiple equations
 - [MANUAL] Fenced scatter graph with `points` renders coordinates
+- [MANUAL] Fenced scatter graph with `connectPoints: true` renders connected points
+- [MANUAL] Fenced `pie` graph renders proportions without x/y axes
+- [MANUAL] Graph labels and hover text remain readable in dark mode
+- [MANUAL] Admin graph requests use returned tool/API/database data, not invented data
 - [MANUAL] Invalid `graph` JSON falls back to source text
 - [MANUAL] Fenced `mermaid` content renders a diagram
 - [MANUAL] Invalid Mermaid content falls back to source text

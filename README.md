@@ -445,10 +445,16 @@ Scientific output guidance is added to the system prompt when the user's
 message asks for math, science, engineering, graphing, code, or diagrams.
 
 Graph blocks are validated before rendering. Supported graph types are
-`function`, `multi-function`, `scatter`, `line`, `bar`, and `histogram`.
-Versioned graph JSON may use `schemaVersion: 1`, `points`, `functions`,
-axis labels, and axis ranges. Legacy `xValues`, `yValues`, and `labels`
-remain supported.
+`function`, `multi-function`, `scatter`, `line`, `bar`, `pie`, and
+`histogram`. Versioned graph JSON may use `schemaVersion: 1`, `points`,
+`functions`, `values`, `connectPoints`, axis labels, and axis ranges. Legacy
+`xValues`, `yValues`, and `labels` remain supported.
+
+Graph validation limits are intentionally bounded: 500 points, 5 functions,
+120 characters per expression, 80 characters per label, and a maximum x/y
+range width of 1000. Admin analytics graphs must be based on returned
+tool/API/database data; OZ should not invent library statistics to fill a
+chart.
 
 ### Python Scientific Runner
 
