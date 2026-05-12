@@ -5,8 +5,8 @@ import { AgentService } from './agent.service';
 // ── Registry unit tests ────────────────────────────────────────────────────────
 
 describe('MODEL_REGISTRY', () => {
-  it('contains exactly 3 selectable models', () => {
-    expect(MODEL_REGISTRY.filter(m => m.isSelectable)).toHaveLength(3);
+  it('contains exactly 4 selectable models', () => {
+    expect(MODEL_REGISTRY.filter(m => m.isSelectable)).toHaveLength(4);
   });
 
   it('IDs match OPENROUTER_MODELS tiers', () => {
@@ -42,6 +42,10 @@ describe('isAllowlistedModel', () => {
     expect(isAllowlistedModel('')).toBe(false);
     expect(isAllowlistedModel('auto-extra')).toBe(false);
   });
+
+  it('accepts Codex Mini model ID', () => {
+    expect(isAllowlistedModel('openai/gpt-5.1-codex-mini')).toBe(true);
+  });
 });
 
 describe('getModelByTier', () => {
@@ -71,6 +75,13 @@ describe('getPublicModelList', () => {
       expect(entry).not.toHaveProperty('tier');
       expect(entry).not.toHaveProperty('capabilities');
     }
+  });
+
+  it('includes GPT-5.1 Codex Mini', () => {
+    const list = getPublicModelList();
+    const codex = list.find(m => m.id === 'openai/gpt-5.1-codex-mini');
+    expect(codex).toBeDefined();
+    expect(codex?.label).toBe('GPT-5.1 Codex Mini');
   });
 });
 
@@ -176,6 +187,44 @@ describe('AgentService.resolveModelSelection', () => {
       expect(state.manualModel).toBeNull();
       expect(state.lastModelSelectionSource).toBe('auto');
     });
+
+    it('uses Codex Mini directly for a simple text request', () => {
+      const state = resolve('hello', false, 'openai/gpt-5.1-codex-mini');
+      expect(state.lastModelSelectionSource).toBe('manual');
+      expect(state.activeModel).toBe('openai/gpt-5.1-codex-mini');
+      expect(state.manualModel).toBe('openai/gpt-5.1-codex-mini');
+    });
+
+    it('uses Codex Mini directly for an image request (supports images)', () => {
+      const state = resolve('describe this', true, 'openai/gpt-5.1-codex-mini');
+      expect(state.lastModelSelectionSource).toBe('manual');
+      expect(state.activeModel).toBe('openai/gpt-5.1-codex-mini');
+    });
+
+    it('uses Codex Mini directly for a tool/catalog request (supports tools)', () => {
+      const state = resolve('search for books on algorithms', false, 'openai/gpt-5.1-codex-mini');
+      expect(state.lastModelSelectionSource).toBe('manual');
+      expect(state.activeModel).toBe('openai/gpt-5.1-codex-mini');
+    });
+  });
+});
+
+describe('AgentService.resolveModelSelection — sequential state', () => {
+  const service = makeService();
+  const resolve = (msg: string, hasImage: boolean, manual?: string | null) =>
+    service['resolveModelSelection'](msg, hasImage, manual);
+
+  it('does not carry image fallback into the next text-only message', () => {
+    const imageState = resolve('describe this image', true, OPENROUTER_MODELS.FREE);
+    expect(imageState.lastModelSelectionSource).toBe('capability_fallback');
+    expect(imageState.lastResolvedModel).toBe(OPENROUTER_MODELS.CHEAP);
+
+    const textState = resolve('hello', false, OPENROUTER_MODELS.FREE);
+    expect(textState.lastModelSelectionSource).toBe('manual');
+    expect(textState.lastResolvedModel).toBe(OPENROUTER_MODELS.FREE);
+
+    const secondImageState = resolve('describe this second image', true, OPENROUTER_MODELS.FREE);
+    expect(secondImageState.lastModelSelectionSource).toBe('capability_fallback');
   });
 });
 

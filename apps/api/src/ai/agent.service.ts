@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogSearchService } from './catalog-search.service';
 import { BorrowStatus, BookCopyStatus, IndexStatus, Role } from '@prisma/client';
-import { buildSystemPrompt as buildSystemPromptFromModule, PromptContext } from './prompts/system-prompt-builder';
+import { buildSystemPrompt as buildSystemPromptFromModule, PromptContext, ResponseIntent } from './prompts/system-prompt-builder';
 import { ToolHookService } from './tools/tool-hook.service';
 import { ToolExecutionContext } from './tools/tool-hooks';
 import { TokenTrackerService } from './session/token-tracker.service';
@@ -41,6 +41,15 @@ export class AgentService {
   private readonly openRouterBaseUrl = 'https://openrouter.ai/api/v1';
   private readonly chatMaxTokens = 2048;
   private readonly studyGuideMaxTokens = 1536;
+
+  private static readonly FINAL_PROVIDER_FAILURE_MESSAGES: Record<number, string> = {
+    402: 'OZ AI is out of credits for this session. Your conversation has been saved. Please try again later.',
+    429: 'OZ AI is being rate limited. Please wait a moment and try your message again.',
+    503: 'OZ AI is temporarily unavailable. Your conversation has been saved. Please try again shortly.',
+  };
+
+  private static readonly DEFAULT_PROVIDER_FAILURE_MESSAGE =
+    'OZ AI encountered an unexpected provider error. Your conversation has been saved. Please try again.';
 
   constructor(
     private readonly prisma: PrismaService,
@@ -130,6 +139,28 @@ export class AgentService {
     return false;
   }
 
+  private detectScientificOutput(message: string): boolean {
+    const lower = message.toLowerCase();
+    return (
+      /equation|matrix|derivative|integral|solve|proof/.test(lower) ||
+      /physics|chemistry|biology|lab|statistics/.test(lower) ||
+      /circuit|force|beam|algorithm|simulation/.test(lower) ||
+      /\bplot\b|\bgraph\b|\bchart\b|visuali[sz]e/.test(lower) ||
+      /flowchart|sequence diagram|er diagram|architecture diagram/.test(lower)
+    );
+  }
+
+  private detectResponseIntent(message: string): ResponseIntent {
+    const lower = message.toLowerCase();
+    if (/explain|summarize|describe|analyze|analyse|elaborate|break.?down|why is/.test(lower)) {
+      return 'elaborate';
+    }
+    if (/write|generate|create|implement|format|give me a list|bullet|steps|table/.test(lower)) {
+      return 'structured';
+    }
+    return 'concise';
+  }
+
   // ── Conversations ──────────────────────────────────────────────
 
   private buildConversationModeState(conversation: {
@@ -180,6 +211,7 @@ export class AgentService {
     if (normalizedManualModel) {
       const entry = getModelEntry(normalizedManualModel);
       if (requiresImage && entry && !entry.capabilities.supportsImages) {
+        this.logFallback(normalizedManualModel, OPENROUTER_MODELS.CHEAP, 'capability_fallback', 'image_required');
         return {
           manualModel: normalizedManualModel,
           lastResolvedModel: OPENROUTER_MODELS.CHEAP,
@@ -189,6 +221,7 @@ export class AgentService {
         };
       }
       if (requiresTools && entry && !entry.capabilities.supportsTools) {
+        this.logFallback(normalizedManualModel, OPENROUTER_MODELS.CHEAP, 'capability_fallback', 'tools_required');
         return {
           manualModel: normalizedManualModel,
           lastResolvedModel: OPENROUTER_MODELS.CHEAP,
@@ -228,6 +261,17 @@ export class AgentService {
       activeModel: resolvedModel,
       reason,
     };
+  }
+
+  private logFallback(
+    preferred: string,
+    actual: string,
+    source: Extract<ModelSelectionSource, 'capability_fallback' | 'rate_limit_fallback'>,
+    reason: string,
+  ): void {
+    this.logger.warn(
+      `[model-fallback] preferred=${preferred} actual=${actual} source=${source} reason=${reason}`,
+    );
   }
 
   private serializeConversation(conversation: {
@@ -1213,6 +1257,8 @@ Be concise, practical, and encouraging. Base everything on the book details prov
       currentDate: new Date().toLocaleDateString('en-GB', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
       }),
+      responseIntent: this.detectResponseIntent(message),
+      scientificOutput: this.detectScientificOutput(message),
     };
 
     const hasManualModeOverride = typeof manualModesInput === 'string' || Array.isArray(manualModesInput);
@@ -1354,6 +1400,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
         // If free tier is rate-limited, auto-fallback to cheap tier
         if (res.status === 429 && model === OPENROUTER_MODELS.FREE) {
           this.logger.warn(`Free tier rate-limited, falling back to CHEAP tier`);
+          this.logFallback(modelState.manualModel ?? model, OPENROUTER_MODELS.CHEAP, 'rate_limit_fallback', 'rate_limit');
           model = OPENROUTER_MODELS.CHEAP;
           modelState = {
             ...modelState,
@@ -1377,7 +1424,13 @@ Be concise, practical, and encouraging. Base everything on the book details prov
           continue;
         }
         this.logger.error(`OpenRouter API error ${res.status}: ${errText}`);
-        throw new Error(this.getUserFacingProviderError(res.status, errText));
+        const fallbackText =
+          AgentService.FINAL_PROVIDER_FAILURE_MESSAGES[res.status] ??
+          AgentService.DEFAULT_PROVIDER_FAILURE_MESSAGE;
+        yield { type: 'text', text: fallbackText };
+        await this.saveMessage(userId, 'user', message, conversationId);
+        await this.saveMessage(userId, 'assistant', fallbackText, conversationId);
+        return;
       }
 
       const data = await res.json() as {

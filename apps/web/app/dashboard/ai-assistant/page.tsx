@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { BookOpen, Plus, Trash2, MessageSquare, History, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
-import { renderMessage } from '@/lib/renderMessage';
 import { BookCitationCards } from '@/components/BookCitationCards';
+import { AIMessage } from '@/components/ui/ai-message';
 import { AssistantChatInput, type ChatSendPayload } from '@/components/ui/assistant-chat-input';
 import { type AiMode, type DisplayAiMode, normalizeAiModes, resolveAiModes } from '@/lib/ai-modes';
 import { AUTO_MODEL_ID, getAiModelLabel } from '@/lib/ai-models';
@@ -752,7 +752,7 @@ export default function AIAssistantPage() {
                   )}
                   {msg.role === 'assistant' ? (
                     <div className="leading-relaxed">
-                      {renderMessage(msg.content)}
+                      <AIMessage content={msg.content} />
                       {msg.citations && msg.citations.length > 0 && <BookCitationCards citations={msg.citations} />}
                       {isStreaming && isLast && (
                         <span className="inline-block w-2 h-4 bg-primary-500 rounded-sm animate-pulse ml-0.5 align-middle" />

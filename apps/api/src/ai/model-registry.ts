@@ -9,7 +9,7 @@ export interface ModelRegistryEntry {
   id: string;
   label: string;
   description: string;
-  tier: 'free' | 'tool' | 'smart';
+  tier: 'free' | 'tool' | 'smart' | 'technical';
   capabilities: ModelCapabilities;
   isSelectable: boolean;
 }
@@ -36,6 +36,14 @@ export const MODEL_REGISTRY: ModelRegistryEntry[] = [
     label: 'Claude 3 Haiku',
     description: 'Smart · deep analysis & research',
     tier: 'smart',
+    capabilities: { supportsImages: true, supportsTools: true },
+    isSelectable: true,
+  },
+  {
+    id: 'openai/gpt-5.1-codex-mini',
+    label: 'GPT-5.1 Codex Mini',
+    description: 'Technical · coding and structured reasoning',
+    tier: 'technical',
     capabilities: { supportsImages: true, supportsTools: true },
     isSelectable: true,
   },

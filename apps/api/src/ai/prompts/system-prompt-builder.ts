@@ -1,6 +1,8 @@
 import { Role } from '@prisma/client';
 import { ROLE_BASE_INSTRUCTIONS, ROLE_BEHAVIORAL_EXAMPLES } from './role-prompts';
 
+export type ResponseIntent = 'elaborate' | 'structured' | 'concise';
+
 export interface PromptContext {
   userName: string;
   userRole: Role;
@@ -16,6 +18,8 @@ export interface PromptContext {
   publishedReadingLists: number;
   indexedMaterials?: number;
   currentDate: string;
+  responseIntent?: ResponseIntent;
+  scientificOutput?: boolean;
 }
 
 export function buildSystemPrompt(context: PromptContext): string {
@@ -78,7 +82,31 @@ ${examples}
 - **Total Books:** ${context.catalogTotalBooks}
 - **Available Copies:** ${context.catalogAvailableCopies}
 - **Published Reading Lists:** ${context.publishedReadingLists}
-- Indexed study materials available for AI reading: ${context.indexedMaterials ?? 0}`;
+- Indexed study materials available for AI reading: ${context.indexedMaterials ?? 0}${buildResponseStyleBlock(context.responseIntent)}${buildScientificOutputBlock(context.scientificOutput)}`;
+}
+
+function buildResponseStyleBlock(intent?: ResponseIntent): string {
+  if (!intent || intent === 'concise') return '';
+  if (intent === 'elaborate') {
+    return '\n\n## Response Style\n\nThis message asks for an explanation or analysis. Provide enough detail to be genuinely helpful: use headings, sub-points, and examples where they aid understanding.';
+  }
+  // structured
+  return '\n\n## Response Style\n\nThis message asks you to produce or format something. Use structured output: numbered steps, bullet lists, tables, or code blocks as appropriate.';
+}
+
+function buildScientificOutputBlock(scientific?: boolean): string {
+  if (!scientific) return '';
+  return `
+
+## Scientific Output Format
+
+- Format math and science answers with Markdown.
+- Use \`$...$\` for inline math (e.g. \`$E = mc^2$\`).
+- Use \`$$...$$\` for display math on its own line.
+- Use fenced code blocks with a language tag for all code.
+- For graph data, use a \`\`\`graph fenced block with JSON matching: \`{ "type": "function"|"scatter"|"line"|"bar", "title": "...", "expression": "...", "xMin": n, "xMax": n }\`.
+- For diagrams, use a \`\`\`mermaid fenced block.
+- Show step-by-step reasoning, formulas, assumptions, and final answers in visible text.`;
 }
 
 function buildExamples(role: Role): string {

@@ -30,6 +30,11 @@ export const AI_MODEL_OPTIONS: AiModelOption[] = [
     description: 'Free · simple questions & greetings',
     badge: 'Free',
   },
+  {
+    id: 'openai/gpt-5.1-codex-mini',
+    name: 'GPT-5.1 Codex Mini',
+    description: 'Technical - coding and structured reasoning',
+  },
 ];
 
 export function getAiModelOption(modelId?: string | null): AiModelOption | undefined {
