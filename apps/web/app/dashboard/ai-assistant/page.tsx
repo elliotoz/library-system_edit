@@ -546,20 +546,24 @@ export default function AIAssistantPage() {
               <p className="text-xs text-slate-400 dark:text-slate-400">No conversations yet</p>
             </div>
           ) : conversations.map(conv => (
-            <button
+            <div
               key={conv.id}
-              onClick={() => switchConversation(conv.id)}
               style={{ width: 'calc(100% - 8px)' }}
               className={cn(
-                'group mx-1 flex w-full items-start justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors',
+                'group mx-1 flex items-start justify-between gap-2 rounded-xl border px-3 py-2.5 transition-colors',
                 conv.id === activeConversationId ? 'border-teal-300 bg-teal-50 text-slate-900 dark:border-teal-700 dark:bg-teal-950/40 dark:text-white' : 'border-transparent text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-900 dark:hover:text-white',
               )}
             >
-              <div className="flex-1 min-w-0">
+              <button
+                type="button"
+                onClick={() => switchConversation(conv.id)}
+                className="min-w-0 flex-1 text-left"
+              >
                 <p className="text-sm font-medium truncate leading-tight">{conv.title || 'New Chat'}</p>
                 <p className={cn('mt-0.5 text-[11px]', conv.id === activeConversationId ? 'text-teal-700 dark:text-slate-300' : 'text-slate-500 dark:text-slate-400')}>{formatConvTime(conv.updatedAt)}</p>
-              </div>
+              </button>
               <button
+                type="button"
                 onClick={e => handleDeleteConversation(conv.id, e)}
                 disabled={deletingId === conv.id}
                 className={cn(
@@ -571,7 +575,7 @@ export default function AIAssistantPage() {
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
-            </button>
+            </div>
           ))}
         </div>
       </div>
@@ -795,7 +799,6 @@ export default function AIAssistantPage() {
     </div>
   );
 }
-
 
 
 

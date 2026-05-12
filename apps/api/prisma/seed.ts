@@ -3,7 +3,7 @@
 // Run with: npx prisma db seed
 
 import { PrismaClient, Role, BookCopyStatus } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 

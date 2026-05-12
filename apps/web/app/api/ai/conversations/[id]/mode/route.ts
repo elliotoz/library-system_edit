@@ -5,10 +5,11 @@ const BACKEND = SERVER_API_URL;
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const body = await request.text();
-  const res = await fetch(`${BACKEND}/ai/conversations/${params.id}/mode`, {
+  const res = await fetch(`${BACKEND}/ai/conversations/${id}/mode`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',

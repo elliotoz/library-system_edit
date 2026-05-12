@@ -5,9 +5,11 @@ const BACKEND = SERVER_API_URL;
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  await fetch(`${BACKEND}/ai/conversations/${params.id}`, {
+  const { id } = await params;
+
+  await fetch(`${BACKEND}/ai/conversations/${id}`, {
     method: 'DELETE',
     headers: { Cookie: request.headers.get('cookie') || '' },
   });
