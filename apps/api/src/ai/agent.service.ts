@@ -2038,19 +2038,9 @@ Be concise, accurate, and educational. Base the guide only on the material metad
     }
 
     const studyMaterialId = this.extractStudyMaterialId(dbHistory);
-    let materialStudyBlock = '';
-    if (studyMaterialId) {
-      const studyMaterial = await this.prisma.material.findUnique({
-        where: { id: studyMaterialId },
-        select: { title: true, fileUrl: true },
-      });
-      if (studyMaterial) {
-        const readUrl = studyMaterial.fileUrl ?? null;
-        materialStudyBlock = readUrl
-          ? `\n\n## Active Material Study Session\n\nThis conversation is a dedicated study session for: **${studyMaterial.title}**\nThe material file URL is: \`${readUrl}\`\nFor questions about chapters, table of contents, page count, or full content, call \`read_ebook\` with this URL directly — it will extract the full text from the file. For a quick structural overview, call \`get_material_outline\` with \`materialId: "${studyMaterialId}"\`. Do not refuse these questions — always call a tool first.`
-          : `\n\n## Active Material Study Session\n\nThis conversation is a dedicated study session for: **${studyMaterial.title}**\nFor structural questions, call \`get_material_outline\` with \`materialId: "${studyMaterialId}"\`. Do not refuse these questions — always call the tool first.`;
-      }
-    }
+    const materialStudyBlock = studyMaterialId
+      ? `\n\n## Active Material Study Session\n\nThis conversation is a dedicated study session for a specific indexed academic material. The material ID is \`${studyMaterialId}\`. When the user asks about chapters, sections, table of contents, outline, structure, or any question about what the material covers, call \`get_material_outline\` with \`materialId: "${studyMaterialId}"\`. Do not refuse these questions — always call the tool first.`
+      : '';
     const systemPrompt = `${buildModeInstructionBlock(modeState.activeModes)}${buildSystemPromptFromModule(promptContext)}${bookStudyBlock}${materialStudyBlock}`;
 
     if (conversationId) {
