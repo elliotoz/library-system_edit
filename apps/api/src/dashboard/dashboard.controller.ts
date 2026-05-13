@@ -29,6 +29,8 @@ export class DashboardController {
   }
 
   @Get('instructor')
+  @UseGuards(RolesGuard)
+  @Roles(Role.INSTRUCTOR, Role.ADMIN)
   @ApiOperation({ summary: 'Get instructor dashboard stats' })
   async getInstructorStats(@CurrentUser('id') userId: string) {
     return this.dashboardService.getInstructorStats(userId);

@@ -68,9 +68,10 @@ export class ReadingListsController {
   async addItem(
     @Param('id') listId: string,
     @CurrentUser('id') userId: string,
+    @CurrentUser('role') userRole: Role,
     @Body() dto: AddReadingListItemDto,
   ) {
-    return this.readingListsService.addItem(listId, userId, dto);
+    return this.readingListsService.addItem(listId, userId, dto, userRole);
   }
 
   @Delete(':id/items/:itemId')
@@ -81,8 +82,9 @@ export class ReadingListsController {
     @Param('id') listId: string,
     @Param('itemId') itemId: string,
     @CurrentUser('id') userId: string,
+    @CurrentUser('role') userRole: Role,
   ) {
-    return this.readingListsService.removeItem(listId, itemId, userId);
+    return this.readingListsService.removeItem(listId, itemId, userId, userRole);
   }
 
   // ── Admin moderation ─────────────────────────────────────────

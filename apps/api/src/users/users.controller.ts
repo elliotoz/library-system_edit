@@ -120,21 +120,6 @@ export class UsersController {
     return this.usersService.updateProfile(userId, dto);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get user by ID — ADMIN or own record only' })
-  @ApiResponse({ status: 200, description: 'User retrieved' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async findById(
-    @Param('id') id: string,
-    @CurrentUser() currentUser: { id: string; role: Role },
-  ) {
-    if (currentUser.role !== Role.ADMIN && currentUser.id !== id) {
-      throw new ForbiddenException();
-    }
-    return this.usersService.findById(id);
-  }
-
   @Patch('interests')
   @ApiOperation({ summary: 'Update current user interests' })
   @ApiResponse({ status: 200, description: 'Interests updated' })
@@ -167,6 +152,21 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Data export returned' })
   async exportMyData(@CurrentUser('id') userId: string) {
     return this.usersService.exportData(userId);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get user by ID — ADMIN or own record only' })
+  @ApiResponse({ status: 200, description: 'User retrieved' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async findById(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: { id: string; role: Role },
+  ) {
+    if (currentUser.role !== Role.ADMIN && currentUser.id !== id) {
+      throw new ForbiddenException();
+    }
+    return this.usersService.findById(id);
   }
 
   @Patch(':id/deactivate')

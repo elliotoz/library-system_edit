@@ -36,6 +36,16 @@ export default function InstructorDashboard() {
     } catch {}
   }, []);
 
+  const fetchProfileCompletion = useCallback(async (userId: string) => {
+    try {
+      const r = await fetch(`/api/users/${userId}`, { credentials: 'include' });
+      if (r.ok) {
+        const d = await r.json();
+        setHasProfile(!!(d.bio || d.department || d.courses?.length));
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -50,15 +60,6 @@ export default function InstructorDashboard() {
           setFollowingCount(following.length);
           setFollowers(myFollowers);
         } catch {}
-        if (user?.id) {
-          try {
-            const r = await fetch(`/api/users/${user.id}`, { credentials: 'include' });
-            if (r.ok) {
-              const d = await r.json();
-              setHasProfile(!!(d.bio || d.department || d.courses?.length));
-            }
-          } catch {}
-        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -67,6 +68,12 @@ export default function InstructorDashboard() {
     };
     fetchData();
   }, [fetchReadingLists]);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchProfileCompletion(user.id);
+    }
+  }, [fetchProfileCompletion, user?.id]);
 
   const greeting = () => {
     const h = new Date().getHours();

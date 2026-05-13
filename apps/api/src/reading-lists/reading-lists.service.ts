@@ -135,12 +135,13 @@ export class ReadingListsService {
     return { message: 'Reading list deleted successfully' };
   }
 
-  async addItem(listId: string, userId: string, dto: AddReadingListItemDto) {
+  async addItem(listId: string, userId: string, dto: AddReadingListItemDto, userRole?: Role) {
     const list = await this.prisma.readingList.findUnique({ where: { id: listId } });
     if (!list) {
       throw new NotFoundException('Reading list not found');
     }
-    if (list.ownerId !== userId) {
+    const isAdmin = userRole === Role.ADMIN;
+    if (list.ownerId !== userId && !isAdmin) {
       throw new ForbiddenException('You can only modify your own reading lists');
     }
 
@@ -189,12 +190,13 @@ export class ReadingListsService {
     }
   }
 
-  async removeItem(listId: string, itemId: string, userId: string) {
+  async removeItem(listId: string, itemId: string, userId: string, userRole?: Role) {
     const list = await this.prisma.readingList.findUnique({ where: { id: listId } });
     if (!list) {
       throw new NotFoundException('Reading list not found');
     }
-    if (list.ownerId !== userId) {
+    const isAdmin = userRole === Role.ADMIN;
+    if (list.ownerId !== userId && !isAdmin) {
       throw new ForbiddenException('You can only modify your own reading lists');
     }
 
@@ -350,7 +352,10 @@ export class ReadingListsService {
     });
 
     return {
-      instructor,
+      instructor: {
+        ...instructor,
+        email: isOwner || isAdmin ? instructor.email : null,
+      },
       followersCount,
       isFollowing: isFollower,
       readingLists: processedLists,
