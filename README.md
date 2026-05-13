@@ -14,6 +14,7 @@ Items absent from the current repository are marked as **not documented in the c
 
 - [Project Overview](#project-overview)
 - [Current Feature Set](#current-feature-set)
+- [User Roles and Access Model](#user-roles-and-access-model)
 - [User Experience and Main User Journeys](#user-experience-and-main-user-journeys)
 - [Functional Requirements](#functional-requirements)
 - [Non-Functional Requirements](#non-functional-requirements)
@@ -47,13 +48,13 @@ This repository is a Node.js monorepo containing two applications:
 
 Primary local ports:
 
-| Service    | Port   | Source                                           |
-| ---------- | -----: | ------------------------------------------------ |
-| Web app    | `3000` | `apps/web/package.json`, `apps/web/Dockerfile`   |
-| API        | `3001` | `apps/api/.env.example`, `apps/api/Dockerfile`   |
-| PostgreSQL | `5432` | `docker-compose.yml`                             |
-| Python runner | internal | `apps/python-runner`, `docker-compose.yml`       |
-| pgAdmin    | `5050` | `docker-compose.yml`                             |
+| Service       | Port       | Source                                         |
+| ------------- | ---------- | ---------------------------------------------- |
+| Web app       | `3000`     | `apps/web/package.json`, `apps/web/Dockerfile` |
+| API           | `3001`     | `apps/api/.env.example`, `apps/api/Dockerfile` |
+| PostgreSQL    | `5432`     | `docker-compose.yml`                           |
+| Python runner | `internal` | `apps/python-runner`, `docker-compose.yml`     |
+| pgAdmin       | `5050`     | `docker-compose.yml`                           |
 
 ---
 
@@ -87,6 +88,40 @@ Primary local ports:
   book-cover scanning.
 - Swagger API documentation at `/api/docs`.
 - Health probes at `/health/live`, `/health/ready`, and `/auth/health`.
+
+---
+
+## User Roles and Access Model
+
+The system uses four application roles from the Prisma `Role` enum. Frontend
+middleware, backend guards, and AI tool authorization all rely on these roles.
+
+| Role         | Primary Dashboard       | Access Level        | OZ AI Scope                    |
+| ------------ | ----------------------- | ------------------- | ------------------------------ |
+| `STUDENT`    | `/dashboard/student`    | Learner             | Study and catalog assistance   |
+| `INSTRUCTOR` | `/dashboard/instructor` | Teaching and lists  | Teaching-aware assistance      |
+| `STAFF`      | `/dashboard/staff`      | Library operations  | Staff-facing assistance        |
+| `ADMIN`      | `/dashboard/admin`      | Full administration | Admin analytics and operations |
+
+Role capabilities:
+
+- `STUDENT`: Browse the catalog, reserve books, view current borrows, review
+  borrow history, view fines, follow instructors, browse reading lists, search
+  approved study materials, and use OZ AI for learning and catalog support.
+- `INSTRUCTOR`: Includes student-facing access plus material submission, own
+  submission review, reading-list creation, reading-list management, and
+  follower-facing recommendations.
+- `STAFF`: Uses the staff dashboard and shared operational surfaces permitted
+  by frontend middleware and backend guards, including catalog, borrow,
+  reservation, notification, profile, reading-list, and settings workflows.
+- `ADMIN`: Full management for users, books, branches, borrows, reservations,
+  fines, materials, reading lists, policies, reports, statistics, uploads,
+  imports, admin analytics, and book-cover scanning.
+
+Admin-only data is never exposed to non-admin users. In OZ AI, requests for
+admin dashboards, borrowed-by-faculty analytics, reservation trends, overdue
+trends, fine-payment charts, and most-borrowed operational metrics are blocked
+for non-admin roles.
 
 ---
 
@@ -441,6 +476,9 @@ Assistant messages render through `AIMessage` with:
 - automatic wrapping of standalone valid graph JSON into fenced `graph` blocks
 - Mermaid diagrams from fenced `mermaid` blocks
 - source-code fallback when graph or Mermaid rendering fails
+- semantic multi-color chart styling for dashboard-style bar and pie charts
+- simplified chart display labels for long book titles while preserving full
+  labels in hover tooltips
 
 When users provide literal pie-chart values in the message, such as
 `Students = 70%`, OZ can render the pie chart directly from those supplied
@@ -461,6 +499,11 @@ Graph validation limits are intentionally bounded: 500 points, 5 functions,
 range width of 1000. Admin analytics graphs must be based on returned
 tool/API/database data; OZ should not invent library statistics to fill a
 chart.
+
+Graph labels shown on axes and pie slices may be simplified for readability.
+For example, `Clean Code: A Handbook of Agile Software Craftsmanship` renders
+as `Clean Code` on the chart, while the full title remains available in the
+hover tooltip and underlying trace metadata.
 
 Admin analytics dashboards and operational metrics are admin-only. For
 non-admin users, OZ refuses borrowed-by-faculty, reservation trend, overdue
