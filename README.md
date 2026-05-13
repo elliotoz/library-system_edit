@@ -60,32 +60,53 @@ Primary local ports:
 
 ## Current Feature Set
 
-- Email/password authentication with email verification, password reset, and password change.
+The current codebase covers the main library workflow from authentication to
+catalog operations, role-specific dashboards, reporting, and AI-assisted
+research support.
+
+### Identity and Access
+
+- Email/password authentication with email verification, password reset, and
+  password change.
 - Optional Google OAuth login when Google credentials are configured.
 - HttpOnly `access_token` cookie sessions with JWT verification.
 - Role model: `STUDENT`, `INSTRUCTOR`, `STAFF`, `ADMIN`.
 - Role-protected frontend dashboard routes and backend guards.
-- Book catalog with metadata, authors, ISBN, faculty/category/subject tags, cover images,
-  e-book URLs, PDF URLs, copies, branches, and availability state.
+
+### Library Operations
+
+- Book catalog with metadata, authors, ISBN, faculty/category/subject tags,
+  cover images, e-book URLs, PDF URLs, copies, branches, and availability.
 - Book copy and branch management.
-- Reservation lifecycle: `PENDING`, `APPROVED`, `READY_FOR_PICKUP`, `COLLECTED`, `CANCELLED`, `EXPIRED`.
-- Borrow lifecycle: `ACTIVE`, `RETURNED`, `OVERDUE`; extensions and return handling.
+- Reservation lifecycle: `PENDING`, `APPROVED`, `READY_FOR_PICKUP`,
+  `COLLECTED`, `CANCELLED`, `EXPIRED`.
+- Borrow lifecycle: `ACTIVE`, `RETURNED`, `OVERDUE`; extensions and return
+  handling.
 - Borrow policies configurable per role.
 - Fine payments with `PENDING`, `PAID`, and `WAIVED` states.
-- Notifications with unread counts, read/delete operations, and multiple notification types.
-- Instructor reading lists with visibility, publication status, and per-item ordering.
+- Notifications with unread counts, read/delete operations, and multiple
+  notification types.
+
+### Teaching, Materials, and Reporting
+
+- Instructor reading lists with visibility, publication status, and per-item
+  ordering.
 - Instructor following/follower relationships.
-- Research material upload (professor publications, research papers, course materials, theses)
-  with approval, publishing, access controls, indexing, and search.
+- Research material upload for professor publications, research papers, course
+  materials, and theses, with approval, publishing, access controls, indexing,
+  and search.
 - Reports export endpoints for PDF and Excel.
 - External book search and import from OpenLibrary and Gutendex.
-- Admin dashboards for users, books, branches, borrows, reservations, fines, materials,
-  policies, reports, statistics, uploads, and external book imports.
-- AI assistant with conversations, saved messages, streaming SSE chat, study sessions,
-  live model auto-selection, manual model override, response modes, tool calling, catalog
-  access, reading-list access, borrow/reservation/stat lookups, study-material search,
-  e-book/PDF reading, webpage fetching, scientific response rendering, and admin
-  book-cover scanning.
+
+### Admin and AI
+
+- Admin dashboards for users, books, branches, borrows, reservations, fines,
+  materials, policies, reports, statistics, uploads, and external book imports.
+- AI assistant with conversations, saved messages, streaming SSE chat, study
+  sessions, live model auto-selection, manual model override, response modes,
+  tool calling, catalog access, reading-list access, borrow/reservation/stat
+  lookups, study-material search, e-book/PDF reading, webpage fetching,
+  scientific response rendering, and admin book-cover scanning.
 - Swagger API documentation at `/api/docs`.
 - Health probes at `/health/live`, `/health/ready`, and `/auth/health`.
 
