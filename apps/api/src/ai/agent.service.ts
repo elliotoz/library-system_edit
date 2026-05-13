@@ -31,6 +31,7 @@ export interface ConversationModelState {
 }
 
 type ConversationMemoryMessage = { role: string; content: string };
+type LiteralPieChartSpec = { title: string; labels: string[]; values: number[] };
 
 export type ChatChunk =
   | { type: 'mode_state'; modeState: AiModeState }
@@ -211,6 +212,44 @@ export class AgentService {
     ].join('\n');
   }
 
+  private parseLiteralPieChartRequest(message: string): LiteralPieChartSpec | null {
+    if (!/\bpie\s+chart\b/i.test(message)) return null;
+
+    const entries: Array<{ label: string; value: number }> = [];
+    const pattern = /(?:^|\n|[-*]\s*)([A-Za-z][A-Za-z0-9 &'()\/-]{0,79})\s*(?:=|:)\s*(\d+(?:\.\d+)?)\s*%?/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = pattern.exec(message)) !== null) {
+      const label = match[1].trim().replace(/[.,;:]$/, '');
+      const value = Number(match[2]);
+      if (label && Number.isFinite(value) && value >= 0) {
+        entries.push({ label, value });
+      }
+    }
+
+    if (entries.length < 2) return null;
+
+    return {
+      title: 'Pie Chart',
+      labels: entries.map((entry) => entry.label),
+      values: entries.map((entry) => entry.value),
+    };
+  }
+
+  private buildLiteralPieChartResponse(spec: LiteralPieChartSpec): string {
+    return [
+      'Here is the pie chart from the values you provided:',
+      '',
+      this.graphBlock({
+        schemaVersion: 1,
+        type: 'pie',
+        title: spec.title,
+        labels: spec.labels,
+        values: spec.values,
+      }),
+    ].join('\n');
+  }
+
   private graphBlock(spec: Record<string, unknown>): string {
     return ['```graph', JSON.stringify(spec, null, 2), '```'].join('\n');
   }
@@ -382,7 +421,7 @@ export class AgentService {
     ].join('\n');
   }
 
-  private async buildMostBorrowedCategoryDashboardResponse(limit = 12): Promise<string> {
+  private async buildMostBorrowedCategoryDashboardResponse(limit = 12, chartType: 'bar' | 'pie' = 'bar'): Promise<string> {
     const borrows = await this.prisma.borrow.findMany({
       include: {
         bookCopy: {
@@ -400,6 +439,18 @@ export class AgentService {
 
     const chart = this.entriesToLabelsAndValues(categories, limit, 'No borrowed categories', 'valueDesc');
 
+    const graphSpec: Record<string, unknown> = {
+      schemaVersion: 1,
+      type: chartType,
+      title: 'Most Borrowed Book Categories',
+      labels: chart.labels,
+      values: chart.values,
+    };
+    if (chartType === 'bar') {
+      graphSpec.xLabel = 'Category';
+      graphSpec.yLabel = 'Borrow count';
+    }
+
     return [
       '## Most Borrowed Book Categories',
       '',
@@ -407,19 +458,11 @@ export class AgentService {
       '',
       this.emptyChartNote('borrowed category', chart.isEmpty),
       '',
-      this.graphBlock({
-        schemaVersion: 1,
-        type: 'bar',
-        title: 'Most Borrowed Book Categories',
-        labels: chart.labels,
-        values: chart.values,
-        xLabel: 'Category',
-        yLabel: 'Borrow count',
-      }),
+      this.graphBlock(graphSpec),
     ].join('\n');
   }
 
-  private async buildMostBorrowedBooksDashboardResponse(limit = 12): Promise<string> {
+  private async buildMostBorrowedBooksDashboardResponse(limit = 12, chartType: 'bar' | 'pie' = 'bar'): Promise<string> {
     const borrows = await this.prisma.borrow.findMany({
       include: {
         bookCopy: {
@@ -439,6 +482,18 @@ export class AgentService {
     const maxBorrowCount = chart.isEmpty ? 0 : Math.max(...chart.values);
     const topTitles = chart.labels.filter((_, index) => chart.values[index] === maxBorrowCount && maxBorrowCount > 0);
 
+    const graphSpec: Record<string, unknown> = {
+      schemaVersion: 1,
+      type: chartType,
+      title: 'Most Borrowed Books',
+      labels: chart.labels,
+      values: chart.values,
+    };
+    if (chartType === 'bar') {
+      graphSpec.xLabel = 'Book title';
+      graphSpec.yLabel = 'Borrow count';
+    }
+
     return [
       '## Most Borrowed Books',
       '',
@@ -448,15 +503,7 @@ export class AgentService {
         ? this.emptyChartNote('borrowed book', true)
         : `Most borrowed title${topTitles.length === 1 ? '' : 's'}: ${topTitles.map((title) => `**${title}**`).join(', ')} (${maxBorrowCount} borrow${maxBorrowCount === 1 ? '' : 's'}).`,
       '',
-      this.graphBlock({
-        schemaVersion: 1,
-        type: 'bar',
-        title: 'Most Borrowed Books',
-        labels: chart.labels,
-        values: chart.values,
-        xLabel: 'Book title',
-        yLabel: 'Borrow count',
-      }),
+      this.graphBlock(graphSpec),
     ].join('\n');
   }
 
@@ -1120,6 +1167,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
               type: 'object',
               properties: {
                 limit: { type: 'number', description: 'Number of books to show, default 12' },
+                chartType: { type: 'string', enum: ['bar', 'pie'], description: 'Chart type to render, default bar. Use pie when the user asks for a pie chart.' },
               },
             },
           },
@@ -1134,6 +1182,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
               type: 'object',
               properties: {
                 limit: { type: 'number', description: 'Number of categories to show, default 12' },
+                chartType: { type: 'string', enum: ['bar', 'pie'], description: 'Chart type to render, default bar. Use pie when the user asks for a pie chart.' },
               },
             },
           },
@@ -1686,7 +1735,8 @@ Be concise, practical, and encouraging. Base everything on the book details prov
             return { result: 'Access denied: admin only.', citations: [] };
           }
           const limit = (args.limit as number | undefined) ?? 12;
-          return { result: await this.buildMostBorrowedBooksDashboardResponse(limit), citations: [] };
+          const chartType = (args.chartType as 'bar' | 'pie' | undefined) ?? 'bar';
+          return { result: await this.buildMostBorrowedBooksDashboardResponse(limit, chartType), citations: [] };
         }
 
         case 'get_most_borrowed_categories': {
@@ -1694,7 +1744,8 @@ Be concise, practical, and encouraging. Base everything on the book details prov
             return { result: 'Access denied: admin only.', citations: [] };
           }
           const limit = (args.limit as number | undefined) ?? 12;
-          return { result: await this.buildMostBorrowedCategoryDashboardResponse(limit), citations: [] };
+          const chartType = (args.chartType as 'bar' | 'pie' | undefined) ?? 'bar';
+          return { result: await this.buildMostBorrowedCategoryDashboardResponse(limit, chartType), citations: [] };
         }
 
         case 'get_admin_analytics': {
@@ -1862,6 +1913,15 @@ Be concise, practical, and encouraging. Base everything on the book details prov
       yield { type: 'text', text: deniedText };
       await this.saveMessage(userId, 'user', message, conversationId);
       await this.saveMessage(userId, 'assistant', deniedText, conversationId);
+      return;
+    }
+
+    const literalPieChart = this.parseLiteralPieChartRequest(message);
+    if (literalPieChart) {
+      const chartText = this.buildLiteralPieChartResponse(literalPieChart);
+      yield { type: 'text', text: chartText };
+      await this.saveMessage(userId, 'user', message, conversationId);
+      await this.saveMessage(userId, 'assistant', chartText, conversationId);
       return;
     }
 

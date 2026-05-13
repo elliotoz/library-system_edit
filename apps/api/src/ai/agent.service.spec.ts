@@ -551,6 +551,56 @@ describe('AgentService admin analytics authorization', () => {
   });
 });
 
+describe('AgentService literal chart rendering', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('renders user-provided pie chart values as a graph block before calling the model', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    const prisma = makeChatPrisma(Role.STUDENT);
+    const service = makeAgentService({
+      prisma,
+      materialSearch: { countAccessibleIndexedMaterials: jest.fn().mockResolvedValue(0) },
+    });
+
+    const chunks: unknown[] = [];
+    for await (const chunk of service.chatStream(
+      'user-1',
+      [
+        'Create a pie chart showing library users:',
+        'Students = 70%',
+        'Instructors = 20%',
+        'Staff = 10%',
+      ].join('\n'),
+      [],
+      false,
+      null,
+      '',
+    )) {
+      chunks.push(chunk);
+    }
+
+    const response = chunks
+      .filter((chunk): chunk is { type: 'text'; text: string } =>
+        typeof chunk === 'object' && chunk !== null && (chunk as { type?: string }).type === 'text',
+      )
+      .map((chunk) => chunk.text)
+      .join('\n');
+
+    expect(response).toContain('```graph');
+    expect(response).toContain('"type": "pie"');
+    expect(response).toContain('"Students"');
+    expect(response).toContain('"Instructors"');
+    expect(response).toContain('"Staff"');
+    expect(response).toContain('70');
+    expect(response).toContain('20');
+    expect(response).toContain('10');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(prisma.aiMessage.create).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('AgentService read_ebook structure questions', () => {
   it('returns a focused table-of-contents excerpt for chapter questions', async () => {
     const prisma = {};

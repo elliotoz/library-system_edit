@@ -442,6 +442,10 @@ Assistant messages render through `AIMessage` with:
 - Mermaid diagrams from fenced `mermaid` blocks
 - source-code fallback when graph or Mermaid rendering fails
 
+When users provide literal pie-chart values in the message, such as
+`Students = 70%`, OZ can render the pie chart directly from those supplied
+values without calling the model.
+
 Scientific output guidance is added to the system prompt when the user's
 message asks for math, science, engineering, graphing, code, or diagrams.
 
