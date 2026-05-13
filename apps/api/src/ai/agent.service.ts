@@ -2022,11 +2022,26 @@ Be concise, accurate, and educational. Base the guide only on the material metad
     });
     let modelState = this.resolveModelSelection(message, hasImage, manualModel, !!conversation?.studyBookId);
 
+    // Inject study-session context blocks so OZ can call the right tools without re-discovery
+    let bookStudyBlock = '';
+    if (conversation?.studyBookId) {
+      const studyBook = await this.prisma.book.findUnique({
+        where: { id: conversation.studyBookId },
+        select: { title: true, pdfUrl: true, ebookUrl: true },
+      });
+      if (studyBook) {
+        const readUrl = studyBook.pdfUrl ?? studyBook.ebookUrl ?? null;
+        bookStudyBlock = readUrl
+          ? `\n\n## Active Book Study Session\n\nThis conversation is a dedicated study session for: **${studyBook.title}**\nThe e-book read URL is: \`${readUrl}\`\nFor any question about chapters, table of contents, structure, content, quotes, or summaries, call \`read_ebook\` with this URL directly. Do not call \`get_book_details\` first — the readUrl is already provided above.`
+          : `\n\n## Active Book Study Session\n\nThis conversation is a dedicated study session for: **${studyBook.title}**`;
+      }
+    }
+
     const studyMaterialId = this.extractStudyMaterialId(dbHistory);
     const materialStudyBlock = studyMaterialId
       ? `\n\n## Active Material Study Session\n\nThis conversation is a dedicated study session for a specific indexed academic material. The material ID is \`${studyMaterialId}\`. When the user asks about chapters, sections, table of contents, outline, structure, or any question about what the material covers, call \`get_material_outline\` with \`materialId: "${studyMaterialId}"\`. Do not refuse these questions — always call the tool first.`
       : '';
-    const systemPrompt = `${buildModeInstructionBlock(modeState.activeModes)}${buildSystemPromptFromModule(promptContext)}${materialStudyBlock}`;
+    const systemPrompt = `${buildModeInstructionBlock(modeState.activeModes)}${buildSystemPromptFromModule(promptContext)}${bookStudyBlock}${materialStudyBlock}`;
 
     if (conversationId) {
       const updateData: Record<string, unknown> = {
