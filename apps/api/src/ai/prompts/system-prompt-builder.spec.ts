@@ -52,7 +52,7 @@ describe('buildGraphOutputRule', () => {
     const block = buildGraphOutputRule();
 
     expect(block).toContain('ALWAYS wrap graph JSON');
-    expect(block).toContain('NEVER output raw JSON');
+    expect(block).toContain('NEVER output graph JSON');
     expect(block).toContain('NEVER place explanation text inside the graph block');
   });
 
@@ -103,7 +103,7 @@ describe('buildSystemPrompt', () => {
 
     for (const prompt of [plain, scientific]) {
       expect(prompt).toContain('ALWAYS wrap graph JSON');
-      expect(prompt).toContain('NEVER output raw JSON');
+      expect(prompt).toContain('NEVER output graph JSON');
     }
   });
 

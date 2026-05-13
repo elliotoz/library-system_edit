@@ -91,7 +91,7 @@ export function buildGraphOutputRule(): string {
 
 ## Graph Output Rule
 
-ALWAYS wrap graph JSON in a fenced \`\`\`graph block. NEVER output raw JSON directly in prose. NEVER place explanation text inside the graph block. The frontend only renders graphs from fenced blocks — raw JSON appears as unformatted text to the user.
+ALWAYS wrap graph JSON in a fenced \`\`\`graph block. NEVER output graph JSON directly in prose. NEVER place explanation text inside the graph block. The frontend only renders graphs from fenced blocks — graph JSON outside a fenced block appears as unformatted text to the user.
 
 **Correct format:**
 
@@ -182,4 +182,3 @@ ${ex.response}`,
     )
     .join('\n\n');
 }
-
