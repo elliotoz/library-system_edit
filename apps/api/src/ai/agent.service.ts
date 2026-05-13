@@ -382,7 +382,7 @@ export class AgentService {
     ].join('\n');
   }
 
-  private async buildMostBorrowedCategoryDashboardResponse(): Promise<string> {
+  private async buildMostBorrowedCategoryDashboardResponse(limit = 12): Promise<string> {
     const borrows = await this.prisma.borrow.findMany({
       include: {
         bookCopy: {
@@ -398,7 +398,7 @@ export class AgentService {
       this.incrementCount(categories, borrow.bookCopy.book.category ?? 'Uncategorized');
     }
 
-    const chart = this.entriesToLabelsAndValues(categories, 12, 'No borrowed categories', 'valueDesc');
+    const chart = this.entriesToLabelsAndValues(categories, limit, 'No borrowed categories', 'valueDesc');
 
     return [
       '## Most Borrowed Book Categories',
@@ -419,7 +419,7 @@ export class AgentService {
     ].join('\n');
   }
 
-  private async buildMostBorrowedBooksDashboardResponse(): Promise<string> {
+  private async buildMostBorrowedBooksDashboardResponse(limit = 12): Promise<string> {
     const borrows = await this.prisma.borrow.findMany({
       include: {
         bookCopy: {
@@ -435,7 +435,7 @@ export class AgentService {
       this.incrementCount(books, borrow.bookCopy.book.title);
     }
 
-    const chart = this.entriesToLabelsAndValues(books, 12, 'No borrowed books', 'valueDesc');
+    const chart = this.entriesToLabelsAndValues(books, limit, 'No borrowed books', 'valueDesc');
     const maxBorrowCount = chart.isEmpty ? 0 : Math.max(...chart.values);
     const topTitles = chart.labels.filter((_, index) => chart.values[index] === maxBorrowCount && maxBorrowCount > 0);
 
@@ -914,8 +914,8 @@ Be concise, practical, and encouraging. Base everything on the book details prov
   }
   // ── Tools ──────────────────────────────────────────────────────
 
-  private getTools(): Array<{ type: 'function'; function: { name: string; description: string; parameters: Record<string, unknown> } }> {
-    return [
+  private getTools(userRole?: Role): Array<{ type: 'function'; function: { name: string; description: string; parameters: Record<string, unknown> } }> {
+    const tools: Array<{ type: 'function'; function: { name: string; description: string; parameters: Record<string, unknown> } }> = [
       {
         type: 'function',
         function: {
@@ -1106,6 +1106,51 @@ Be concise, practical, and encouraging. Base everything on the book details prov
         },
       }] : []),
     ];
+
+    // Admin-only analytics tools — only passed to the model when the user is an ADMIN
+    if (userRole === Role.ADMIN) {
+      tools.push(
+        {
+          type: 'function',
+          function: {
+            name: 'get_most_borrowed_books',
+            description:
+              'Returns a chart showing which books have been borrowed the most times, ranked by borrow count. Use when the user asks about popular books, most borrowed titles, or borrowing statistics.',
+            parameters: {
+              type: 'object',
+              properties: {
+                limit: { type: 'number', description: 'Number of books to show, default 12' },
+              },
+            },
+          },
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'get_most_borrowed_categories',
+            description:
+              'Returns a chart showing which book categories are borrowed most, grouped by category. Use when the user asks about popular categories, genres, or subject areas.',
+            parameters: {
+              type: 'object',
+              properties: {
+                limit: { type: 'number', description: 'Number of categories to show, default 12' },
+              },
+            },
+          },
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'get_admin_analytics',
+            description:
+              'Returns the full admin analytics dashboard: active borrows, overdue count, fine totals, pending reservations, and borrow trends. Use when the user asks for general library statistics or an overview.',
+            parameters: { type: 'object', properties: {} },
+          },
+        },
+      );
+    }
+
+    return tools;
   }
 
   // ── Tool execution ─────────────────────────────────────────────
@@ -1636,6 +1681,29 @@ Be concise, practical, and encouraging. Base everything on the book details prov
           return { result: parts.join('\n'), citations: [] };
         }
 
+        case 'get_most_borrowed_books': {
+          if (userRole !== Role.ADMIN) {
+            return { result: 'Access denied: admin only.', citations: [] };
+          }
+          const limit = (args.limit as number | undefined) ?? 12;
+          return { result: await this.buildMostBorrowedBooksDashboardResponse(limit), citations: [] };
+        }
+
+        case 'get_most_borrowed_categories': {
+          if (userRole !== Role.ADMIN) {
+            return { result: 'Access denied: admin only.', citations: [] };
+          }
+          const limit = (args.limit as number | undefined) ?? 12;
+          return { result: await this.buildMostBorrowedCategoryDashboardResponse(limit), citations: [] };
+        }
+
+        case 'get_admin_analytics': {
+          if (userRole !== Role.ADMIN) {
+            return { result: 'Access denied: admin only.', citations: [] };
+          }
+          return { result: await this.buildAdminAnalyticsDashboardResponse(), citations: [] };
+        }
+
         default:
           return { result: 'Unknown tool.', citations: [] };
       }
@@ -2008,7 +2076,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
       // On the last round, remove tools to force the model to produce a text answer
       const isLastRound = round === MAX_ROUNDS;
       if (useTools && !isLastRound) {
-        body.tools = this.getTools();
+        body.tools = this.getTools(user.role);
         body.tool_choice = 'auto';
       } else if (isLastRound && useTools) {
         this.logger.warn(`Round ${round}/${MAX_ROUNDS} — forcing text response (no tools)`);

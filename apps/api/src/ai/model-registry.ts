@@ -24,7 +24,7 @@ export const MODEL_REGISTRY: ModelRegistryEntry[] = [
     isSelectable: true,
   },
   {
-    id: 'google/gemini-3.1-flash-lite-preview',
+    id: 'google/gemini-2.5-flash-lite',
     label: 'Gemini Flash Lite',
     description: 'Fast · catalog queries & tool use',
     tier: 'tool',
