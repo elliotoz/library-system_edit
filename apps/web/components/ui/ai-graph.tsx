@@ -106,6 +106,10 @@ export function AIGraph({ raw }: AIGraphProps) {
   );
 }
 
+export function buildGraphTracesForTest(spec: NormalizedGraphSpec): Plotly.Data[] {
+  return buildTraces(spec);
+}
+
 function buildTraces(spec: NormalizedGraphSpec): Plotly.Data[] {
   if (spec.type === 'function' && spec.expression) {
     return [buildFunctionTrace(spec.expression, spec.xMin, spec.xMax)];
@@ -143,7 +147,7 @@ function buildTraces(spec: NormalizedGraphSpec): Plotly.Data[] {
   }
 
   if (spec.type === 'pie') {
-    const pieValues = spec.values ?? spec.yValues;
+    const pieValues = spec.values;
     if (
       !spec.labels || spec.labels.length === 0 ||
       !pieValues || pieValues.length === 0 ||

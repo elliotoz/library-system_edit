@@ -126,13 +126,19 @@ describe('parseGraphSpec', () => {
 
   it('accepts pie charts with labels and values', () => {
     const spec = parseGraphSpec(JSON.stringify({
+      schemaVersion: 1,
       type: 'pie',
-      labels: ['Students', 'Staff'],
-      values: [80, 20],
+      title: 'Library Users',
+      labels: ['Students', 'Instructors', 'Staff'],
+      values: [70, 20, 10],
     }));
 
     expect(spec?.type).toBe('pie');
-    expect(spec?.values).toEqual([80, 20]);
+    expect(spec?.title).toBe('Library Users');
+    expect(spec?.labels).toEqual(['Students', 'Instructors', 'Staff']);
+    expect(spec?.values).toEqual([70, 20, 10]);
+    expect(spec?.xValues).toBeUndefined();
+    expect(spec?.yValues).toBeUndefined();
   });
 
   it('accepts pie charts with labels and legacy yValues', () => {
@@ -143,7 +149,9 @@ describe('parseGraphSpec', () => {
     }));
 
     expect(spec?.type).toBe('pie');
-    expect(spec?.yValues).toEqual([60, 40]);
+    expect(spec?.values).toEqual([60, 40]);
+    expect(spec?.xValues).toBeUndefined();
+    expect(spec?.yValues).toBeUndefined();
   });
 
   it('rejects oversized point arrays', () => {
@@ -176,6 +184,26 @@ describe('parseGraphSpec', () => {
     const spec = parseGraphSpec(JSON.stringify({
       type: 'pie',
       labels: ['A', 'B'],
+    }));
+
+    expect(spec).toBeNull();
+  });
+
+  it('rejects pie charts with empty labels', () => {
+    const spec = parseGraphSpec(JSON.stringify({
+      type: 'pie',
+      labels: [],
+      values: [],
+    }));
+
+    expect(spec).toBeNull();
+  });
+
+  it('rejects pie charts with mismatched labels and values', () => {
+    const spec = parseGraphSpec(JSON.stringify({
+      type: 'pie',
+      labels: ['A', 'B'],
+      values: [100],
     }));
 
     expect(spec).toBeNull();

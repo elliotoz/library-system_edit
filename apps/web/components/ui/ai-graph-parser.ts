@@ -20,7 +20,7 @@ const graphTypeSchema = z.enum([
 ]);
 
 const finiteNumber = z.number().finite();
-const label = z.string().max(GRAPH_LIMITS.maxLabelLength);
+const label = z.string().trim().min(1).max(GRAPH_LIMITS.maxLabelLength);
 const expression = z
   .string()
   .trim()
@@ -118,7 +118,7 @@ const graphSchema = z.object({
 
   if (spec.type === 'pie') {
     const values = spec.values ?? spec.yValues;
-    if (!spec.labels || !values || spec.labels.length !== values.length) {
+    if (!spec.labels || spec.labels.length === 0 || !values || values.length === 0 || spec.labels.length !== values.length) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'Pie charts need labels and values with matching lengths',
@@ -221,6 +221,7 @@ function normalizeGraphSpec(spec: ParsedGraphSpec & { schemaVersion: 1 }): Norma
   return {
     ...spec,
     yValues: spec.yValues ?? (spec.type === 'bar' ? spec.values : undefined),
+    values: spec.values ?? (spec.type === 'pie' ? spec.yValues : undefined),
     functions,
     series,
   };
