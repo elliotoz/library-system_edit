@@ -114,6 +114,10 @@ export default function SubmitMaterialPage() {
       toast.error('Author name is required');
       return;
     }
+    if (!fileInfo) {
+      toast.error('Upload a file before submitting material');
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -135,11 +139,9 @@ export default function SubmitMaterialPage() {
         accessLevel: 'PUBLIC',
         // NOT published - requires admin approval
         isPublished: false,
-        ...(fileInfo && {
-          fileUrl: fileInfo.fileUrl,
-          fileName: fileInfo.fileName,
-          fileSize: fileInfo.fileSize,
-        }),
+        fileUrl: fileInfo.fileUrl,
+        fileName: fileInfo.fileName,
+        fileSize: fileInfo.fileSize,
       };
 
       const response = await fetch('/api/materials', {

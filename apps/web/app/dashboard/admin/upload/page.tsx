@@ -130,6 +130,10 @@ export default function AdminUploadPage() {
       toast.error('Author name is required');
       return;
     }
+    if (!fileInfo) {
+      toast.error('Upload a file before creating material');
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -150,11 +154,9 @@ export default function AdminUploadPage() {
         year: formData.year ? parseInt(formData.year) : undefined,
         accessLevel: formData.accessLevel,
         isPublished: formData.isPublished,
-        ...(fileInfo && {
-          fileUrl: fileInfo.fileUrl,
-          fileName: fileInfo.fileName,
-          fileSize: fileInfo.fileSize,
-        }),
+        fileUrl: fileInfo.fileUrl,
+        fileName: fileInfo.fileName,
+        fileSize: fileInfo.fileSize,
       };
 
       const response = await fetch('/api/materials', {

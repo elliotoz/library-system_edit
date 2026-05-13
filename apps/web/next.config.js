@@ -3,6 +3,10 @@ const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
   transpilePackages: ['three', '@react-three/fiber'],
+  experimental: {
+    // Match the material/book upload limit enforced by the Nest API.
+    middlewareClientMaxBodySize: 50 * 1024 * 1024,
+  },
   images: {
     remotePatterns: [
       { protocol: 'http', hostname: 'localhost' },
