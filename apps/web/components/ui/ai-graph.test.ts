@@ -27,10 +27,6 @@ describe('AIGraph trace generation', () => {
           '#14b8a6',
           '#8b5cf6',
           '#f59e0b',
-          '#ef4444',
-          '#3b82f6',
-          '#22c55e',
-          '#ec4899',
         ],
       },
       opacity: 1,
@@ -69,5 +65,27 @@ describe('AIGraph trace generation', () => {
     expect(layout).not.toHaveProperty('hoverlabel');
     expect(layout.xaxis).toBeUndefined();
     expect(layout.yaxis).toBeUndefined();
+  });
+
+  it('builds semantic per-bar colors for category labels', () => {
+    const spec = parseGraphSpec(JSON.stringify({
+      schemaVersion: 1,
+      type: 'bar',
+      title: 'Students per Faculty',
+      labels: ['Engineering', 'Medicine', 'Humanities', 'Communication', 'Unknown'],
+      values: [42, 31, 18, 24, 7],
+    }));
+
+    expect(spec).not.toBeNull();
+
+    const traces = buildGraphTracesForTest(spec!);
+
+    expect(traces).toHaveLength(1);
+    expect(traces[0]).toMatchObject({
+      type: 'bar',
+      marker: {
+        color: ['#14b8a6', '#8b5cf6', '#f59e0b', '#3b82f6', '#ef4444'],
+      },
+    });
   });
 });

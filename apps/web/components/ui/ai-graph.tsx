@@ -4,19 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { evaluate } from 'mathjs';
 import { NormalizedGraphSpec, parseGraphSpec } from './ai-graph-parser';
+import { colorsForLabels } from './graph-colors';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 const MAX_SAMPLES = 500;
-const PIE_MARKER_COLORS = [
-  '#14b8a6',
-  '#8b5cf6',
-  '#f59e0b',
-  '#ef4444',
-  '#3b82f6',
-  '#22c55e',
-  '#ec4899',
-];
 const PLOTLY_CONFIG: Partial<Plotly.Config> = { responsive: true, displayModeBar: true, displaylogo: false };
 
 function sampleFunction(expr: string, xMin: number, xMax: number): { x: number[]; y: number[] } {
@@ -150,10 +142,11 @@ function buildLayout(spec: NormalizedGraphSpec, dark: boolean): Partial<Plotly.L
     title: spec.title ? { text: spec.title } : undefined,
     autosize: true,
     width: undefined,
-    margin: { t: spec.title ? 40 : 20, r: 20, b: 40, l: 50 },
+    bargap: spec.type === 'bar' ? 0.28 : undefined,
+    margin: { t: spec.title ? 52 : 24, r: 24, b: 52, l: 56 },
     paper_bgcolor: 'transparent',
     plot_bgcolor: 'transparent',
-    font: { size: 11, color: dark ? '#e5e7eb' : '#374151' },
+    font: { size: 12, color: dark ? '#e5e7eb' : '#374151' },
     hovermode: 'closest',
     hoverlabel: {
       bgcolor: dark ? '#111827' : '#ffffff',
@@ -165,14 +158,18 @@ function buildLayout(spec: NormalizedGraphSpec, dark: boolean): Partial<Plotly.L
     xaxis: {
       title: spec.xLabel ? { text: spec.xLabel } : undefined,
       range: spec.xMin !== undefined && spec.xMax !== undefined ? [spec.xMin, spec.xMax] : undefined,
+      automargin: true,
       gridcolor: dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
       zerolinecolor: dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
+      tickfont: { color: dark ? '#d1d5db' : '#4b5563' },
     },
     yaxis: {
       title: spec.yLabel ? { text: spec.yLabel } : undefined,
       range: spec.yMin !== undefined && spec.yMax !== undefined ? [spec.yMin, spec.yMax] : undefined,
+      automargin: true,
       gridcolor: dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
       zerolinecolor: dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
+      tickfont: { color: dark ? '#d1d5db' : '#4b5563' },
     },
   };
 }
@@ -238,7 +235,17 @@ function buildTraces(spec: NormalizedGraphSpec): Plotly.Data[] {
   }
 
   if (spec.type === 'bar' && spec.labels && spec.yValues) {
-    return [{ type: 'bar', x: spec.labels, y: spec.yValues, name: spec.title ?? 'Values' } as Plotly.Data];
+    return [{
+      type: 'bar',
+      x: spec.labels,
+      y: spec.yValues,
+      name: spec.title ?? 'Values',
+      marker: {
+        color: colorsForLabels(spec.labels),
+        line: { color: 'rgba(15, 23, 42, 0.14)', width: 1 },
+      },
+      hovertemplate: '%{x}<br>%{y}<extra></extra>',
+    } as Plotly.Data];
   }
 
   if (spec.type === 'pie') {
@@ -254,7 +261,7 @@ function buildTraces(spec: NormalizedGraphSpec): Plotly.Data[] {
       labels: spec.labels,
       values: pieValues,
       name: spec.title ?? 'Proportion',
-      marker: { colors: PIE_MARKER_COLORS },
+      marker: { colors: colorsForLabels(spec.labels) },
       opacity: 1,
       textinfo: 'label+percent',
       hoverinfo: 'label+value+percent',
