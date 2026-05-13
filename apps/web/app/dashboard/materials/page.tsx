@@ -15,8 +15,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import toast from 'react-hot-toast';
 
 interface Material {
   id: string;
@@ -75,6 +77,7 @@ export default function MaterialsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [types, setTypes] = useState<string[]>([]);
+  const [studyLoadingId, setStudyLoadingId] = useState<string | null>(null);
 
   const fetchMaterials = async () => {
     setIsLoading(true);
@@ -133,6 +136,29 @@ export default function MaterialsPage() {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const handleAskOz = async (material: Material) => {
+    setStudyLoadingId(material.id);
+    try {
+      const response = await fetch('/api/ai/study-material', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ materialId: material.id }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to start material study session');
+      }
+
+      const { conversationId } = await response.json() as { conversationId: string };
+      router.push(`/dashboard/ai-assistant?conversation=${conversationId}&study=1`);
+    } catch {
+      toast.error('Failed to start material study session. Please try again.');
+    } finally {
+      setStudyLoadingId(null);
+    }
   };
 
   return (
@@ -294,10 +320,21 @@ export default function MaterialsPage() {
                 )}
                 {material.indexStatus === 'INDEXED' && (
                   <button
-                    onClick={() => router.push(`/dashboard/ai-assistant?q=${encodeURIComponent(`Tell me about "${material.title}"`)}`)}
-                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-200 py-2 text-sm font-medium text-violet-700 transition-colors hover:bg-violet-50 dark:border-violet-700 dark:text-violet-300 dark:hover:bg-violet-900/20"
+                    onClick={() => handleAskOz(material)}
+                    disabled={studyLoadingId === material.id}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-200 py-2 text-sm font-medium text-violet-700 transition-colors hover:bg-violet-50 disabled:opacity-60 dark:border-violet-700 dark:text-violet-300 dark:hover:bg-violet-900/20"
                   >
-                    <span>✦</span> Ask OZ
+                    {studyLoadingId === material.id ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Preparing study session...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Ask OZ
+                      </>
+                    )}
                   </button>
                 )}
               </div>

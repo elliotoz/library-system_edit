@@ -7,6 +7,7 @@ import { ToolHookService } from './tools/tool-hook.service';
 import { ToolExecutionContext } from './tools/tool-hooks';
 import { TokenTrackerService } from './session/token-tracker.service';
 import { MaterialSearchService } from '../materials/material-search.service';
+import { buildMaterialAccessWhere } from '../materials/material-access.util';
 import { BookDocumentService, BookPdfContent } from '../books/book-document.service';
 import { OPENROUTER_MODELS } from './providers/openrouter.provider';
 import { AUTO_MODEL_ID, getModelEntry, getPublicModelList, isAllowlistedModel } from './model-registry';
@@ -931,6 +932,133 @@ Be concise, practical, and encouraging. Base everything on the book details prov
         `2. What evidence or examples does the author use to support their points?\n` +
         `3. How does this connect to what you already know about the subject?\n\n` +
         `Ask me anything about this book to deepen your understanding.`;
+    }
+
+    await this.saveMessage(userId, 'assistant', studyGuide, conv.id);
+
+    return { conversationId: conv.id, openingMessage: studyGuide };
+  }
+
+  async createMaterialStudySession(
+    userId: string,
+    userRole: Role,
+    materialId: string,
+    requestedManualModes?: string[] | string,
+  ): Promise<{ conversationId: string; openingMessage: string }> {
+    const accessContext = await this.materialSearch.getAccessContextForUser(userId, userRole);
+    const material = await this.prisma.material.findFirst({
+      where: {
+        id: materialId,
+        isApproved: true,
+        isPublished: true,
+        indexStatus: IndexStatus.INDEXED,
+        ...buildMaterialAccessWhere(accessContext),
+      },
+      select: {
+        id: true,
+        title: true,
+        type: true,
+        description: true,
+        authorName: true,
+        keywords: true,
+        facultyCode: true,
+        courseCode: true,
+        year: true,
+      },
+    });
+
+    if (!material) {
+      throw new NotFoundException(`Material ${materialId} not found`);
+    }
+
+    const outline = await this.materialSearch.getMaterialOutline(materialId, accessContext);
+    if (!outline.length) {
+      throw new NotFoundException(`Indexed content for material ${materialId} not found`);
+    }
+
+    const conv = await this.prisma.aiConversation.create({
+      data: {
+        userId,
+        title: `Study: ${material.title.slice(0, 50)}`,
+        manualModes: normalizeAiModes(requestedManualModes),
+        lastAutoModes: getDefaultAutoModes(true),
+        manualModel: null,
+        lastResolvedModel: OPENROUTER_MODELS.STUDY,
+        lastModelSelectionSource: 'auto',
+      },
+    });
+
+    const keywordText = Array.isArray(material.keywords) && material.keywords.length > 0
+      ? material.keywords.join(', ')
+      : 'none';
+    const outlineText = outline.map((chunk) =>
+      `[Chunk ${chunk.chunkIndex}${chunk.pageNumber != null ? `, page ${chunk.pageNumber}` : ''}]\n${chunk.content}`,
+    ).join('\n\n---\n\n');
+
+    const studyPrompt = `You are a university library study assistant. A user has opened a dedicated study session for this indexed academic material.
+
+Title: ${material.title}
+Type: ${material.type}
+Author: ${material.authorName}
+Year: ${material.year ?? 'Unknown'}
+Faculty: ${material.facultyCode ?? 'Not specified'}
+Course: ${material.courseCode ?? 'Not specified'}
+Keywords: ${keywordText}
+Description: ${material.description ?? 'No description available'}
+
+Opening indexed content:
+${outlineText}
+
+Write a structured study guide in markdown covering:
+1. **Material summary** based on the indexed content
+2. **Main topics or arguments**
+3. **How to study this material** with practical reading steps
+4. **5 key terms, ideas, or sections to focus on**
+5. **3 guiding questions for deeper understanding**
+6. **What the user can ask OZ next**
+
+Be concise, accurate, and educational. Base the guide only on the material metadata and indexed content above. Do not claim to have read sections that are not represented in the indexed content.`;
+
+    let studyGuide = '';
+    try {
+      const res = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: this.openRouterHeaders,
+        body: JSON.stringify({
+          model: OPENROUTER_MODELS.STUDY,
+          messages: [{ role: 'user', content: studyPrompt }],
+          max_tokens: this.studyGuideMaxTokens,
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        this.logger.warn(`Material study guide generation failed (${res.status}): ${errText} — using rule-based fallback`);
+      } else {
+        const data = await res.json() as { choices: Array<{ message: { content: string | null } }> };
+        studyGuide = data.choices[0]?.message?.content ?? '';
+      }
+    } catch (err) {
+      this.logger.warn(`Material study guide LLM error: ${String(err)} — using rule-based fallback`);
+    }
+
+    if (!studyGuide) {
+      const preview = outline[0]?.content ?? material.description ?? '';
+      studyGuide = `## Study Guide: ${material.title}\n\n` +
+        `**Type:** ${material.type}\n` +
+        `**Author:** ${material.authorName}\n` +
+        (material.description ? `\n${material.description}\n` : '') +
+        `\n### Material summary\n\n` +
+        `${preview}\n\n` +
+        `### How to study this material\n\n` +
+        `1. Start by reading the opening section carefully and note the central topic.\n` +
+        `2. Identify recurring terms, definitions, and examples.\n` +
+        `3. Turn each major section into a short question and answer it in your own words.\n\n` +
+        `### Guiding questions\n\n` +
+        `1. What problem or topic is this material focused on?\n` +
+        `2. Which concepts are most important for a course discussion or exam?\n` +
+        `3. What examples or evidence does the author use?\n\n` +
+        `Ask me to explain a section, create quiz questions, build flashcards, or make a study plan for this material.`;
     }
 
     await this.saveMessage(userId, 'assistant', studyGuide, conv.id);

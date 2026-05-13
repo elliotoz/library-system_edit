@@ -106,6 +106,27 @@ export class AiController {
     return this.agentService.createStudySession(userId, body.bookId, body.manualModes ?? body.mode);
   }
 
+  @Post('study-material')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(201)
+  @ApiOperation({ summary: 'Create a dedicated study session for an indexed material' })
+  async createMaterialStudySession(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') userRole: Role,
+    @Body() body: { materialId: string; mode?: string; manualModes?: string[] },
+  ) {
+    if (!body.materialId) {
+      throw new BadRequestException('materialId is required');
+    }
+    return this.agentService.createMaterialStudySession(
+      userId,
+      userRole,
+      body.materialId,
+      body.manualModes ?? body.mode,
+    );
+  }
+
   @Patch('conversations/:id/mode')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
