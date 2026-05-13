@@ -1,5 +1,5 @@
 import { Role } from '@prisma/client';
-import { buildMemoryRuleBlock, buildScientificWorkspaceBlock, buildSystemPrompt, PromptContext } from './system-prompt-builder';
+import { buildGraphOutputRule, buildMemoryRuleBlock, buildScientificWorkspaceBlock, buildSystemPrompt, PromptContext } from './system-prompt-builder';
 
 const baseContext: PromptContext = {
   userName: 'Ada',
@@ -23,26 +23,20 @@ describe('buildScientificWorkspaceBlock', () => {
     expect(buildScientificWorkspaceBlock(false)).toBe('');
   });
 
-  it('documents currently supported renderer features', () => {
+  it('documents scientific workspace formatting rules', () => {
     const block = buildScientificWorkspaceBlock(true);
 
     expect(block).toContain('Scientific Workspace Output');
-    expect(block).toContain('multi-function');
-    expect(block).toContain('pie');
-    expect(block).toContain('points');
-    expect(block).toContain('connectPoints');
     expect(block).toContain('Do not claim Python execution support');
+    expect(block).toContain('mermaid');
+    expect(block).toContain('bmatrix');
   });
 
-  it('documents graph selection and admin data safety rules', () => {
+  it('does not duplicate graph schema content (moved to buildGraphOutputRule)', () => {
     const block = buildScientificWorkspaceBlock(true);
 
-    expect(block).toContain('scatter');
-    expect(block).toContain('coordinate points');
-    expect(block).toContain('pie');
-    expect(block).toContain('proportions');
-    expect(block).toContain('Never invent library or admin analytics data');
-    expect(block).toContain('call available tools first');
+    expect(block).not.toContain('ALWAYS wrap graph JSON');
+    expect(block).not.toContain('Supported types');
   });
 
   it('documents Python tool usage only when available', () => {
@@ -50,6 +44,43 @@ describe('buildScientificWorkspaceBlock', () => {
 
     expect(block).toContain('Use the Python calculation tool');
     expect(block).not.toContain('Do not claim Python execution support');
+  });
+});
+
+describe('buildGraphOutputRule', () => {
+  it('contains strict ALWAYS and NEVER graph formatting rules', () => {
+    const block = buildGraphOutputRule();
+
+    expect(block).toContain('ALWAYS wrap graph JSON');
+    expect(block).toContain('NEVER output raw JSON');
+    expect(block).toContain('NEVER place explanation text inside the graph block');
+  });
+
+  it('contains a correct format example with a fenced graph block', () => {
+    const block = buildGraphOutputRule();
+
+    expect(block).toContain('Correct format');
+    expect(block).toContain('```graph');
+  });
+
+  it('contains an invalid format counter-example', () => {
+    const block = buildGraphOutputRule();
+
+    expect(block).toContain('Invalid format');
+  });
+
+  it('documents all supported graph types', () => {
+    const block = buildGraphOutputRule();
+
+    for (const type of ['function', 'multi-function', 'scatter', 'line', 'bar', 'pie', 'histogram']) {
+      expect(block).toContain(type);
+    }
+  });
+
+  it('prohibits inventing library or admin data for charts', () => {
+    const block = buildGraphOutputRule();
+
+    expect(block).toContain('Never invent library or admin data');
   });
 });
 
@@ -66,6 +97,16 @@ describe('buildMemoryRuleBlock', () => {
 });
 
 describe('buildSystemPrompt', () => {
+  it('includes graph output rule for every prompt regardless of scientificOutput', () => {
+    const plain = buildSystemPrompt(baseContext);
+    const scientific = buildSystemPrompt({ ...baseContext, scientificOutput: true });
+
+    for (const prompt of [plain, scientific]) {
+      expect(prompt).toContain('ALWAYS wrap graph JSON');
+      expect(prompt).toContain('NEVER output raw JSON');
+    }
+  });
+
   it('includes conversation memory boundary rule in every prompt', () => {
     const prompt = buildSystemPrompt(baseContext);
 

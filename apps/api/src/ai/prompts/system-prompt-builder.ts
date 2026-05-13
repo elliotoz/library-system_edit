@@ -83,7 +83,38 @@ ${examples}
 - **Total Books:** ${context.catalogTotalBooks}
 - **Available Copies:** ${context.catalogAvailableCopies}
 - **Published Reading Lists:** ${context.publishedReadingLists}
-- Indexed study materials available for AI reading: ${context.indexedMaterials ?? 0}${buildMemoryRuleBlock()}${buildResponseStyleBlock(context.responseIntent)}${buildScientificWorkspaceBlock(context.scientificOutput, context.pythonExecutionAvailable)}`;
+- Indexed study materials available for AI reading: ${context.indexedMaterials ?? 0}${buildGraphOutputRule()}${buildMemoryRuleBlock()}${buildResponseStyleBlock(context.responseIntent)}${buildScientificWorkspaceBlock(context.scientificOutput, context.pythonExecutionAvailable)}`;
+}
+
+export function buildGraphOutputRule(): string {
+  return `
+
+## Graph Output Rule
+
+ALWAYS wrap graph JSON in a fenced \`\`\`graph block. NEVER output raw JSON directly in prose. NEVER place explanation text inside the graph block. The frontend only renders graphs from fenced blocks — raw JSON appears as unformatted text to the user.
+
+**Correct format:**
+
+\`\`\`graph
+{
+  "schemaVersion": 1,
+  "type": "line",
+  "xValues": [1, 2, 3],
+  "yValues": [4, 5, 6]
+}
+\`\`\`
+
+**Invalid format — never do this:**
+
+Here is the chart data: { "type": "line", "xValues": [1,2,3], "yValues": [4,5,6] }
+
+**Rules:**
+- One graph block per chart. One JSON object per block. No trailing text inside the block.
+- Put all explanation before or after the \`\`\`graph block, never inside it.
+- Supported types: \`function\`, \`multi-function\`, \`scatter\`, \`line\`, \`bar\`, \`pie\`, \`histogram\`.
+- Allowed fields: \`schemaVersion\`, \`type\`, \`title\`, \`expression\`, \`functions\`, \`xMin\`, \`xMax\`, \`yMin\`, \`yMax\`, \`xLabel\`, \`yLabel\`, \`xValues\`, \`yValues\`, \`points\`, \`labels\`, \`values\`, \`connectPoints\`.
+- Use \`scatter\` for coordinate points, \`function\` for one equation, \`multi-function\` for equation comparisons, \`line\` for trends, \`bar\` for category comparisons, \`pie\` for proportions, \`histogram\` for distributions.
+- Never invent library or admin data for a chart. Call the relevant tool first, then build the graph block from the returned data only.`;
 }
 
 export function buildMemoryRuleBlock(): string {
@@ -131,11 +162,6 @@ export function buildScientificWorkspaceBlock(scientific?: boolean, pythonAvaila
 - Use \`$...$\` for inline math and \`$$...$$\` for display math.
 - Matrix math must use LaTeX matrix environments such as \`bmatrix\`.
 - Use fenced code blocks with a language tag for code.
-- Use \`\`\`graph fenced blocks only for supported graph schemas.
-- Supported graph types: \`function\`, \`multi-function\`, \`scatter\`, \`line\`, \`bar\`, \`pie\`, and \`histogram\`.
-- Graph JSON may use \`schemaVersion: 1\`, \`xLabel\`, \`yLabel\`, \`xMin\`, \`xMax\`, \`yMin\`, \`yMax\`, \`points\`, \`xValues\`, \`yValues\`, \`labels\`, \`values\`, \`functions\`, or \`connectPoints\`.
-- Use \`scatter\` for coordinate points, \`function\` for one equation, \`multi-function\` for equation comparisons, \`line\` for trends, \`bar\` for category comparisons, \`pie\` for proportions, and \`histogram\` for distributions.
-- Never invent library or admin analytics data to make a chart. For admin statistics, call available tools first and create graph blocks only from returned tool/API/database data.
 - Use \`\`\`mermaid fenced blocks for flowcharts, sequence diagrams, ER diagrams, class diagrams, and state diagrams.
 - Close all Markdown fences and math blocks before finishing.
 ${pythonRule}`;
