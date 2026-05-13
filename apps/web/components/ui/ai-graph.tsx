@@ -58,10 +58,14 @@ export function AIGraph({ raw }: AIGraphProps) {
   }
 
   const hasCartesianAxes = spec.type !== 'pie';
+  const isPie = spec.type === 'pie';
   const layout: Partial<Plotly.Layout> = {
     title: spec.title ? { text: spec.title, font: { size: 14 } } : undefined,
     autosize: true,
-    margin: { t: spec.title ? 40 : 20, r: 20, b: 40, l: 50 },
+    height: isPie ? 320 : undefined,
+    margin: isPie
+      ? { t: spec.title ? 44 : 24, r: 20, b: 64, l: 20 }
+      : { t: spec.title ? 40 : 20, r: 20, b: 40, l: 50 },
     paper_bgcolor: 'transparent',
     plot_bgcolor: 'transparent',
     font: { size: 11, color: dark ? '#e5e7eb' : '#374151' },
@@ -71,13 +75,10 @@ export function AIGraph({ raw }: AIGraphProps) {
       bordercolor: dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)',
       font: { color: dark ? '#f9fafb' : '#111827' },
     },
-    showlegend: spec.type === 'multi-function' || spec.type === 'pie',
-    legend: {
-      orientation: 'h',
-      x: 0,
-      y: -0.2,
-      font: { color: dark ? '#e5e7eb' : '#374151' },
-    },
+    showlegend: spec.type === 'multi-function' || isPie,
+    legend: isPie
+      ? { orientation: 'h', x: 0.5, xanchor: 'center', y: -0.15, font: { color: dark ? '#e5e7eb' : '#374151' } }
+      : { orientation: 'h', x: 0, y: -0.2, font: { color: dark ? '#e5e7eb' : '#374151' } },
     xaxis: hasCartesianAxes ? {
       title: spec.xLabel ? { text: spec.xLabel } : undefined,
       range: spec.xMin !== undefined && spec.xMax !== undefined ? [spec.xMin, spec.xMax] : undefined,
@@ -98,7 +99,7 @@ export function AIGraph({ raw }: AIGraphProps) {
         data={traces}
         layout={layout}
         config={{ responsive: true, displayModeBar: true, displaylogo: false }}
-        style={{ width: '100%', minHeight: 260 }}
+        style={{ width: '100%', minHeight: isPie ? 320 : 260 }}
         useResizeHandler
       />
     </div>
@@ -141,11 +142,18 @@ function buildTraces(spec: NormalizedGraphSpec): Plotly.Data[] {
     return [{ type: 'bar', x: spec.labels, y: spec.yValues, name: spec.title ?? 'Values' } as Plotly.Data];
   }
 
-  if (spec.type === 'pie' && spec.labels) {
+  if (spec.type === 'pie') {
+    const pieValues = spec.values ?? spec.yValues;
+    if (
+      !spec.labels || spec.labels.length === 0 ||
+      !pieValues || pieValues.length === 0 ||
+      pieValues.length !== spec.labels.length ||
+      !pieValues.every((v) => typeof v === 'number' && isFinite(v))
+    ) return [];
     return [{
       type: 'pie',
       labels: spec.labels,
-      values: spec.values ?? spec.yValues,
+      values: pieValues,
       name: spec.title ?? 'Proportion',
       textinfo: 'label+percent',
       hoverinfo: 'label+value+percent',
