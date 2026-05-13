@@ -179,7 +179,7 @@ export class AgentService {
     const lower = message.toLowerCase();
     const hasAdminDashboardIntent = /\badmin\b|\badministrative\b|\banalytics dashboard\b|\bdashboard\b/.test(lower);
     const hasRestrictedMetric =
-      /\bborrowed books? by faculty\b|\bby faculty\b|\bfine payments?\b|\bfines? summary\b|\bmost borrowed\b/.test(lower) ||
+      /\bborrowed books? by faculty\b|\bby faculty\b|\bfine payments?\b|\bfines? summary\b|\bmost borrowed\b|\bmost popular\b|\bborrowed (the )?most\b/.test(lower) ||
       /\breservations? per\b|\breservation trends?\b|\boverdue books? trend\b|\boverdue trends?\b/.test(lower);
     const hasOperationalMetric =
       /\bborrowed books?\b|\breservations?\b|\boverdue\b|\bfines?\b|\bfine payments?\b|\bfaculty\b|\bcategor(?:y|ies)\b/.test(lower);
@@ -190,12 +190,14 @@ export class AgentService {
 
   private isMostBorrowedCategoryRequest(message: string): boolean {
     const lower = message.toLowerCase();
-    return /\bmost borrowed\b/.test(lower) && /\bcategor(?:y|ies)\b/.test(lower);
+    return /\b(most borrowed|most popular|borrowed (?:the )?most)\b/.test(lower) && /\bcategor(?:y|ies)\b/.test(lower);
   }
 
   private isMostBorrowedBookRequest(message: string): boolean {
     const lower = message.toLowerCase();
-    return /\bmost borrowed\b/.test(lower) && /\bbooks?\b/.test(lower) && !this.isMostBorrowedCategoryRequest(message);
+    const hasMostBorrowedIntent = /\b(most borrowed|most popular|borrowed (?:the )?most)\b/.test(lower);
+    const hasBookIntent = /\bbooks?\b|\btitles?\b/.test(lower);
+    return hasMostBorrowedIntent && hasBookIntent && !this.isMostBorrowedCategoryRequest(message);
   }
 
   private buildAdminAnalyticsDeniedResponse(role: Role): string {
