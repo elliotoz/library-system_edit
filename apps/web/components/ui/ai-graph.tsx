@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { evaluate } from 'mathjs';
 import { NormalizedGraphSpec, parseGraphSpec } from './ai-graph-parser';
+import { simplifyChartLabels } from './chart-labels';
 import { colorsForLabels } from './graph-colors';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
@@ -235,16 +236,18 @@ function buildTraces(spec: NormalizedGraphSpec): Plotly.Data[] {
   }
 
   if (spec.type === 'bar' && spec.labels && spec.yValues) {
+    const displayLabels = simplifyChartLabels(spec.labels);
     return [{
       type: 'bar',
-      x: spec.labels,
+      x: displayLabels,
       y: spec.yValues,
       name: spec.title ?? 'Values',
+      customdata: spec.labels,
       marker: {
         color: colorsForLabels(spec.labels),
         line: { color: 'rgba(15, 23, 42, 0.14)', width: 1 },
       },
-      hovertemplate: '%{x}<br>%{y}<extra></extra>',
+      hovertemplate: '%{customdata}<br>%{y}<extra></extra>',
     } as Plotly.Data];
   }
 
@@ -258,13 +261,14 @@ function buildTraces(spec: NormalizedGraphSpec): Plotly.Data[] {
     ) return [];
     return [{
       type: 'pie',
-      labels: spec.labels,
+      labels: simplifyChartLabels(spec.labels),
       values: pieValues,
       name: spec.title ?? 'Proportion',
+      customdata: spec.labels,
       marker: { colors: colorsForLabels(spec.labels) },
       opacity: 1,
       textinfo: 'label+percent',
-      hoverinfo: 'label+value+percent',
+      hovertemplate: '%{customdata}<br>%{value} (%{percent})<extra></extra>',
     } as Plotly.Data];
   }
 

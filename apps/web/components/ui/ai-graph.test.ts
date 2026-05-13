@@ -88,4 +88,33 @@ describe('AIGraph trace generation', () => {
       },
     });
   });
+
+  it('uses simplified display labels while preserving full labels for hover', () => {
+    const spec = parseGraphSpec(JSON.stringify({
+      schemaVersion: 1,
+      type: 'bar',
+      title: 'Most Borrowed Books',
+      labels: [
+        'Clean Code: A Handbook of Agile Software Craftsmanship',
+        'Design Patterns - Elements of Reusable Object-Oriented Software',
+        'Python Crash Course (2nd Edition)',
+      ],
+      values: [12, 9, 7],
+    }));
+
+    expect(spec).not.toBeNull();
+
+    const traces = buildGraphTracesForTest(spec!);
+
+    expect(traces[0]).toMatchObject({
+      type: 'bar',
+      x: ['Clean Code', 'Design Patterns', 'Python Crash Course'],
+      customdata: [
+        'Clean Code: A Handbook of Agile Software Craftsmanship',
+        'Design Patterns - Elements of Reusable Object-Oriented Software',
+        'Python Crash Course (2nd Edition)',
+      ],
+      hovertemplate: '%{customdata}<br>%{y}<extra></extra>',
+    });
+  });
 });
