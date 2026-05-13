@@ -33,12 +33,32 @@ const pointSchema = z.object({
   y: finiteNumber,
 });
 
+const tuplePointSchema = z
+  .tuple([finiteNumber, finiteNumber])
+  .transform(([x, y]) => ({ x, y }));
+
+const flexiblePointSchema = z.union([pointSchema, tuplePointSchema]);
+
+const graphSeriesSchema = z.object({
+  expression: expression.optional(),
+  label: label.optional(),
+  points: z.array(flexiblePointSchema).max(GRAPH_LIMITS.maxPoints).optional(),
+  connectPoints: z.boolean().optional(),
+}).strict().refine((series) => series.expression || (series.points && series.points.length > 0), {
+  message: 'Graph series needs expression or points',
+});
+
+const functionEntrySchema = z.union([
+  expression,
+  graphSeriesSchema,
+]);
+
 const graphSchema = z.object({
   schemaVersion: z.literal(1).optional(),
   type: graphTypeSchema,
   title: label.optional(),
   expression: expression.optional(),
-  functions: z.array(expression).max(GRAPH_LIMITS.maxFunctions).optional(),
+  functions: z.array(functionEntrySchema).max(GRAPH_LIMITS.maxFunctions).optional(),
   xMin: finiteNumber.optional(),
   xMax: finiteNumber.optional(),
   yMin: finiteNumber.optional(),
@@ -49,7 +69,7 @@ const graphSchema = z.object({
   xValues: z.array(finiteNumber).max(GRAPH_LIMITS.maxPoints).optional(),
   yValues: z.array(finiteNumber).max(GRAPH_LIMITS.maxPoints).optional(),
   labels: z.array(label).max(GRAPH_LIMITS.maxBars).optional(),
-  points: z.array(pointSchema).max(GRAPH_LIMITS.maxPoints).optional(),
+  points: z.array(flexiblePointSchema).max(GRAPH_LIMITS.maxPoints).optional(),
   values: z.array(finiteNumber).max(GRAPH_LIMITS.maxPoints).optional(),
 }).strict().superRefine((spec, ctx) => {
   if (spec.schemaVersion !== undefined && spec.schemaVersion !== 1) {
@@ -86,11 +106,14 @@ const graphSchema = z.object({
     });
   }
 
-  if (spec.type === 'bar' && (!spec.labels || !spec.yValues || spec.labels.length !== spec.yValues.length)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Bar graphs need labels and yValues with matching lengths',
-    });
+  if (spec.type === 'bar') {
+    const values = spec.values ?? spec.yValues;
+    if (!spec.labels || !values || spec.labels.length !== values.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Bar graphs need labels and values with matching lengths',
+      });
+    }
   }
 
   if (spec.type === 'pie') {
@@ -116,6 +139,12 @@ export interface NormalizedGraphSpec {
   title?: string;
   expression?: string;
   functions?: string[];
+  series?: Array<{
+    expression?: string;
+    label?: string;
+    points?: Array<{ x: number; y: number }>;
+    connectPoints?: boolean;
+  }>;
   xMin?: number;
   xMax?: number;
   yMin?: number;
@@ -142,9 +171,31 @@ export function parseGraphSpec(raw: string): NormalizedGraphSpec | null {
   if (!result.success) return null;
 
   const spec = result.data;
-  return {
+  return normalizeGraphSpec({
     ...spec,
     schemaVersion: 1,
+  });
+}
+
+function normalizeGraphSpec(spec: ParsedGraphSpec & { schemaVersion: 1 }): NormalizedGraphSpec {
+  const functions = spec.functions
+    ?.map((entry) => typeof entry === 'string' ? entry : entry.expression)
+    .filter((entry): entry is string => !!entry);
+
+  const series = spec.functions
+    ?.filter((entry): entry is Extract<typeof entry, object> => typeof entry === 'object')
+    .map((entry) => ({
+      expression: entry.expression,
+      label: entry.label,
+      points: entry.points,
+      connectPoints: entry.connectPoints,
+    }));
+
+  return {
+    ...spec,
+    yValues: spec.yValues ?? (spec.type === 'bar' ? spec.values : undefined),
+    functions,
+    series,
   };
 }
 

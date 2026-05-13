@@ -438,6 +438,7 @@ Assistant messages render through `AIMessage` with:
 - safe normalization of `\(...\)` and `\[...\]` outside fenced code blocks
 - syntax-highlighted code blocks with a copy button
 - interactive Plotly graph blocks from fenced `graph` JSON
+- automatic wrapping of standalone valid graph JSON into fenced `graph` blocks
 - Mermaid diagrams from fenced `mermaid` blocks
 - source-code fallback when graph or Mermaid rendering fails
 
@@ -448,7 +449,8 @@ Graph blocks are validated before rendering. Supported graph types are
 `function`, `multi-function`, `scatter`, `line`, `bar`, `pie`, and
 `histogram`. Versioned graph JSON may use `schemaVersion: 1`, `points`,
 `functions`, `values`, `connectPoints`, axis labels, and axis ranges. Legacy
-`xValues`, `yValues`, and `labels` remain supported.
+`xValues`, `yValues`, `labels`, tuple points, and model-style function series
+remain supported.
 
 Graph validation limits are intentionally bounded: 500 points, 5 functions,
 120 characters per expression, 80 characters per label, and a maximum x/y

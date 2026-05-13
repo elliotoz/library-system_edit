@@ -111,7 +111,10 @@ function buildTraces(spec: NormalizedGraphSpec): Plotly.Data[] {
   }
 
   if (spec.type === 'multi-function' && spec.functions) {
-    return spec.functions.map((expr) => buildFunctionTrace(expr, spec.xMin, spec.xMax));
+    return [
+      ...spec.functions.map((expr) => buildFunctionTrace(expr, spec.xMin, spec.xMax)),
+      ...buildSeriesTraces(spec),
+    ];
   }
 
   if ((spec.type === 'scatter' || spec.type === 'line') && spec.points) {
@@ -159,6 +162,26 @@ function buildTraces(spec: NormalizedGraphSpec): Plotly.Data[] {
 function buildFunctionTrace(expr: string, xMin = -10, xMax = 10): Plotly.Data {
   const { x, y } = sampleFunction(expr, xMin, xMax);
   return { type: 'scatter', mode: 'lines', x, y, name: expr } as Plotly.Data;
+}
+
+function buildSeriesTraces(spec: NormalizedGraphSpec): Plotly.Data[] {
+  return (spec.series ?? []).flatMap((series) => {
+    const traces: Plotly.Data[] = [];
+    if (series.expression) {
+      traces.push(buildFunctionTrace(series.expression, spec.xMin, spec.xMax));
+      traces[traces.length - 1].name = series.label ?? series.expression;
+    }
+    if (series.points && series.points.length > 0) {
+      traces.push({
+        type: 'scatter',
+        mode: series.connectPoints ? 'lines+markers' : 'markers',
+        x: series.points.map((point) => point.x),
+        y: series.points.map((point) => point.y),
+        name: series.label ?? 'points',
+      } as Plotly.Data);
+    }
+    return traces;
+  });
 }
 
 function getScatterMode(spec: NormalizedGraphSpec): 'lines' | 'markers' | 'lines+markers' {

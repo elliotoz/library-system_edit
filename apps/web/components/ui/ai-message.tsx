@@ -12,6 +12,7 @@ import { Copy, Check } from 'lucide-react';
 import { AIGraph } from './ai-graph';
 import { AIMermaid } from './ai-mermaid';
 import { normalizeMathDelimiters } from './ai-markdown-normalizer';
+import { normalizeGraphJsonBlocks } from './ai-graph-block-normalizer';
 
 interface CodeBlockProps {
   language: string;
@@ -69,7 +70,7 @@ interface AIMessageProps {
 }
 
 export function AIMessage({ content }: AIMessageProps) {
-  const normalizedContent = normalizeMathDelimiters(content);
+  const normalizedContent = normalizeMathDelimiters(normalizeGraphJsonBlocks(content));
 
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none leading-relaxed ai-message">

@@ -52,6 +52,45 @@ describe('parseGraphSpec', () => {
     expect(spec?.functions).toHaveLength(GRAPH_LIMITS.maxFunctions);
   });
 
+  it('accepts model-style function objects inside multi-function graphs', () => {
+    const spec = parseGraphSpec(JSON.stringify({
+      schemaVersion: 1,
+      type: 'multi-function',
+      functions: [
+        { expression: 'x^2', label: 'x^2' },
+        { expression: '2*x+1', label: '2x+1' },
+      ],
+    }));
+
+    expect(spec?.type).toBe('multi-function');
+    expect(spec?.functions).toEqual(['x^2', '2*x+1']);
+    expect(spec?.series?.[0].label).toBe('x^2');
+  });
+
+  it('accepts model-style point series inside multi-function graphs', () => {
+    const spec = parseGraphSpec(JSON.stringify({
+      schemaVersion: 1,
+      type: 'multi-function',
+      functions: [
+        { expression: '1.9*x', label: 'best-fit line' },
+        {
+          points: [[1, 2], [2, 4], [3, 5], [4, 8]],
+          label: 'data points',
+          connectPoints: false,
+        },
+      ],
+    }));
+
+    expect(spec?.type).toBe('multi-function');
+    expect(spec?.functions).toEqual(['1.9*x']);
+    expect(spec?.series?.[1].points).toEqual([
+      { x: 1, y: 2 },
+      { x: 2, y: 4 },
+      { x: 3, y: 5 },
+      { x: 4, y: 8 },
+    ]);
+  });
+
   it('accepts line graphs with legacy xValues and yValues', () => {
     const spec = parseGraphSpec(JSON.stringify({
       type: 'line',
@@ -72,6 +111,17 @@ describe('parseGraphSpec', () => {
 
     expect(spec?.type).toBe('bar');
     expect(spec?.labels).toEqual(['Engineering', 'Science']);
+  });
+
+  it('accepts bar charts with labels and values', () => {
+    const spec = parseGraphSpec(JSON.stringify({
+      type: 'bar',
+      labels: ['Engineering', 'Science'],
+      values: [8, 5],
+    }));
+
+    expect(spec?.type).toBe('bar');
+    expect(spec?.yValues).toEqual([8, 5]);
   });
 
   it('accepts pie charts with labels and values', () => {
