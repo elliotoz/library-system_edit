@@ -55,6 +55,59 @@ function makeChatPrisma(role: Role) {
   };
 }
 
+function makeAdminAnalyticsPrisma() {
+  return {
+    user: {
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'admin-1',
+        name: 'Admin',
+        role: Role.ADMIN,
+        interests: [],
+        courses: [],
+        faculty: null,
+        borrows: [],
+      }),
+    },
+    borrowPolicy: {
+      findUnique: jest.fn().mockResolvedValue({
+        maxActiveBorrows: 20,
+        maxBorrowDays: 30,
+        maxExtensions: 3,
+      }),
+    },
+    book: { count: jest.fn().mockResolvedValue(5) },
+    bookCopy: { count: jest.fn().mockResolvedValue(67) },
+    readingList: { count: jest.fn().mockResolvedValue(2) },
+    aiMessage: {
+      create: jest.fn().mockResolvedValue({}),
+    },
+    borrow: {
+      findMany: jest.fn()
+        .mockResolvedValueOnce([
+          { user: { faculty: { name: 'Engineering', code: 'ENG' } } },
+          { user: { faculty: { name: 'Medicine', code: 'MED' } } },
+          { user: { faculty: { name: 'Engineering', code: 'ENG' } } },
+        ])
+        .mockResolvedValueOnce([
+          { dueAt: new Date('2026-05-01T00:00:00.000Z') },
+          { dueAt: new Date('2026-05-03T00:00:00.000Z') },
+        ]),
+    },
+    reservation: {
+      findMany: jest.fn().mockResolvedValue([
+        { createdAt: new Date('2026-05-05T00:00:00.000Z') },
+        { createdAt: new Date('2026-05-06T00:00:00.000Z') },
+      ]),
+    },
+    finePayment: {
+      findMany: jest.fn().mockResolvedValue([
+        { amount: '12.50', paidAt: new Date('2026-05-10T00:00:00.000Z') },
+        { amount: '7.50', paidAt: new Date('2026-05-11T00:00:00.000Z') },
+      ]),
+    },
+  };
+}
+
 describe('AgentService read_ebook', () => {
   it('reads managed local PDFs through the book document service', async () => {
     const prisma = {};
@@ -281,6 +334,49 @@ describe('AgentService admin analytics authorization', () => {
       text: expect.stringContaining('cannot generate admin analytics dashboards'),
     }));
     expect(fetchSpy).not.toHaveBeenCalled();
+    expect(prisma.aiMessage.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns real admin analytics graph blocks for administrators before calling the model', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    const prisma = makeAdminAnalyticsPrisma();
+    const service = makeAgentService({
+      prisma,
+      materialSearch: { countAccessibleIndexedMaterials: jest.fn().mockResolvedValue(1) },
+    });
+
+    const chunks: unknown[] = [];
+    for await (const chunk of service.chatStream(
+      'admin-1',
+      [
+        'Generate an admin analytics dashboard showing:',
+        '- Borrowed books by faculty',
+        '- Reservations per week',
+        '- Overdue books trend',
+        '- Fine payments by month',
+      ].join('\n'),
+      [],
+      false,
+      null,
+      '',
+    )) {
+      chunks.push(chunk);
+    }
+
+    const textChunks = chunks.filter((chunk): chunk is { type: 'text'; text: string } =>
+      typeof chunk === 'object' && chunk !== null && (chunk as { type?: string }).type === 'text',
+    );
+    const response = textChunks.map((chunk) => chunk.text).join('\n');
+
+    expect(response).toContain('## Admin Analytics Dashboard');
+    expect(response.match(/```graph/g)).toHaveLength(4);
+    expect(response).toContain('"title": "Borrowed Books by Faculty"');
+    expect(response).toContain('"Engineering"');
+    expect(response).toContain('20');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(prisma.borrow.findMany).toHaveBeenCalledTimes(2);
+    expect(prisma.reservation.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.finePayment.findMany).toHaveBeenCalledTimes(1);
     expect(prisma.aiMessage.create).toHaveBeenCalledTimes(2);
   });
 

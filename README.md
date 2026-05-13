@@ -461,7 +461,9 @@ chart.
 Admin analytics dashboards and operational metrics are admin-only. For
 non-admin users, OZ refuses borrowed-by-faculty, reservation trend, overdue
 trend, and fine-payment dashboard requests instead of showing sample or
-placeholder admin data.
+placeholder admin data. For admins, OZ can generate a live analytics
+dashboard with graph blocks for borrowed books by faculty, reservations per
+week, overdue trends, and fine payments by month.
 
 ### Python Scientific Runner
 

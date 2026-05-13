@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogSearchService } from './catalog-search.service';
-import { BorrowStatus, BookCopyStatus, IndexStatus, Role } from '@prisma/client';
+import { BorrowStatus, BookCopyStatus, FineStatus, IndexStatus, Role } from '@prisma/client';
 import { buildSystemPrompt as buildSystemPromptFromModule, PromptContext, ResponseIntent } from './prompts/system-prompt-builder';
 import { ToolHookService } from './tools/tool-hook.service';
 import { ToolExecutionContext } from './tools/tool-hooks';
@@ -196,6 +196,148 @@ export class AgentService {
       `As a **${roleLabel}**, I cannot generate admin analytics dashboards, access admin-only operational data, or invent sample data for borrowed-book, reservation, overdue, or fine-payment charts.`,
       '',
       'I can still help you with your own borrows, reservations, reading lists, catalog searches, or study materials.',
+    ].join('\n');
+  }
+
+  private graphBlock(spec: Record<string, unknown>): string {
+    return ['```graph', JSON.stringify(spec, null, 2), '```'].join('\n');
+  }
+
+  private getWeekLabel(date: Date): string {
+    const utc = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    const day = utc.getUTCDay() || 7;
+    utc.setUTCDate(utc.getUTCDate() - day + 1);
+    return utc.toISOString().slice(0, 10);
+  }
+
+  private getMonthLabel(date: Date): string {
+    return date.toISOString().slice(0, 7);
+  }
+
+  private incrementCount(map: Map<string, number>, key: string, amount = 1): void {
+    map.set(key, (map.get(key) ?? 0) + amount);
+  }
+
+  private entriesToLabelsAndValues(map: Map<string, number>, limit?: number): { labels: string[]; values: number[] } {
+    const entries = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+    const selected = typeof limit === 'number' ? entries.slice(-limit) : entries;
+
+    return {
+      labels: selected.map(([label]) => label),
+      values: selected.map(([, value]) => value),
+    };
+  }
+
+  private async buildAdminAnalyticsDashboardResponse(): Promise<string> {
+    const now = new Date();
+    const [borrows, reservations, overdueBorrows, finePayments] = await Promise.all([
+      this.prisma.borrow.findMany({
+        include: {
+          user: {
+            select: {
+              faculty: { select: { name: true, code: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.reservation.findMany({
+        select: { createdAt: true },
+      }),
+      this.prisma.borrow.findMany({
+        where: {
+          OR: [
+            { status: BorrowStatus.OVERDUE },
+            { status: BorrowStatus.ACTIVE, dueAt: { lt: now } },
+          ],
+        },
+        select: { dueAt: true },
+      }),
+      this.prisma.finePayment.findMany({
+        where: { status: FineStatus.PAID, paidAt: { not: null } },
+        select: { amount: true, paidAt: true },
+      }),
+    ]);
+
+    const borrowedByFaculty = new Map<string, number>();
+    for (const borrow of borrows) {
+      const faculty = borrow.user.faculty;
+      this.incrementCount(borrowedByFaculty, faculty?.name ?? faculty?.code ?? 'Unassigned');
+    }
+
+    const reservationsByWeek = new Map<string, number>();
+    for (const reservation of reservations) {
+      this.incrementCount(reservationsByWeek, this.getWeekLabel(reservation.createdAt));
+    }
+
+    const overdueByWeek = new Map<string, number>();
+    for (const borrow of overdueBorrows) {
+      this.incrementCount(overdueByWeek, this.getWeekLabel(borrow.dueAt));
+    }
+
+    const finePaymentsByMonth = new Map<string, number>();
+    for (const payment of finePayments) {
+      if (payment.paidAt) {
+        this.incrementCount(finePaymentsByMonth, this.getMonthLabel(payment.paidAt), Number(payment.amount));
+      }
+    }
+
+    const borrowed = this.entriesToLabelsAndValues(borrowedByFaculty);
+    const reservationsWeekly = this.entriesToLabelsAndValues(reservationsByWeek, 12);
+    const overdueWeekly = this.entriesToLabelsAndValues(overdueByWeek, 12);
+    const finesMonthly = this.entriesToLabelsAndValues(finePaymentsByMonth, 12);
+
+    return [
+      '## Admin Analytics Dashboard',
+      '',
+      'These charts use live library database records available to administrators. Empty charts mean there are no matching records for that metric.',
+      '',
+      '### Borrowed Books by Faculty',
+      '',
+      this.graphBlock({
+        schemaVersion: 1,
+        type: 'bar',
+        title: 'Borrowed Books by Faculty',
+        labels: borrowed.labels,
+        values: borrowed.values,
+        xLabel: 'Faculty',
+        yLabel: 'Borrow count',
+      }),
+      '',
+      '### Reservations per Week',
+      '',
+      this.graphBlock({
+        schemaVersion: 1,
+        type: 'bar',
+        title: 'Reservations per Week',
+        labels: reservationsWeekly.labels,
+        values: reservationsWeekly.values,
+        xLabel: 'Week starting',
+        yLabel: 'Reservations',
+      }),
+      '',
+      '### Overdue Books Trend',
+      '',
+      this.graphBlock({
+        schemaVersion: 1,
+        type: 'bar',
+        title: 'Overdue Books by Due Week',
+        labels: overdueWeekly.labels,
+        values: overdueWeekly.values,
+        xLabel: 'Due week starting',
+        yLabel: 'Overdue borrows',
+      }),
+      '',
+      '### Fine Payments by Month',
+      '',
+      this.graphBlock({
+        schemaVersion: 1,
+        type: 'bar',
+        title: 'Fine Payments by Month',
+        labels: finesMonthly.labels,
+        values: finesMonthly.values,
+        xLabel: 'Month',
+        yLabel: 'Amount paid',
+      }),
     ].join('\n');
   }
 
@@ -1536,6 +1678,14 @@ Be concise, practical, and encouraging. Base everything on the book details prov
       return;
     }
 
+    if (user.role === Role.ADMIN && this.isAdminAnalyticsRequest(message)) {
+      const dashboardText = await this.buildAdminAnalyticsDashboardResponse();
+      yield { type: 'text', text: dashboardText };
+      await this.saveMessage(userId, 'user', message, conversationId);
+      await this.saveMessage(userId, 'assistant', dashboardText, conversationId);
+      return;
+    }
+
     // ── Full-recall path ───────────────────────────────────────────────────────
     // Handles: "what did we discuss?", "recall this session", "summarize the chat", etc.
     // Fetches all messages using { userId, conversationId } — never by userId alone.
@@ -1904,9 +2054,6 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     await this.saveMessage(userId, 'assistant', fallback, conversationId);
   }
 }
-
-
-
 
 
 
