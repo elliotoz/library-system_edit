@@ -150,9 +150,13 @@ for non-admin roles.
 
 ### Public and Auth Journeys
 
-- A visitor opens `/`, signs up at `/signup`, verifies email at `/verify-email`, logs in at
-  `/login`, requests a reset at `/forgot-password`, and resets a password at `/reset-password`.
-- Login sets an HttpOnly `access_token` cookie and redirects users to their role dashboard.
+- A new user opens `/`, signs up at `/signup`, and is registered with the
+  default `STUDENT` role.
+- The new student verifies email at `/verify-email`, logs in at `/login`,
+  requests a reset at `/forgot-password`, and resets a password at
+  `/reset-password`.
+- Login sets an HttpOnly `access_token` cookie and redirects users to their
+  role dashboard.
 - The Google sign-in button is shown only when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
   are configured in the backend.
 
