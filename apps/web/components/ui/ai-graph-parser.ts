@@ -167,21 +167,30 @@ export function parseGraphSpec(raw: string): NormalizedGraphSpec | null {
     return null;
   }
 
-  // Pre-normalise: models sometimes use xValues:string[] for bar chart categories
-  // instead of labels. Move xValues → labels so validation passes.
-  if (
-    parsed !== null &&
-    typeof parsed === 'object' &&
-    (parsed as Record<string, unknown>).type === 'bar'
-  ) {
+  // Pre-normalise model-generated chart JSON before Zod validation.
+  // Models often use non-canonical field names that the schema rejects.
+  if (parsed !== null && typeof parsed === 'object') {
     const obj = parsed as Record<string, unknown>;
+
+    // bar + pie: xValues:string[] used as category labels → move to labels
     if (
+      (obj.type === 'bar' || obj.type === 'pie') &&
       Array.isArray(obj.xValues) &&
       obj.xValues.every((v: unknown) => typeof v === 'string') &&
       !obj.labels
     ) {
       obj.labels = obj.xValues;
       delete obj.xValues;
+    }
+
+    // pie: yValues used instead of values → copy to values
+    if (
+      obj.type === 'pie' &&
+      Array.isArray(obj.yValues) &&
+      !obj.values
+    ) {
+      obj.values = obj.yValues;
+      delete obj.yValues;
     }
   }
 
