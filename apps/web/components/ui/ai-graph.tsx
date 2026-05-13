@@ -145,7 +145,7 @@ function buildLayout(spec: NormalizedGraphSpec, dark: boolean): Partial<Plotly.L
   const isPie = spec.type === 'pie';
 
   return {
-    title: spec.title ? { text: spec.title, font: { size: 14 } } : undefined,
+    title: spec.title ? { text: spec.title } : undefined,
     autosize: true,
     width: undefined,
     height: isPie ? 360 : undefined,
@@ -163,7 +163,7 @@ function buildLayout(spec: NormalizedGraphSpec, dark: boolean): Partial<Plotly.L
     },
     showlegend: spec.type === 'multi-function' || isPie,
     legend: isPie
-      ? { orientation: 'h', x: 0.5, xanchor: 'center', y: -0.15, font: { color: dark ? '#e5e7eb' : '#374151' } }
+      ? { orientation: 'h', font: { color: dark ? '#e5e7eb' : '#374151' } }
       : { orientation: 'h', x: 0, y: -0.2, font: { color: dark ? '#e5e7eb' : '#374151' } },
     xaxis: hasCartesianAxes ? {
       title: spec.xLabel ? { text: spec.xLabel } : undefined,
