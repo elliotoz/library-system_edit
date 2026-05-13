@@ -30,6 +30,8 @@ export interface ConversationModelState {
   reason: string | null;
 }
 
+type ConversationMemoryMessage = { role: string; content: string };
+
 export type ChatChunk =
   | { type: 'mode_state'; modeState: AiModeState }
   | { type: 'model_state'; modelState: ConversationModelState }
@@ -188,6 +190,93 @@ export class AgentService {
     return messages
       .map((m) => `${m.role === 'user' ? 'User' : 'OZ'}: ${m.content}`)
       .join('\n');
+  }
+
+  private async getRecentConversationMessages(
+    userId: string,
+    conversationId: string,
+  ): Promise<ConversationMemoryMessage[]> {
+    const rows = await this.prisma.aiMessage.findMany({
+      where: { userId, conversationId },
+      orderBy: { createdAt: 'desc' },
+      take: AgentService.MEMORY_RECALL_LIMITS.recentContextMessages,
+      select: { role: true, content: true },
+    });
+
+    return rows.reverse();
+  }
+
+  private async getRecallMessagesForConversation(
+    userId: string,
+    conversationId: string,
+  ): Promise<{
+    messages: ConversationMemoryMessage[];
+    totalCount: number;
+    truncated: boolean;
+  }> {
+    const totalCount = await this.prisma.aiMessage.count({
+      where: { userId, conversationId },
+    });
+
+    const rows = await this.prisma.aiMessage.findMany({
+      where: { userId, conversationId },
+      orderBy: { createdAt: 'desc' },
+      take: AgentService.MEMORY_RECALL_LIMITS.maxMessagesProcessedPerRecall,
+      select: { role: true, content: true },
+    });
+
+    const messages = rows.reverse();
+
+    return {
+      messages,
+      totalCount,
+      truncated: totalCount > messages.length,
+    };
+  }
+
+  private async completeRecallPrompt(args: {
+    userId: string;
+    conversationId?: string;
+    model: string;
+    messages: Array<{ role: string; content: string }>;
+    maxTokens: number;
+    fallbackText: string;
+  }): Promise<string> {
+    try {
+      const res = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: this.openRouterHeaders,
+        body: JSON.stringify({
+          model: args.model,
+          messages: args.messages,
+          stream: false,
+          max_tokens: args.maxTokens,
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        this.logger.warn(`Recall completion failed (${res.status}): ${errText}`);
+        return AgentService.FINAL_PROVIDER_FAILURE_MESSAGES[res.status] ?? args.fallbackText;
+      }
+
+      const data = await res.json() as {
+        choices: Array<{ message: { content: string | null } }>;
+        usage?: { prompt_tokens: number; completion_tokens: number };
+      };
+
+      this.tokenTrackerService.record(args.userId, args.conversationId, {
+        provider: 'openrouter',
+        model: args.model,
+        inputTokens: data.usage?.prompt_tokens ?? 0,
+        outputTokens: data.usage?.completion_tokens ?? 0,
+      });
+
+      return data.choices[0]?.message?.content?.trim() || args.fallbackText;
+    } catch (err) {
+      this.logger.warn(`Recall completion error: ${String(err)}`);
+      return args.fallbackText;
+    }
   }
 
   private detectResponseIntent(message: string): ResponseIntent {
@@ -1367,12 +1456,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     // When a conversationId is present, fetch the last 50 messages from PostgreSQL.
     // The frontend-supplied history array is only used as a fallback for conversations without an ID.
     const dbHistory = conversationId
-      ? await this.prisma.aiMessage.findMany({
-          where: { userId, conversationId },
-          orderBy: { createdAt: 'asc' },
-          take: AgentService.MEMORY_RECALL_LIMITS.recentContextMessages,
-          select: { role: true, content: true },
-        })
+      ? await this.getRecentConversationMessages(userId, conversationId)
       : history;
 
     const storedModeState = this.buildConversationModeState(conversation ?? {});
@@ -1435,14 +1519,11 @@ Be concise, practical, and encouraging. Base everything on the book details prov
       } = AgentService.MEMORY_RECALL_LIMITS;
 
       const recallStart = Date.now();
-
-      const allMessages = await this.prisma.aiMessage.findMany({
-        where: { userId, conversationId },
-        orderBy: { createdAt: 'asc' },
-        select: { role: true, content: true },
-      });
-
-      const totalCount = allMessages.length;
+      const {
+        messages: processedMessages,
+        totalCount,
+        truncated,
+      } = await this.getRecallMessagesForConversation(userId, conversationId);
 
       if (totalCount === 0) {
         const noHistoryText = 'There are no saved messages in this conversation yet.';
@@ -1452,13 +1533,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
         return;
       }
 
-      // Apply hard cap — process only the most recent 300 messages
-      let processedMessages = allMessages;
-      let truncated = false;
-
-      if (totalCount > maxMessagesProcessedPerRecall) {
-        processedMessages = allMessages.slice(-maxMessagesProcessedPerRecall);
-        truncated = true;
+      if (truncated) {
         this.logger.warn(
           `[recall] userId=${userId} convId=${conversationId} totalMessages=${totalCount} truncatedTo=${maxMessagesProcessedPerRecall}`,
         );
@@ -1479,24 +1554,17 @@ Be concise, practical, and encouraging. Base everything on the book details prov
           `The user asked to recall this conversation. Full message history:\n\n${formatted}` +
           `${truncationNote}\n\nProvide a clear, concise summary of what was discussed.`;
 
-        const recallRes = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
-          method: 'POST',
-          headers: this.openRouterHeaders,
-          body: JSON.stringify({
-            model: modelState.activeModel ?? OPENROUTER_MODELS.CHEAP,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: recallPrompt },
-            ],
-            stream: false,
-            max_tokens: maxFinalSummaryTokens,
-          }),
+        const recallText = await this.completeRecallPrompt({
+          userId,
+          conversationId,
+          model: modelState.activeModel ?? OPENROUTER_MODELS.CHEAP,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: recallPrompt },
+          ],
+          maxTokens: maxFinalSummaryTokens,
+          fallbackText: 'I was unable to retrieve the conversation history right now.',
         });
-
-        const recallText = recallRes.ok
-          ? ((await recallRes.json() as { choices: Array<{ message: { content: string | null } }> })
-              .choices[0]?.message?.content?.trim() ?? 'I was unable to generate a summary.')
-          : 'I was unable to retrieve the conversation history right now.';
 
         this.logger.log(
           `[recall] mode=direct completed userId=${userId} convId=${conversationId} durationMs=${Date.now() - recallStart}`,
@@ -1534,27 +1602,20 @@ Be concise, practical, and encouraging. Base everything on the book details prov
           `Summarize this portion of a conversation (part ${i + 1} of ${chunksToProcess.length}). ` +
           `Be concise. Do not add information not present in the messages:\n\n${chunkText}`;
 
-        const chunkRes = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
-          method: 'POST',
-          headers: this.openRouterHeaders,
-          body: JSON.stringify({
-            model: modelState.activeModel ?? OPENROUTER_MODELS.CHEAP,
-            messages: [
-              {
-                role: 'system',
-                content: 'You summarize sections of a conversation accurately and concisely. Never add information not present in the provided messages.',
-              },
-              { role: 'user', content: chunkPrompt },
-            ],
-            stream: false,
-            max_tokens: maxSummaryTokensPerChunk,
-          }),
+        const chunkSummary = await this.completeRecallPrompt({
+          userId,
+          conversationId,
+          model: modelState.activeModel ?? OPENROUTER_MODELS.CHEAP,
+          messages: [
+            {
+              role: 'system',
+              content: 'You summarize sections of a conversation accurately and concisely. Never add information not present in the provided messages.',
+            },
+            { role: 'user', content: chunkPrompt },
+          ],
+          maxTokens: maxSummaryTokensPerChunk,
+          fallbackText: `[Part ${i + 1}: summary unavailable]`,
         });
-
-        const chunkSummary = chunkRes.ok
-          ? ((await chunkRes.json() as { choices: Array<{ message: { content: string | null } }> })
-              .choices[0]?.message?.content?.trim() ?? `[Part ${i + 1}: summary unavailable]`)
-          : `[Part ${i + 1}: summary unavailable]`;
 
         chunkSummaries.push(`[Part ${i + 1}] ${chunkSummary}`);
         this.logger.log(
@@ -1567,24 +1628,17 @@ Be concise, practical, and encouraging. Base everything on the book details prov
         `Here are the summaries of each part:\n\n${chunkSummaries.join('\n\n')}` +
         `${truncationNote}\n\nProvide a coherent final summary of what was discussed across all parts.`;
 
-      const finalRes = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: this.openRouterHeaders,
-        body: JSON.stringify({
-          model: modelState.activeModel ?? OPENROUTER_MODELS.CHEAP,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: finalPrompt },
-          ],
-          stream: false,
-          max_tokens: maxFinalSummaryTokens,
-        }),
+      const finalText = await this.completeRecallPrompt({
+        userId,
+        conversationId,
+        model: modelState.activeModel ?? OPENROUTER_MODELS.CHEAP,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: finalPrompt },
+        ],
+        maxTokens: maxFinalSummaryTokens,
+        fallbackText: 'I was unable to combine the conversation summaries right now.',
       });
-
-      const finalText = finalRes.ok
-        ? ((await finalRes.json() as { choices: Array<{ message: { content: string | null } }> })
-            .choices[0]?.message?.content?.trim() ?? 'I was unable to generate a final summary.')
-        : 'I was unable to combine the conversation summaries right now.';
 
       this.logger.log(
         `[recall] mode=chunked completed userId=${userId} convId=${conversationId} chunks=${chunksToProcess.length} durationMs=${Date.now() - recallStart}`,
@@ -1818,10 +1872,6 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     await this.saveMessage(userId, 'assistant', fallback, conversationId);
   }
 }
-
-
-
-
 
 
 
