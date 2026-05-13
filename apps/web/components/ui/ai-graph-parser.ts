@@ -167,6 +167,24 @@ export function parseGraphSpec(raw: string): NormalizedGraphSpec | null {
     return null;
   }
 
+  // Pre-normalise: models sometimes use xValues:string[] for bar chart categories
+  // instead of labels. Move xValues → labels so validation passes.
+  if (
+    parsed !== null &&
+    typeof parsed === 'object' &&
+    (parsed as Record<string, unknown>).type === 'bar'
+  ) {
+    const obj = parsed as Record<string, unknown>;
+    if (
+      Array.isArray(obj.xValues) &&
+      obj.xValues.every((v: unknown) => typeof v === 'string') &&
+      !obj.labels
+    ) {
+      obj.labels = obj.xValues;
+      delete obj.xValues;
+    }
+  }
+
   const result = graphSchema.safeParse(parsed);
   if (!result.success) return null;
 

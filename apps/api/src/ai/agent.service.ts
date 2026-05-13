@@ -1129,7 +1129,7 @@ Be concise, practical, and encouraging. Base everything on the book details prov
           function: {
             name: 'get_most_borrowed_categories',
             description:
-              'Returns a chart showing which book categories are borrowed most, grouped by category. Use when the user asks about popular categories, genres, or subject areas.',
+              'Returns a chart showing which book categories, genres, subject areas, topics, or disciplines are borrowed most, grouped by category. Use when the user asks about popular categories, genres, subject areas, borrowing trends by topic, which fields of study are most popular, or what subjects students read most.',
             parameters: {
               type: 'object',
               properties: {
