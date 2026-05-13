@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { evaluate } from 'mathjs';
 import { NormalizedGraphSpec, parseGraphSpec } from './ai-graph-parser';
@@ -8,6 +8,16 @@ import { NormalizedGraphSpec, parseGraphSpec } from './ai-graph-parser';
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 const MAX_SAMPLES = 500;
+const PIE_MARKER_COLORS = [
+  '#14b8a6',
+  '#8b5cf6',
+  '#f59e0b',
+  '#ef4444',
+  '#3b82f6',
+  '#22c55e',
+  '#ec4899',
+];
+
 function sampleFunction(expr: string, xMin: number, xMax: number): { x: number[]; y: number[] } {
   const x: number[] = [];
   const y: number[] = [];
@@ -34,6 +44,9 @@ interface AIGraphProps {
 export function AIGraph({ raw }: AIGraphProps) {
   const spec = useMemo(() => parseGraphSpec(raw), [raw]);
   const [dark, setDark] = useState(false);
+  const [renderError, setRenderError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const graphDivRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setDark(document.documentElement.classList.contains('dark'));
@@ -49,22 +62,95 @@ export function AIGraph({ raw }: AIGraphProps) {
     return buildTraces(spec);
   }, [spec]);
 
+  const hasCartesianAxes = spec?.type !== 'pie';
+  const isPie = spec?.type === 'pie';
+  const layout: Partial<Plotly.Layout> | null = useMemo(() => {
+    if (!spec) return null;
+    return buildLayout(spec, dark);
+  }, [dark, spec]);
+
+  useEffect(() => {
+    if (!spec || !layout) return;
+    if (process.env.NODE_ENV === 'production' && typeof window !== 'undefined' && !window.localStorage.getItem('oz-ai-graph-debug')) {
+      return;
+    }
+
+    console.debug('[OZ AIGraph]', {
+      raw,
+      parsedGraphSpec: parseGraphSpec(raw),
+      normalizedGraphSpec: spec,
+      plotlyDataTraces: traces,
+      plotlyLayout: layout,
+    });
+  }, [layout, raw, spec, traces]);
+
+  useEffect(() => {
+    if (!containerRef.current || typeof ResizeObserver === 'undefined') return;
+
+    const observer = new ResizeObserver(() => {
+      if (graphDivRef.current) resizePlot(graphDivRef.current);
+    });
+    observer.observe(containerRef.current);
+
+    return () => observer.disconnect();
+  }, []);
+
   if (!spec || traces.length === 0) {
     return (
-      <pre className="bg-gray-100 dark:bg-white/[0.06] rounded p-3 text-xs font-mono overflow-x-auto whitespace-pre-wrap text-gray-600 dark:text-gray-400">
-        {raw}
-      </pre>
+      <div className="my-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
+        <p className="mb-2 font-semibold">Graph could not render.</p>
+        <p className="mb-2">{spec ? 'No valid Plotly traces were generated.' : 'Graph JSON did not pass validation.'}</p>
+        <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-[11px] text-amber-900 dark:text-amber-100">
+          {raw}
+        </pre>
+      </div>
     );
   }
 
+  if (renderError) {
+    return (
+      <div className="my-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
+        <p className="mb-2 font-semibold">Graph could not render.</p>
+        <p>{renderError}</p>
+      </div>
+    );
+  }
+
+  const plotLayout = layout ?? {};
+
+  return (
+    <div ref={containerRef} className="my-3 min-h-[320px] rounded-lg border border-gray-200 dark:border-white/10 overflow-hidden">
+      <Plot
+        data={traces}
+        layout={plotLayout}
+        config={{ responsive: true, displayModeBar: true, displaylogo: false }}
+        style={{ width: '100%', height: isPie ? 360 : 320, minHeight: isPie ? 360 : 260 }}
+        useResizeHandler
+        onInitialized={(_, graphDiv) => {
+          graphDivRef.current = graphDiv;
+          resizePlot(graphDiv);
+        }}
+        onUpdate={(_, graphDiv) => {
+          graphDivRef.current = graphDiv;
+          resizePlot(graphDiv);
+        }}
+        onError={(error) => setRenderError(error.message)}
+      />
+    </div>
+  );
+}
+
+function buildLayout(spec: NormalizedGraphSpec, dark: boolean): Partial<Plotly.Layout> {
   const hasCartesianAxes = spec.type !== 'pie';
   const isPie = spec.type === 'pie';
-  const layout: Partial<Plotly.Layout> = {
+
+  return {
     title: spec.title ? { text: spec.title, font: { size: 14 } } : undefined,
     autosize: true,
-    height: isPie ? 320 : undefined,
+    width: undefined,
+    height: isPie ? 360 : undefined,
     margin: isPie
-      ? { t: spec.title ? 44 : 24, r: 20, b: 64, l: 20 }
+      ? { t: spec.title ? 48 : 24, r: 24, b: 72, l: 24 }
       : { t: spec.title ? 40 : 20, r: 20, b: 40, l: 50 },
     paper_bgcolor: 'transparent',
     plot_bgcolor: 'transparent',
@@ -92,22 +178,20 @@ export function AIGraph({ raw }: AIGraphProps) {
       zerolinecolor: dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
     } : undefined,
   };
+}
 
-  return (
-    <div className="my-3 rounded-lg border border-gray-200 dark:border-white/10 overflow-hidden">
-      <Plot
-        data={traces}
-        layout={layout}
-        config={{ responsive: true, displayModeBar: true, displaylogo: false }}
-        style={{ width: '100%', minHeight: isPie ? 320 : 260 }}
-        useResizeHandler
-      />
-    </div>
-  );
+function resizePlot(_graphDiv: Readonly<HTMLElement>): void {
+  window.requestAnimationFrame(() => {
+    window.dispatchEvent(new Event('resize'));
+  });
 }
 
 export function buildGraphTracesForTest(spec: NormalizedGraphSpec): Plotly.Data[] {
   return buildTraces(spec);
+}
+
+export function buildGraphLayoutForTest(spec: NormalizedGraphSpec, dark = false): Partial<Plotly.Layout> {
+  return buildLayout(spec, dark);
 }
 
 function buildTraces(spec: NormalizedGraphSpec): Plotly.Data[] {
@@ -159,6 +243,8 @@ function buildTraces(spec: NormalizedGraphSpec): Plotly.Data[] {
       labels: spec.labels,
       values: pieValues,
       name: spec.title ?? 'Proportion',
+      marker: { colors: PIE_MARKER_COLORS },
+      opacity: 1,
       textinfo: 'label+percent',
       hoverinfo: 'label+value+percent',
     } as Plotly.Data];
