@@ -114,6 +114,14 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Never mix different conversations');
   });
 
+  it('instructs the model to call get_material_outline for chapter and structure questions', () => {
+    const prompt = buildSystemPrompt(baseContext);
+
+    expect(prompt).toContain('how many chapters or sections it has');
+    expect(prompt).toContain('get_material_outline');
+    expect(prompt).toContain('NEVER refuse this type of question without first calling get_material_outline');
+  });
+
   it('refuses non-admin admin analytics data instead of inventing it', () => {
     const prompt = buildSystemPrompt(baseContext);
 
