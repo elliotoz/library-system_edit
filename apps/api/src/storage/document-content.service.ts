@@ -3,14 +3,27 @@ import * as mammoth from "mammoth";
 import * as path from "path";
 import { StorageService } from "./storage.service";
 
-interface PdfParseTextResult {
+interface PdfParsePageResult {
+  num: number;
   text: string;
-  numpages?: number;
 }
 
-type PdfParseFunction = (buffer: Buffer) => Promise<PdfParseTextResult>;
+interface PdfParseTextResult {
+  text: string;
+  total: number;
+  pages: PdfParsePageResult[];
+}
 
-let pdfParseFn: PdfParseFunction | null = null;
+interface PdfParseInstance {
+  getText(options?: { pageJoiner?: string }): Promise<PdfParseTextResult>;
+  destroy(): Promise<void>;
+}
+
+type PdfParseConstructor = new (options: {
+  data: Uint8Array;
+}) => PdfParseInstance;
+
+let pdfParseCtor: PdfParseConstructor | null = null;
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const WordExtractor = require("word-extractor");
 
@@ -94,25 +107,24 @@ function ensurePdfRuntimePolyfills(): void {
   }
 }
 
-function getPdfParseFunction(): PdfParseFunction {
-  if (!pdfParseFn) {
+function getPdfParseCtor(): PdfParseConstructor {
+  if (!pdfParseCtor) {
     ensurePdfRuntimePolyfills();
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParseModule = require("pdf-parse") as
-      | PdfParseFunction
-      | { default?: PdfParseFunction };
+    const pdfParseModule = require("pdf-parse") as {
+      PDFParse?: PdfParseConstructor;
+      default?: { PDFParse?: PdfParseConstructor };
+    };
 
-    pdfParseFn =
-      typeof pdfParseModule === "function"
-        ? pdfParseModule
-        : pdfParseModule.default ?? null;
+    pdfParseCtor =
+      pdfParseModule.PDFParse ?? pdfParseModule.default?.PDFParse ?? null;
 
-    if (!pdfParseFn) {
-      throw new Error("Unable to load pdf-parse function");
+    if (!pdfParseCtor) {
+      throw new Error("Unable to load PDFParse constructor from pdf-parse");
     }
   }
 
-  return pdfParseFn;
+  return pdfParseCtor;
 }
 
 const MIN_BLOCK_CHARS = 30;
@@ -176,16 +188,38 @@ export class DocumentContentService {
   }
 
   private async extractPdf(buffer: Buffer): Promise<ExtractedDocument> {
-    const parsePdf = getPdfParseFunction();
-    const result = await parsePdf(buffer);
-    const paragraphs = this.toParagraphs(result.text);
+    const PDFParse = getPdfParseCtor();
+    const parser = new PDFParse({ data: new Uint8Array(buffer) });
 
-    return {
-      text: paragraphs.map((p) => p.text).join("\n\n"),
-      pageCount: result.numpages ?? null,
-      paragraphs,
-      sourceType: "pdf",
-    };
+    try {
+      const result = await parser.getText({ pageJoiner: "\f" });
+      const pages = result.pages?.length
+        ? result.pages
+        : result.text
+            .split("\f")
+            .map((text, index) => ({ num: index + 1, text }));
+      const paragraphs: ExtractedParagraph[] = [];
+
+      for (const page of pages) {
+        const rawParagraphs = page.text.split(/\n{2,}/);
+
+        for (const raw of rawParagraphs) {
+          const cleanText = this.cleanTextBlock(raw);
+          if (cleanText.length >= MIN_BLOCK_CHARS) {
+            paragraphs.push({ text: cleanText, pageNumber: page.num });
+          }
+        }
+      }
+
+      return {
+        text: paragraphs.map((p) => p.text).join("\n\n"),
+        pageCount: result.total ?? pages.length ?? null,
+        paragraphs,
+        sourceType: "pdf",
+      };
+    } finally {
+      await parser.destroy().catch(() => undefined);
+    }
   }
 
   private async extractDocx(buffer: Buffer): Promise<ExtractedDocument> {
