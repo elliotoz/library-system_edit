@@ -193,6 +193,11 @@ export class AgentService {
     return /\bmost borrowed\b/.test(lower) && /\bcategor(?:y|ies)\b/.test(lower);
   }
 
+  private isMostBorrowedBookRequest(message: string): boolean {
+    const lower = message.toLowerCase();
+    return /\bmost borrowed\b/.test(lower) && /\bbooks?\b/.test(lower) && !this.isMostBorrowedCategoryRequest(message);
+  }
+
   private buildAdminAnalyticsDeniedResponse(role: Role): string {
     const roleLabel = role.toLowerCase();
     return [
@@ -227,9 +232,17 @@ export class AgentService {
     map: Map<string, number>,
     limit?: number,
     emptyLabel = 'No records',
+    sortBy: 'label' | 'valueDesc' = 'label',
   ): { labels: string[]; values: number[]; isEmpty: boolean } {
-    const entries = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-    const selected = typeof limit === 'number' ? entries.slice(-limit) : entries;
+    const entries = Array.from(map.entries()).sort(([aLabel, aValue], [bLabel, bValue]) => {
+      if (sortBy === 'valueDesc') {
+        return bValue - aValue || aLabel.localeCompare(bLabel);
+      }
+      return aLabel.localeCompare(bLabel);
+    });
+    const selected = typeof limit === 'number'
+      ? sortBy === 'valueDesc' ? entries.slice(0, limit) : entries.slice(-limit)
+      : entries;
 
     if (selected.length === 0) {
       return { labels: [emptyLabel], values: [0], isEmpty: true };
@@ -383,7 +396,7 @@ export class AgentService {
       this.incrementCount(categories, borrow.bookCopy.book.category ?? 'Uncategorized');
     }
 
-    const chart = this.entriesToLabelsAndValues(categories, 12, 'No borrowed categories');
+    const chart = this.entriesToLabelsAndValues(categories, 12, 'No borrowed categories', 'valueDesc');
 
     return [
       '## Most Borrowed Book Categories',
@@ -399,6 +412,47 @@ export class AgentService {
         labels: chart.labels,
         values: chart.values,
         xLabel: 'Category',
+        yLabel: 'Borrow count',
+      }),
+    ].join('\n');
+  }
+
+  private async buildMostBorrowedBooksDashboardResponse(): Promise<string> {
+    const borrows = await this.prisma.borrow.findMany({
+      include: {
+        bookCopy: {
+          include: {
+            book: { select: { title: true } },
+          },
+        },
+      },
+    });
+
+    const books = new Map<string, number>();
+    for (const borrow of borrows) {
+      this.incrementCount(books, borrow.bookCopy.book.title);
+    }
+
+    const chart = this.entriesToLabelsAndValues(books, 12, 'No borrowed books', 'valueDesc');
+    const maxBorrowCount = chart.isEmpty ? 0 : Math.max(...chart.values);
+    const topTitles = chart.labels.filter((_, index) => chart.values[index] === maxBorrowCount && maxBorrowCount > 0);
+
+    return [
+      '## Most Borrowed Books',
+      '',
+      'This chart uses live borrow records grouped by exact book title.',
+      '',
+      chart.isEmpty
+        ? this.emptyChartNote('borrowed book', true)
+        : `Most borrowed title${topTitles.length === 1 ? '' : 's'}: ${topTitles.map((title) => `**${title}**`).join(', ')} (${maxBorrowCount} borrow${maxBorrowCount === 1 ? '' : 's'}).`,
+      '',
+      this.graphBlock({
+        schemaVersion: 1,
+        type: 'bar',
+        title: 'Most Borrowed Books',
+        labels: chart.labels,
+        values: chart.values,
+        xLabel: 'Book title',
         yLabel: 'Borrow count',
       }),
     ].join('\n');
@@ -1742,9 +1796,14 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     }
 
     if (user.role === Role.ADMIN && this.isAdminAnalyticsRequest(message)) {
-      const dashboardText = this.isMostBorrowedCategoryRequest(message)
-        ? await this.buildMostBorrowedCategoryDashboardResponse()
-        : await this.buildAdminAnalyticsDashboardResponse();
+      let dashboardText: string;
+      if (this.isMostBorrowedCategoryRequest(message)) {
+        dashboardText = await this.buildMostBorrowedCategoryDashboardResponse();
+      } else if (this.isMostBorrowedBookRequest(message)) {
+        dashboardText = await this.buildMostBorrowedBooksDashboardResponse();
+      } else {
+        dashboardText = await this.buildAdminAnalyticsDashboardResponse();
+      }
       yield { type: 'text', text: dashboardText };
       await this.saveMessage(userId, 'user', message, conversationId);
       await this.saveMessage(userId, 'assistant', dashboardText, conversationId);
@@ -2119,5 +2178,3 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     await this.saveMessage(userId, 'assistant', fallback, conversationId);
   }
 }
-
-

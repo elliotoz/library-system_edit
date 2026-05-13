@@ -464,7 +464,7 @@ trend, and fine-payment dashboard requests instead of showing sample or
 placeholder admin data. For admins, OZ can generate a live analytics
 dashboard with graph blocks for borrowed books by faculty, reservations per
 week, overdue trends, fine payments by month, and most-borrowed book
-categories.
+categories or exact book titles.
 
 ### Python Scientific Runner
 

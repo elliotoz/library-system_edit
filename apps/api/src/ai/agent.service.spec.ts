@@ -144,6 +144,44 @@ function makeMostBorrowedCategoryPrisma() {
   };
 }
 
+function makeMostBorrowedBooksPrisma() {
+  return {
+    user: {
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'admin-1',
+        name: 'Admin',
+        role: Role.ADMIN,
+        interests: [],
+        courses: [],
+        faculty: null,
+        borrows: [],
+      }),
+    },
+    borrowPolicy: {
+      findUnique: jest.fn().mockResolvedValue({
+        maxActiveBorrows: 20,
+        maxBorrowDays: 30,
+        maxExtensions: 3,
+      }),
+    },
+    book: { count: jest.fn().mockResolvedValue(5) },
+    bookCopy: { count: jest.fn().mockResolvedValue(67) },
+    readingList: { count: jest.fn().mockResolvedValue(2) },
+    aiMessage: {
+      create: jest.fn().mockResolvedValue({}),
+    },
+    borrow: {
+      findMany: jest.fn().mockResolvedValue([
+        { bookCopy: { book: { title: 'Clean Architecture' } } },
+        { bookCopy: { book: { title: 'Design Patterns' } } },
+        { bookCopy: { book: { title: 'Clean Architecture' } } },
+        { bookCopy: { book: { title: 'Introduction to Algorithms' } } },
+        { bookCopy: { book: { title: 'Design Patterns' } } },
+      ]),
+    },
+  };
+}
+
 describe('AgentService read_ebook', () => {
   it('reads managed local PDFs through the book document service', async () => {
     const prisma = {};
@@ -348,6 +386,14 @@ describe('AgentService admin analytics authorization', () => {
     expect(service['isMostBorrowedCategoryRequest']('Show a dashboard graph of most borrowed book categories')).toBe(true);
   });
 
+  it('detects most-borrowed book dashboard requests separately from category requests', () => {
+    const service = makeAgentService();
+
+    expect(service['isAdminAnalyticsRequest']('Show the most borrowed book')).toBe(true);
+    expect(service['isMostBorrowedBookRequest']('Show the most borrowed book')).toBe(true);
+    expect(service['isMostBorrowedCategoryRequest']('Show the most borrowed book')).toBe(false);
+  });
+
   it('denies student admin analytics requests before calling the model', async () => {
     const fetchSpy = jest.spyOn(global, 'fetch');
     const prisma = makeChatPrisma(Role.STUDENT);
@@ -453,6 +499,45 @@ describe('AgentService admin analytics authorization', () => {
     expect(response).toContain('## Most Borrowed Book Categories');
     expect(response).toContain('"title": "Most Borrowed Book Categories"');
     expect(response).toContain('"Computer Science"');
+    expect(response).not.toContain('Reservations per Week');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(prisma.borrow.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns exact most-borrowed book titles and includes ties', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    const prisma = makeMostBorrowedBooksPrisma();
+    const service = makeAgentService({
+      prisma,
+      materialSearch: { countAccessibleIndexedMaterials: jest.fn().mockResolvedValue(1) },
+    });
+
+    const chunks: unknown[] = [];
+    for await (const chunk of service.chatStream(
+      'admin-1',
+      'Show the most borrowed book',
+      [],
+      false,
+      null,
+      '',
+    )) {
+      chunks.push(chunk);
+    }
+
+    const response = chunks
+      .filter((chunk): chunk is { type: 'text'; text: string } =>
+        typeof chunk === 'object' && chunk !== null && (chunk as { type?: string }).type === 'text',
+      )
+      .map((chunk) => chunk.text)
+      .join('\n');
+
+    expect(response).toContain('## Most Borrowed Books');
+    expect(response).toContain('**Clean Architecture**');
+    expect(response).toContain('**Design Patterns**');
+    expect(response).toContain('(2 borrows)');
+    expect(response).toContain('"title": "Most Borrowed Books"');
+    expect(response).toContain('"Clean Architecture"');
+    expect(response).toContain('"Design Patterns"');
     expect(response).not.toContain('Reservations per Week');
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(prisma.borrow.findMany).toHaveBeenCalledTimes(1);
