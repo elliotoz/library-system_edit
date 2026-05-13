@@ -53,7 +53,7 @@ describe('AIGraph trace generation', () => {
     const layout = buildGraphLayoutForTest(spec!);
 
     expect(layout).toMatchObject({
-      title: { text: 'Library Users' },
+      title: 'Library Users',
       autosize: true,
       height: 360,
       paper_bgcolor: 'transparent',
@@ -65,6 +65,8 @@ describe('AIGraph trace generation', () => {
     });
     expect(layout.legend).not.toHaveProperty('xanchor');
     expect(layout.legend).not.toHaveProperty('yanchor');
+    expect(layout).not.toHaveProperty('hovermode');
+    expect(layout).not.toHaveProperty('hoverlabel');
     expect(layout.xaxis).toBeUndefined();
     expect(layout.yaxis).toBeUndefined();
   });

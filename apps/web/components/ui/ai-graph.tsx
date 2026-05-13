@@ -17,6 +17,7 @@ const PIE_MARKER_COLORS = [
   '#22c55e',
   '#ec4899',
 ];
+const PLOTLY_CONFIG: Partial<Plotly.Config> = { responsive: true, displayModeBar: true, displaylogo: false };
 
 function sampleFunction(expr: string, xMin: number, xMax: number): { x: number[]; y: number[] } {
   const x: number[] = [];
@@ -62,7 +63,6 @@ export function AIGraph({ raw }: AIGraphProps) {
     return buildTraces(spec);
   }, [spec]);
 
-  const hasCartesianAxes = spec?.type !== 'pie';
   const isPie = spec?.type === 'pie';
   const layout: Partial<Plotly.Layout> | null = useMemo(() => {
     if (!spec) return null;
@@ -81,6 +81,7 @@ export function AIGraph({ raw }: AIGraphProps) {
       normalizedGraphSpec: spec,
       plotlyDataTraces: traces,
       plotlyLayout: layout,
+      plotlyConfig: PLOTLY_CONFIG,
     });
   }, [layout, raw, spec, traces]);
 
@@ -123,7 +124,7 @@ export function AIGraph({ raw }: AIGraphProps) {
       <Plot
         data={traces}
         layout={plotLayout}
-        config={{ responsive: true, displayModeBar: true, displaylogo: false }}
+        config={PLOTLY_CONFIG}
         style={{ width: '100%', height: isPie ? 360 : 320, minHeight: isPie ? 360 : 260 }}
         useResizeHandler
         onInitialized={(_, graphDiv) => {
@@ -141,42 +142,52 @@ export function AIGraph({ raw }: AIGraphProps) {
 }
 
 function buildLayout(spec: NormalizedGraphSpec, dark: boolean): Partial<Plotly.Layout> {
-  const hasCartesianAxes = spec.type !== 'pie';
-  const isPie = spec.type === 'pie';
+  if (spec.type === 'pie') {
+    return buildPieLayout(spec, dark);
+  }
 
   return {
     title: spec.title ? { text: spec.title } : undefined,
     autosize: true,
     width: undefined,
-    height: isPie ? 360 : undefined,
-    margin: isPie
-      ? { t: spec.title ? 48 : 24, r: 24, b: 72, l: 24 }
-      : { t: spec.title ? 40 : 20, r: 20, b: 40, l: 50 },
+    margin: { t: spec.title ? 40 : 20, r: 20, b: 40, l: 50 },
     paper_bgcolor: 'transparent',
     plot_bgcolor: 'transparent',
     font: { size: 11, color: dark ? '#e5e7eb' : '#374151' },
-    hovermode: hasCartesianAxes ? 'closest' : undefined,
+    hovermode: 'closest',
     hoverlabel: {
       bgcolor: dark ? '#111827' : '#ffffff',
       bordercolor: dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)',
       font: { color: dark ? '#f9fafb' : '#111827' },
     },
-    showlegend: spec.type === 'multi-function' || isPie,
-    legend: isPie
-      ? { orientation: 'h', font: { color: dark ? '#e5e7eb' : '#374151' } }
-      : { orientation: 'h', x: 0, y: -0.2, font: { color: dark ? '#e5e7eb' : '#374151' } },
-    xaxis: hasCartesianAxes ? {
+    showlegend: spec.type === 'multi-function',
+    legend: { orientation: 'h', x: 0, y: -0.2, font: { color: dark ? '#e5e7eb' : '#374151' } },
+    xaxis: {
       title: spec.xLabel ? { text: spec.xLabel } : undefined,
       range: spec.xMin !== undefined && spec.xMax !== undefined ? [spec.xMin, spec.xMax] : undefined,
       gridcolor: dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
       zerolinecolor: dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
-    } : undefined,
-    yaxis: hasCartesianAxes ? {
+    },
+    yaxis: {
       title: spec.yLabel ? { text: spec.yLabel } : undefined,
       range: spec.yMin !== undefined && spec.yMax !== undefined ? [spec.yMin, spec.yMax] : undefined,
       gridcolor: dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
       zerolinecolor: dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
-    } : undefined,
+    },
+  };
+}
+
+function buildPieLayout(spec: NormalizedGraphSpec, dark: boolean): Partial<Plotly.Layout> {
+  return {
+    title: spec.title as unknown as Plotly.Layout['title'],
+    autosize: true,
+    height: 360,
+    margin: { t: spec.title ? 48 : 24, r: 24, b: 72, l: 24 },
+    paper_bgcolor: 'transparent',
+    plot_bgcolor: 'transparent',
+    font: { color: dark ? '#e5e7eb' : '#374151' },
+    showlegend: true,
+    legend: { orientation: 'h' },
   };
 }
 
