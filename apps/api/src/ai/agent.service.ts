@@ -612,6 +612,16 @@ export class AgentService {
     }
   }
 
+  private extractStudyMaterialId(history: ConversationMemoryMessage[]): string | null {
+    for (const msg of history) {
+      if (msg.role === 'assistant') {
+        const match = /<!--\s*oz-material-id:\s*([a-zA-Z0-9_-]+)\s*-->/.exec(msg.content);
+        if (match) return match[1];
+      }
+    }
+    return null;
+  }
+
   private detectResponseIntent(message: string): ResponseIntent {
     const lower = message.toLowerCase();
     if (/explain|summarize|describe|analyze|analyse|elaborate|break.?down|why is/.test(lower)) {
@@ -1061,9 +1071,10 @@ Be concise, accurate, and educational. Base the guide only on the material metad
         `Ask me to explain a section, create quiz questions, build flashcards, or make a study plan for this material.`;
     }
 
-    await this.saveMessage(userId, 'assistant', studyGuide, conv.id);
+    const studyGuideWithRef = `<!-- oz-material-id: ${materialId} -->\n${studyGuide}`;
+    await this.saveMessage(userId, 'assistant', studyGuideWithRef, conv.id);
 
-    return { conversationId: conv.id, openingMessage: studyGuide };
+    return { conversationId: conv.id, openingMessage: studyGuideWithRef };
   }
 
   async updateConversationMode(id: string, userId: string, requestedManualModes?: string[] | string): Promise<void> {
@@ -2011,7 +2022,11 @@ Be concise, accurate, and educational. Base the guide only on the material metad
     });
     let modelState = this.resolveModelSelection(message, hasImage, manualModel, !!conversation?.studyBookId);
 
-    const systemPrompt = `${buildModeInstructionBlock(modeState.activeModes)}${buildSystemPromptFromModule(promptContext)}`;
+    const studyMaterialId = this.extractStudyMaterialId(dbHistory);
+    const materialStudyBlock = studyMaterialId
+      ? `\n\n## Active Material Study Session\n\nThis conversation is a dedicated study session for a specific indexed academic material. The material ID is \`${studyMaterialId}\`. When the user asks about chapters, sections, table of contents, outline, structure, or any question about what the material covers, call \`get_material_outline\` with \`materialId: "${studyMaterialId}"\`. Do not refuse these questions — always call the tool first.`
+      : '';
+    const systemPrompt = `${buildModeInstructionBlock(modeState.activeModes)}${buildSystemPromptFromModule(promptContext)}${materialStudyBlock}`;
 
     if (conversationId) {
       const updateData: Record<string, unknown> = {

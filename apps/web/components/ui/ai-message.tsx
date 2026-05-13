@@ -70,7 +70,8 @@ interface AIMessageProps {
 }
 
 export function AIMessage({ content }: AIMessageProps) {
-  const normalizedContent = normalizeMathDelimiters(normalizeGraphJsonBlocks(content));
+  const stripped = content.replace(/<!--\s*oz-\w[^>]*-->\n?/g, '');
+  const normalizedContent = normalizeMathDelimiters(normalizeGraphJsonBlocks(stripped));
 
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none leading-relaxed ai-message">
