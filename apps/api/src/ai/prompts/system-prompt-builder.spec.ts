@@ -114,6 +114,13 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Never mix different conversations');
   });
 
+  it('refuses non-admin admin analytics data instead of inventing it', () => {
+    const prompt = buildSystemPrompt(baseContext);
+
+    expect(prompt).toContain('Only ADMIN users may receive admin dashboards');
+    expect(prompt).toContain('do not provide sample, placeholder, or invented admin data');
+  });
+
   it('preserves library tool rules when scientific output is enabled', () => {
     const prompt = buildSystemPrompt({ ...baseContext, scientificOutput: true });
 

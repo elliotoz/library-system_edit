@@ -175,6 +175,30 @@ export class AgentService {
     );
   }
 
+  private isAdminAnalyticsRequest(message: string): boolean {
+    const lower = message.toLowerCase();
+    const hasAdminDashboardIntent = /\badmin\b|\badministrative\b|\banalytics dashboard\b|\bdashboard\b/.test(lower);
+    const hasRestrictedMetric =
+      /\bborrowed books? by faculty\b|\bby faculty\b|\bfine payments?\b|\bfines? summary\b/.test(lower) ||
+      /\breservations? per\b|\breservation trends?\b|\boverdue books? trend\b|\boverdue trends?\b/.test(lower);
+    const hasOperationalMetric =
+      /\bborrowed books?\b|\breservations?\b|\boverdue\b|\bfines?\b|\bfine payments?\b|\bfaculty\b/.test(lower);
+    const hasAnalyticsIntent = /\banalytics?\b|\bcharts?\b|\bgraphs?\b|\btrends?\b|\breports?\b/.test(lower);
+
+    return hasRestrictedMetric || (hasOperationalMetric && hasAdminDashboardIntent && hasAnalyticsIntent);
+  }
+
+  private buildAdminAnalyticsDeniedResponse(role: Role): string {
+    const roleLabel = role.toLowerCase();
+    return [
+      'That request requires administrator privileges.',
+      '',
+      `As a **${roleLabel}**, I cannot generate admin analytics dashboards, access admin-only operational data, or invent sample data for borrowed-book, reservation, overdue, or fine-payment charts.`,
+      '',
+      'I can still help you with your own borrows, reservations, reading lists, catalog searches, or study materials.',
+    ].join('\n');
+  }
+
   private detectFullRecall(message: string): boolean {
     return (
       /what (have|did) we (discuss|talk|cover|do)/i.test(message) ||
@@ -1504,6 +1528,14 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     yield { type: 'mode_state', modeState };
     yield { type: 'model_state', modelState };
 
+    if (user.role !== Role.ADMIN && this.isAdminAnalyticsRequest(message)) {
+      const deniedText = this.buildAdminAnalyticsDeniedResponse(user.role);
+      yield { type: 'text', text: deniedText };
+      await this.saveMessage(userId, 'user', message, conversationId);
+      await this.saveMessage(userId, 'assistant', deniedText, conversationId);
+      return;
+    }
+
     // ── Full-recall path ───────────────────────────────────────────────────────
     // Handles: "what did we discuss?", "recall this session", "summarize the chat", etc.
     // Fetches all messages using { userId, conversationId } — never by userId alone.
@@ -1872,10 +1904,6 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     await this.saveMessage(userId, 'assistant', fallback, conversationId);
   }
 }
-
-
-
-
 
 
 

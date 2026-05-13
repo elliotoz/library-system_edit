@@ -1,15 +1,17 @@
 import { AgentService } from './agent.service';
+import { Role } from '@prisma/client';
 
 function makeAgentService(overrides: {
   prisma?: unknown;
   tokenTracker?: unknown;
   pythonExecution?: unknown;
+  materialSearch?: unknown;
 } = {}) {
   const prisma = overrides.prisma ?? {};
   const catalogSearch = {};
   const toolHooks = {};
   const tokenTracker = overrides.tokenTracker ?? { record: jest.fn() };
-  const materialSearch = {};
+  const materialSearch = overrides.materialSearch ?? {};
   const bookDocumentService = {};
   const pythonExecution = overrides.pythonExecution ?? { isAvailable: jest.fn().mockReturnValue(false) };
 
@@ -22,6 +24,35 @@ function makeAgentService(overrides: {
     bookDocumentService as never,
     pythonExecution as never,
   );
+}
+
+function makeChatPrisma(role: Role) {
+  return {
+    user: {
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'user-1',
+        name: 'Ada',
+        role,
+        interests: [],
+        courses: [],
+        faculty: null,
+        borrows: [],
+      }),
+    },
+    borrowPolicy: {
+      findUnique: jest.fn().mockResolvedValue({
+        maxActiveBorrows: 5,
+        maxBorrowDays: 14,
+        maxExtensions: 2,
+      }),
+    },
+    book: { count: jest.fn().mockResolvedValue(5) },
+    bookCopy: { count: jest.fn().mockResolvedValue(67) },
+    readingList: { count: jest.fn().mockResolvedValue(0) },
+    aiMessage: {
+      create: jest.fn().mockResolvedValue({}),
+    },
+  };
 }
 
 describe('AgentService read_ebook', () => {
@@ -197,6 +228,70 @@ describe('AgentService conversation memory helpers', () => {
     expect(record).not.toHaveBeenCalled();
   });
 });
+
+describe('AgentService admin analytics authorization', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('detects admin analytics dashboard requests', () => {
+    const service = makeAgentService();
+
+    expect(service['isAdminAnalyticsRequest']([
+      'Generate an admin analytics dashboard showing:',
+      '- Borrowed books by faculty',
+      '- Reservations per week',
+      '- Overdue books trend',
+      '- Fine payments by month',
+    ].join('\n'))).toBe(true);
+  });
+
+  it('does not treat personal reservation requests as admin analytics', () => {
+    const service = makeAgentService();
+
+    expect(service['isAdminAnalyticsRequest']('Show my reservations')).toBe(false);
+  });
+
+  it('denies student admin analytics requests before calling the model', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    const prisma = makeChatPrisma(Role.STUDENT);
+    const service = makeAgentService({
+      prisma,
+      materialSearch: { countAccessibleIndexedMaterials: jest.fn().mockResolvedValue(0) },
+    });
+
+    const chunks: unknown[] = [];
+    for await (const chunk of service.chatStream(
+      'user-1',
+      'Generate an admin analytics dashboard showing borrowed books by faculty and fine payments by month',
+      [],
+      false,
+      null,
+      '',
+    )) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toContainEqual(expect.objectContaining({
+      type: 'text',
+      text: expect.stringContaining('requires administrator privileges'),
+    }));
+    expect(chunks).toContainEqual(expect.objectContaining({
+      type: 'text',
+      text: expect.stringContaining('cannot generate admin analytics dashboards'),
+    }));
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(prisma.aiMessage.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('builds a role-specific student denial message', () => {
+    const service = makeAgentService();
+
+    expect(service['isAdminAnalyticsRequest']('Generate an admin analytics dashboard with fines')).toBe(true);
+    expect(service['buildAdminAnalyticsDeniedResponse'](Role.STUDENT)).toContain('student');
+  });
+});
+
 describe('AgentService read_ebook structure questions', () => {
   it('returns a focused table-of-contents excerpt for chapter questions', async () => {
     const prisma = {};

@@ -458,6 +458,11 @@ range width of 1000. Admin analytics graphs must be based on returned
 tool/API/database data; OZ should not invent library statistics to fill a
 chart.
 
+Admin analytics dashboards and operational metrics are admin-only. For
+non-admin users, OZ refuses borrowed-by-faculty, reservation trend, overdue
+trend, and fine-payment dashboard requests instead of showing sample or
+placeholder admin data.
+
 ### Python Scientific Runner
 
 The optional Python runner is a separate FastAPI service under
