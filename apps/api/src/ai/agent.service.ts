@@ -179,13 +179,18 @@ export class AgentService {
     const lower = message.toLowerCase();
     const hasAdminDashboardIntent = /\badmin\b|\badministrative\b|\banalytics dashboard\b|\bdashboard\b/.test(lower);
     const hasRestrictedMetric =
-      /\bborrowed books? by faculty\b|\bby faculty\b|\bfine payments?\b|\bfines? summary\b/.test(lower) ||
+      /\bborrowed books? by faculty\b|\bby faculty\b|\bfine payments?\b|\bfines? summary\b|\bmost borrowed\b/.test(lower) ||
       /\breservations? per\b|\breservation trends?\b|\boverdue books? trend\b|\boverdue trends?\b/.test(lower);
     const hasOperationalMetric =
-      /\bborrowed books?\b|\breservations?\b|\boverdue\b|\bfines?\b|\bfine payments?\b|\bfaculty\b/.test(lower);
+      /\bborrowed books?\b|\breservations?\b|\boverdue\b|\bfines?\b|\bfine payments?\b|\bfaculty\b|\bcategor(?:y|ies)\b/.test(lower);
     const hasAnalyticsIntent = /\banalytics?\b|\bcharts?\b|\bgraphs?\b|\btrends?\b|\breports?\b/.test(lower);
 
     return hasRestrictedMetric || (hasOperationalMetric && hasAdminDashboardIntent && hasAnalyticsIntent);
+  }
+
+  private isMostBorrowedCategoryRequest(message: string): boolean {
+    const lower = message.toLowerCase();
+    return /\bmost borrowed\b/.test(lower) && /\bcategor(?:y|ies)\b/.test(lower);
   }
 
   private buildAdminAnalyticsDeniedResponse(role: Role): string {
@@ -218,14 +223,27 @@ export class AgentService {
     map.set(key, (map.get(key) ?? 0) + amount);
   }
 
-  private entriesToLabelsAndValues(map: Map<string, number>, limit?: number): { labels: string[]; values: number[] } {
+  private entriesToLabelsAndValues(
+    map: Map<string, number>,
+    limit?: number,
+    emptyLabel = 'No records',
+  ): { labels: string[]; values: number[]; isEmpty: boolean } {
     const entries = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
     const selected = typeof limit === 'number' ? entries.slice(-limit) : entries;
+
+    if (selected.length === 0) {
+      return { labels: [emptyLabel], values: [0], isEmpty: true };
+    }
 
     return {
       labels: selected.map(([label]) => label),
       values: selected.map(([, value]) => value),
+      isEmpty: false,
     };
+  }
+
+  private emptyChartNote(metric: string, isEmpty: boolean): string {
+    return isEmpty ? `No ${metric} records were found, so the chart shows a zero-record state.` : '';
   }
 
   private async buildAdminAnalyticsDashboardResponse(): Promise<string> {
@@ -293,6 +311,8 @@ export class AgentService {
       '',
       '### Borrowed Books by Faculty',
       '',
+      this.emptyChartNote('borrowed-book faculty', borrowed.isEmpty),
+      '',
       this.graphBlock({
         schemaVersion: 1,
         type: 'bar',
@@ -304,6 +324,8 @@ export class AgentService {
       }),
       '',
       '### Reservations per Week',
+      '',
+      this.emptyChartNote('reservation', reservationsWeekly.isEmpty),
       '',
       this.graphBlock({
         schemaVersion: 1,
@@ -317,6 +339,8 @@ export class AgentService {
       '',
       '### Overdue Books Trend',
       '',
+      this.emptyChartNote('overdue borrow', overdueWeekly.isEmpty),
+      '',
       this.graphBlock({
         schemaVersion: 1,
         type: 'bar',
@@ -329,6 +353,8 @@ export class AgentService {
       '',
       '### Fine Payments by Month',
       '',
+      this.emptyChartNote('paid fine', finesMonthly.isEmpty),
+      '',
       this.graphBlock({
         schemaVersion: 1,
         type: 'bar',
@@ -337,6 +363,43 @@ export class AgentService {
         values: finesMonthly.values,
         xLabel: 'Month',
         yLabel: 'Amount paid',
+      }),
+    ].join('\n');
+  }
+
+  private async buildMostBorrowedCategoryDashboardResponse(): Promise<string> {
+    const borrows = await this.prisma.borrow.findMany({
+      include: {
+        bookCopy: {
+          include: {
+            book: { select: { category: true } },
+          },
+        },
+      },
+    });
+
+    const categories = new Map<string, number>();
+    for (const borrow of borrows) {
+      this.incrementCount(categories, borrow.bookCopy.book.category ?? 'Uncategorized');
+    }
+
+    const chart = this.entriesToLabelsAndValues(categories, 12, 'No borrowed categories');
+
+    return [
+      '## Most Borrowed Book Categories',
+      '',
+      'This chart uses live borrow records grouped by each book category.',
+      '',
+      this.emptyChartNote('borrowed category', chart.isEmpty),
+      '',
+      this.graphBlock({
+        schemaVersion: 1,
+        type: 'bar',
+        title: 'Most Borrowed Book Categories',
+        labels: chart.labels,
+        values: chart.values,
+        xLabel: 'Category',
+        yLabel: 'Borrow count',
       }),
     ].join('\n');
   }
@@ -1679,7 +1742,9 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     }
 
     if (user.role === Role.ADMIN && this.isAdminAnalyticsRequest(message)) {
-      const dashboardText = await this.buildAdminAnalyticsDashboardResponse();
+      const dashboardText = this.isMostBorrowedCategoryRequest(message)
+        ? await this.buildMostBorrowedCategoryDashboardResponse()
+        : await this.buildAdminAnalyticsDashboardResponse();
       yield { type: 'text', text: dashboardText };
       await this.saveMessage(userId, 'user', message, conversationId);
       await this.saveMessage(userId, 'assistant', dashboardText, conversationId);
@@ -2054,7 +2119,5 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     await this.saveMessage(userId, 'assistant', fallback, conversationId);
   }
 }
-
-
 
 

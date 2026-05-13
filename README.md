@@ -463,7 +463,8 @@ non-admin users, OZ refuses borrowed-by-faculty, reservation trend, overdue
 trend, and fine-payment dashboard requests instead of showing sample or
 placeholder admin data. For admins, OZ can generate a live analytics
 dashboard with graph blocks for borrowed books by faculty, reservations per
-week, overdue trends, and fine payments by month.
+week, overdue trends, fine payments by month, and most-borrowed book
+categories.
 
 ### Python Scientific Runner
 
