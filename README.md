@@ -612,10 +612,12 @@ Tools registered in `AgentService.getTools()` and executed via `AgentService.exe
 
 ### RAG and Retrieval Behavior
 
-- **Catalog search**: keyword-first. `AI_SEMANTIC_MODE` accepts `keyword`, `hybrid`, or
-  `embedding`; the `hybrid` and `embedding` modes currently fall back to keyword search
-  because vector infrastructure is not implemented. Embedding generation returns `null`;
-  no pgvector columns are present in the current Prisma schema.
+- **Catalog search**: `AI_SEMANTIC_MODE` accepts `keyword`, `hybrid`, or `embedding`.
+  `keyword` uses Prisma text filters. `hybrid` merges PostgreSQL FTS results from the
+  `books.search_vector` migration with keyword results. `embedding` is embedding-style
+  semantic search implemented as OpenRouter LLM reranking of FTS candidates; it is not
+  real vector embedding storage or pgvector search. Embedding generation still returns
+  `null`, and no pgvector columns are present in the current Prisma schema.
 - **Material indexing**: extracts text from `.pdf`, `.docx`, `.doc`, and `.txt` files, chunks
   content into approximately 400-word chunks with 40-word overlap, stores chunks in
   `MaterialChunk`, and searches with PostgreSQL full-text search.
@@ -815,7 +817,7 @@ Additional script `apps/api/prisma/add-books.ts` adds or updates 8 test books wh
 | `OPENROUTER_API_KEY` | Required by the active OpenRouter AI provider |
 | `PYTHON_RUNNER_URL` | Optional internal URL for the scientific Python runner |
 | `PYTHON_RUNNER_TIMEOUT_MS` | Python runner execution timeout; default `3000` |
-| `AI_SEMANTIC_MODE` | `keyword`, `hybrid`, or `embedding`; default `hybrid`; hybrid falls back to keyword |
+| `AI_SEMANTIC_MODE` | `keyword`, `hybrid`, or `embedding`; default `hybrid`; hybrid uses PostgreSQL FTS plus keyword results; embedding mode reranks FTS candidates with OpenRouter |
 | `STORAGE_PROVIDER` | `local` or `s3` |
 | `AWS_REGION` | S3 region; required when `STORAGE_PROVIDER=s3` |
 | `AWS_S3_BUCKET` | S3 bucket; required when `STORAGE_PROVIDER=s3` |
@@ -991,6 +993,7 @@ The `test:critical` command runs these five files:
 | `start` | `next start` |
 | `lint` | `next lint` |
 | `lint:css` | `stylelint "**/*.css"` |
+| `test` | `vitest run` |
 | `typecheck` | `npx tsc --noEmit` |
 | `format` | `prettier --write "**/*.{js,jsx,ts,tsx,css,json}"` |
 
@@ -1003,7 +1006,7 @@ The `test:critical` command runs these five files:
 - Unit and service/controller tests use Jest and `ts-jest`.
 - E2E tests use Jest with `apps/api/test/jest-e2e.config.ts`.
 - Test helpers live under `apps/api/test/helpers/` and `apps/api/src/test-utils/`.
-- No frontend test runner is configured in `apps/web/package.json`.
+- Frontend unit tests use Vitest via `apps/web/package.json`.
 
 Discovered test suites:
 
@@ -1025,6 +1028,9 @@ Discovered test suites:
 | `src/materials/material-access.util.spec.ts` | Unit | Material access control |
 | `src/common/filters/global-exception.filter.spec.ts` | Unit | Error contract shape |
 
+Frontend Vitest suites currently cover AI graph parsing/render helpers, chart labels, and
+AI Markdown normalization under `apps/web/components/ui/*.test.ts`.
+
 ### Common Verification Commands
 
 ```bash
@@ -1040,6 +1046,9 @@ npm run test:api
 
 # E2E backend tests (requires a running database)
 npm run test:api:e2e
+
+# Frontend Vitest suite
+npm run test:web
 ```
 
 ### Linting and Formatting
@@ -1369,10 +1378,11 @@ chain.
 Set `OPENROUTER_API_KEY` in `apps/api/.env`. Check `GET /health/ready` — it reports
 `"ai": "configured"` when the key is present.
 
-**Semantic search does not behave like vector search**
+**Embedding mode does not store or query real vectors**
 
-The `hybrid` and `embedding` modes currently fall back to keyword search. Vector storage and
-embedding generation are not implemented in the current schema or code.
+`hybrid` uses PostgreSQL FTS from `books.search_vector` plus keyword results. `embedding`
+mode gets FTS candidates and reranks them with the OpenRouter tool-tier LLM. Vector storage,
+pgvector search, and embedding generation are not implemented in the current schema or code.
 
 **Email is not delivered locally**
 
