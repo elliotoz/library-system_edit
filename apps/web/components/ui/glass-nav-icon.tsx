@@ -1,6 +1,5 @@
 'use client';
 
-import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import type { LucideProps } from 'lucide-react';
 import type { ComponentType } from 'react';
@@ -38,23 +37,26 @@ export function GlassNavIcon({ icon: Icon, active = false, size = 36, className,
     : darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
 
   return (
-    <motion.div
+    <div
       className={cn('relative flex-shrink-0 flex items-center justify-center rounded-xl', className)}
-      style={{ width: size, height: size }}
-      animate={{ scale: active ? 1 : 0.95 }}
-      transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+      style={{
+        width: size,
+        height: size,
+        transform: `scale(${active ? 1 : 0.95})`,
+        transition: 'transform 0.2s ease',
+      }}
     >
       {/* Layer 1 — gradient glow (active only) */}
-      <motion.div
+      <div
         className="absolute inset-0 rounded-xl"
         style={{
           background: darkMode
             ? 'linear-gradient(135deg, rgba(42,157,157,0.9) 0%, rgba(23,102,102,0.95) 100%)'
             : 'linear-gradient(135deg, rgba(42,157,157,0.18) 0%, rgba(23,102,102,0.22) 100%)',
           filter: 'blur(0px)',
+          opacity: active ? 1 : 0,
+          transition: 'opacity 0.2s',
         }}
-        animate={{ opacity: active ? 1 : 0 }}
-        transition={{ duration: 0.2 }}
       />
 
       {/* Layer 2 — frosted glass disc */}
@@ -95,6 +97,6 @@ export function GlassNavIcon({ icon: Icon, active = false, size = 36, className,
           transition: 'opacity 0.2s',
         }}
       />
-    </motion.div>
+    </div>
   );
 }

@@ -356,6 +356,153 @@ describe('AgentService conversation memory helpers', () => {
   });
 });
 
+describe('AgentService material study sessions', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('injects the uploaded material URL so OZ can read the full PDF for page and chapter questions', async () => {
+    const prisma = {
+      ...makeChatPrisma(Role.STUDENT),
+      aiConversation: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'conv-1',
+          studyBookId: null,
+          manualModes: [],
+          lastAutoModes: [],
+          manualModel: null,
+          lastResolvedModel: null,
+          lastModelSelectionSource: null,
+        }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      aiMessage: {
+        count: jest.fn().mockResolvedValue(1),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            role: 'assistant',
+            content: '<!-- oz-material-id: mat-1 -->\n## Study Guide: Introduction to Java',
+          },
+        ]),
+        create: jest.fn().mockResolvedValue({}),
+      },
+      material: {
+        findFirst: jest.fn().mockResolvedValue({
+          title: 'Introduction to Java',
+          fileUrl: 'https://library-bucket.s3.amazonaws.com/materials/java.pdf',
+        }),
+      },
+    };
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        choices: [{ message: { content: 'The material has 1,344 pages.' } }],
+        usage: { prompt_tokens: 10, completion_tokens: 7 },
+      }),
+    } as never);
+    const service = makeAgentService({
+      prisma,
+      materialSearch: { countAccessibleIndexedMaterials: jest.fn().mockResolvedValue(1) },
+    });
+
+    const chunks: unknown[] = [];
+    for await (const chunk of service.chatStream(
+      'user-1',
+      'how many pages in this book?',
+      [],
+      false,
+      null,
+      '',
+      'conv-1',
+    )) {
+      chunks.push(chunk);
+    }
+
+    const firstBody = JSON.parse((fetchMock.mock.calls[0][1] as { body: string }).body) as {
+      messages: Array<{ role: string; content: string }>;
+      tools: Array<{ function: { name: string; description: string } }>;
+    };
+    const systemMessage = firstBody.messages.find((entry) => entry.role === 'system')?.content ?? '';
+    const readTool = firstBody.tools.find((tool) => tool.function.name === 'read_ebook');
+
+    expect(systemMessage).toContain('Active Material Study Session');
+    expect(systemMessage).toContain('The uploaded material read URL is: `https://library-bucket.s3.amazonaws.com/materials/java.pdf`');
+    expect(systemMessage).toContain('call `read_ebook` with this URL directly');
+    expect(systemMessage).toContain('When listing chapters, preserve or add explicit labels like "Chapter 1:"');
+    expect(systemMessage).toContain('one chapter per line');
+    expect(readTool?.function.description).toContain('uploaded study-material PDF');
+    expect(chunks).toContainEqual(expect.objectContaining({
+      type: 'text',
+      text: 'The material has 1,344 pages.',
+    }));
+  });
+
+  it('keeps tools enabled for short follow-up requests inside a material study session', async () => {
+    const prisma = {
+      ...makeChatPrisma(Role.STUDENT),
+      aiConversation: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'conv-1',
+          studyBookId: null,
+          manualModes: [],
+          lastAutoModes: [],
+          manualModel: null,
+          lastResolvedModel: null,
+          lastModelSelectionSource: null,
+        }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      aiMessage: {
+        count: jest.fn().mockResolvedValue(3),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            role: 'assistant',
+            content: '<!-- oz-material-id: mat-1 -->\n## Study Guide: Introduction to Java',
+          },
+          { role: 'user', content: 'how many chapters in this book?' },
+          { role: 'assistant', content: 'It has 42 chapters.' },
+        ]),
+        create: jest.fn().mockResolvedValue({}),
+      },
+      material: {
+        findFirst: jest.fn().mockResolvedValue({
+          title: 'Introduction to Java',
+          fileUrl: 'https://library-bucket.s3.amazonaws.com/materials/java.pdf',
+        }),
+      },
+    };
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        choices: [{ message: { content: 'Here are the chapters.' } }],
+        usage: { prompt_tokens: 8, completion_tokens: 5 },
+      }),
+    } as never);
+    const service = makeAgentService({
+      prisma,
+      materialSearch: { countAccessibleIndexedMaterials: jest.fn().mockResolvedValue(1) },
+    });
+
+    for await (const _chunk of service.chatStream(
+      'user-1',
+      'list them',
+      [],
+      false,
+      null,
+      '',
+      'conv-1',
+    )) {
+      // Drain stream.
+    }
+
+    const firstBody = JSON.parse((fetchMock.mock.calls[0][1] as { body: string }).body) as {
+      tools?: Array<{ function: { name: string } }>;
+    };
+
+    expect(firstBody.tools?.some((tool) => tool.function.name === 'read_ebook')).toBe(true);
+  });
+});
+
 describe('AgentService admin analytics authorization', () => {
   afterEach(() => {
     jest.restoreAllMocks();
@@ -394,6 +541,13 @@ describe('AgentService admin analytics authorization', () => {
     expect(service['isMostBorrowedCategoryRequest']('Show the most borrowed book')).toBe(false);
   });
 
+  it('detects system-wide library statistics overview requests as admin analytics', () => {
+    const service = makeAgentService();
+
+    expect(service['isAdminAnalyticsRequest']('Give me an overview of current library statistics')).toBe(true);
+    expect(service['isAdminAnalyticsRequest']('Show current library stats')).toBe(true);
+  });
+
   it('denies student admin analytics requests before calling the model', async () => {
     const fetchSpy = jest.spyOn(global, 'fetch');
     const prisma = makeChatPrisma(Role.STUDENT);
@@ -421,6 +575,62 @@ describe('AgentService admin analytics authorization', () => {
     expect(chunks).toContainEqual(expect.objectContaining({
       type: 'text',
       text: expect.stringContaining('cannot generate admin analytics dashboards'),
+    }));
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(prisma.aiMessage.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('denies instructor library statistics overview requests before calling the model', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    const prisma = makeChatPrisma(Role.INSTRUCTOR);
+    const service = makeAgentService({
+      prisma,
+      materialSearch: { countAccessibleIndexedMaterials: jest.fn().mockResolvedValue(0) },
+    });
+
+    const chunks: unknown[] = [];
+    for await (const chunk of service.chatStream(
+      'instructor-1',
+      'Give me an overview of current library statistics',
+      [],
+      false,
+      null,
+      '',
+    )) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toContainEqual(expect.objectContaining({
+      type: 'text',
+      text: expect.stringContaining('requires administrator privileges'),
+    }));
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(prisma.aiMessage.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('denies staff library statistics overview requests before calling the model', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    const prisma = makeChatPrisma(Role.STAFF);
+    const service = makeAgentService({
+      prisma,
+      materialSearch: { countAccessibleIndexedMaterials: jest.fn().mockResolvedValue(0) },
+    });
+
+    const chunks: unknown[] = [];
+    for await (const chunk of service.chatStream(
+      'staff-1',
+      'Give me an overview of current library statistics',
+      [],
+      false,
+      null,
+      '',
+    )) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toContainEqual(expect.objectContaining({
+      type: 'text',
+      text: expect.stringContaining('requires administrator privileges'),
     }));
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(prisma.aiMessage.create).toHaveBeenCalledTimes(2);
@@ -599,6 +809,65 @@ describe('AgentService literal chart rendering', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(prisma.aiMessage.create).toHaveBeenCalledTimes(2);
   });
+
+  it('does not classify user-provided borrowed-by-faculty bar chart values as admin analytics', () => {
+    const service = makeAgentService();
+
+    expect(service['isAdminAnalyticsRequest']([
+      'Create a bar chart comparing borrowed books by faculty:',
+      '    Engineering: 42',
+      '    Medicine: 35',
+      '    Business: 28',
+      '    Arts: 18',
+      '    Law: 12',
+    ].join('\n'))).toBe(false);
+  });
+
+  it('renders user-provided borrowed-by-faculty bar chart values for students before calling the model', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    const prisma = makeChatPrisma(Role.STUDENT);
+    const service = makeAgentService({
+      prisma,
+      materialSearch: { countAccessibleIndexedMaterials: jest.fn().mockResolvedValue(0) },
+    });
+
+    const chunks: unknown[] = [];
+    for await (const chunk of service.chatStream(
+      'user-1',
+      [
+        'Create a bar chart comparing borrowed books by faculty:',
+        '    Engineering: 42',
+        '    Medicine: 35',
+        '    Business: 28',
+        '    Arts: 18',
+        '    Law: 12',
+      ].join('\n'),
+      [],
+      false,
+      null,
+      '',
+    )) {
+      chunks.push(chunk);
+    }
+
+    const response = chunks
+      .filter((chunk): chunk is { type: 'text'; text: string } =>
+        typeof chunk === 'object' && chunk !== null && (chunk as { type?: string }).type === 'text',
+      )
+      .map((chunk) => chunk.text)
+      .join('\n');
+
+    expect(response).toContain('```graph');
+    expect(response).toContain('"type": "bar"');
+    expect(response).toContain('"Engineering"');
+    expect(response).toContain('"Medicine"');
+    expect(response).toContain('"Law"');
+    expect(response).toContain('42');
+    expect(response).toContain('35');
+    expect(response).toContain('12');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(prisma.aiMessage.create).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('AgentService read_ebook structure questions', () => {
@@ -651,9 +920,83 @@ describe('AgentService read_ebook structure questions', () => {
     );
 
     expect(result.result).toContain('BOOK STRUCTURE');
-    expect(result.result).toContain('Table of Contents');
-    expect(result.result).toContain('Chapter 1 What Is the Shell?');
-    expect(result.result).toContain('Part 2 Configuration and the Environment');
+    expect(result.result).toContain('Use the chapter list below directly');
+    expect(result.result).toContain('Chapter 1: What Is the Shell?');
+    expect(result.result).toContain('Chapter 2: Navigation');
+    expect(result.result).toContain('Chapter 4: Manipulating Files and Directories');
+    expect(result.result).not.toContain('Chapter 1 What Is the Shell?');
+  });
+
+  it('recognizes brief contents and numbered chapter lines without a chapter prefix', async () => {
+    const service = makeAgentService();
+    const text = [
+      'BRIEF CONTENTS',
+      '1 Introduction to Computers, Programs, and Java 1',
+      '2 Elementary Programming 33',
+      '3 Selections 75',
+      '33 JavaServer Faces 1213',
+      'Chapters 34-42 are bonus Web chapters',
+      '34 Advanced JavaFX 34-1',
+      '42 Testing Using JUnit 42-1',
+      'APPENDIXES',
+    ].join('\n');
+
+    const result = service['formatReadableBookContent']({
+      title: 'Introduction to Java',
+      authors: [],
+      description: null,
+      category: null,
+      publicationYear: null,
+      publisher: null,
+      pageCount: 1290,
+      text,
+    }, 'list them');
+
+    expect(result).toContain('BOOK STRUCTURE');
+    expect(result).toContain('one chapter per line');
+    expect(result).toContain('Chapter 1: Introduction to Computers, Programs, and Java');
+    expect(result).toContain('Chapter 34: Advanced JavaFX');
+    expect(result).toContain('Chapter 42: Testing Using JUnit');
+    expect(result).not.toContain('1 Introduction to Computers, Programs, and Java 1');
+  });
+
+  it('formats Clean Code chapter titles as one numbered chapter per line', () => {
+    const service = makeAgentService();
+    const text = [
+      'Contents',
+      '1 Clean Code 1',
+      '2 Meaningful Names 17',
+      '3 Functions 31',
+      '4 Comments 53',
+      '5 Formatting 75',
+      '6 Objects and Data Structures 93',
+      '7 Error Handling 103',
+      '8 Boundaries 113',
+      '9 Unit Tests 121',
+      '10 Classes 135',
+      '11 Systems 153',
+      '12 Emergence 171',
+      '13 Concurrency 177',
+      '14 Successive Refinement 189',
+      '15 JUnit Internals 251',
+      '16 Refactoring SerialDate 267',
+    ].join('\n');
+
+    const result = service['formatReadableBookContent']({
+      title: 'Clean Code',
+      authors: [],
+      description: null,
+      category: null,
+      publicationYear: null,
+      publisher: null,
+      pageCount: 464,
+      text,
+    }, 'list the chapters');
+
+    expect(result).toContain('Chapter 1: Clean Code');
+    expect(result).toContain('Chapter 2: Meaningful Names');
+    expect(result).toContain('Chapter 16: Refactoring SerialDate');
+    expect(result).not.toContain('Chapter 1: Clean Code Chapter 2: Meaningful Names');
   });
 });
 

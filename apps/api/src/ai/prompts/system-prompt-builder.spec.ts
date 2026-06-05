@@ -114,19 +114,27 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Never mix different conversations');
   });
 
-  it('instructs the model to call get_material_outline for chapter and structure questions', () => {
+  it('instructs the model to read active material PDFs before falling back to indexed outlines', () => {
     const prompt = buildSystemPrompt(baseContext);
 
+    expect(prompt).toContain('uploaded material read URL');
+    expect(prompt).toContain('call read_ebook with that URL before answering');
+    expect(prompt).toContain('Do not return bare chapter titles');
+    expect(prompt).toContain('one chapter per line');
     expect(prompt).toContain('how many chapters or sections it has');
     expect(prompt).toContain('get_material_outline');
-    expect(prompt).toContain('NEVER refuse this type of question without first calling get_material_outline');
+    expect(prompt).toContain('NEVER refuse this type of question without first calling the available material tool');
   });
 
   it('refuses non-admin admin analytics data instead of inventing it', () => {
     const prompt = buildSystemPrompt(baseContext);
 
     expect(prompt).toContain('Only ADMIN users may receive admin dashboards');
-    expect(prompt).toContain('do not provide sample, placeholder, or invented admin data');
+    expect(prompt).toContain('system-wide library statistics/overviews');
+    expect(prompt).toContain('For ADMIN users only, to count books');
+    expect(prompt).toContain('do not provide full library statistics or overviews');
+    expect(prompt).toContain('refuse briefly when the request asks for real/admin operational data');
+    expect(prompt).toContain('If the user explicitly provides all chart values');
   });
 
   it('preserves library tool rules when scientific output is enabled', () => {

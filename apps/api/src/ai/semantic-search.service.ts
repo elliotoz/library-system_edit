@@ -282,6 +282,7 @@ export class SemanticSearchService {
 
     try {
       const modelId = getModelByTier('tool').id;
+      const timeoutMs = Number(process.env.OPENROUTER_TIMEOUT_MS ?? 30000);
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -296,6 +297,7 @@ export class SemanticSearchService {
           max_tokens: 300,
           temperature: 0,
         }),
+        signal: AbortSignal.timeout(Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 30000),
       });
 
       if (!res.ok) {

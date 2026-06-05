@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
-import { motion, AnimatePresence } from 'framer-motion';
 import { GlassNavIcon } from '@/components/ui/glass-nav-icon';
 
 const WebGLBackground = dynamic(
@@ -457,13 +456,9 @@ export default function DashboardLayout({
                             : 'text-gray-500 dark:text-white/45'
                         )}
                       >
-                        {/* Framer Motion sliding glass active pill */}
+                        {/* Sliding glass active pill */}
                         {active && (
-                          <motion.div
-                            layoutId={`nav-active-${section.label}`}
-                            className="absolute inset-0 rounded-xl bg-teal-50 dark:bg-teal-400/10 border border-teal-200 dark:border-teal-400/20"
-                            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                          />
+                          <div className="absolute inset-0 rounded-xl bg-teal-50 dark:bg-teal-400/10 border border-teal-200 dark:border-teal-400/20 transition-all duration-200" />
                         )}
 
                         {/* Teal left indicator bar */}
@@ -473,8 +468,8 @@ export default function DashboardLayout({
 
                         {/* Hover highlight (non-active) */}
                         {!active && (
-                          <motion.div
-                            className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100"
+                          <div
+                            className="absolute inset-0 rounded-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100"
                             style={{
                               background: darkMode
                                 ? 'rgba(255,255,255,0.08)'
@@ -487,7 +482,6 @@ export default function DashboardLayout({
                                 ? 'inset 0 1px 0 rgba(255,255,255,0.08)'
                                 : 'inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 8px rgba(0,0,0,0.04)',
                             }}
-                            transition={{ duration: 0.15 }}
                           />
                         )}
 

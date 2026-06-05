@@ -10,7 +10,7 @@ import { colorsForLabels } from './graph-colors';
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 const MAX_SAMPLES = 500;
-const PLOTLY_CONFIG: Partial<Plotly.Config> = { responsive: true, displayModeBar: true, displaylogo: false };
+const PLOTLY_CONFIG: Partial<Plotly.Config> = { responsive: true, displayModeBar: false, displaylogo: false };
 
 function sampleFunction(expr: string, xMin: number, xMax: number): { x: number[]; y: number[] } {
   const x: number[] = [];

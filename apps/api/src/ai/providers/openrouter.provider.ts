@@ -75,6 +75,11 @@ export class OpenRouterProvider implements LlmProvider {
     };
   }
 
+  private getOpenRouterTimeoutMs(): number {
+    const parsed = Number(process.env.OPENROUTER_TIMEOUT_MS ?? 30000);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 30000;
+  }
+
   async chat(options: {
     model: string;
     system: string;
@@ -117,6 +122,7 @@ export class OpenRouterProvider implements LlmProvider {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(this.getOpenRouterTimeoutMs()),
     });
 
     if (!res.ok) {
@@ -168,6 +174,7 @@ export class OpenRouterProvider implements LlmProvider {
         stream: true,
         max_tokens: 4096,
       }),
+      signal: AbortSignal.timeout(this.getOpenRouterTimeoutMs()),
     });
 
     if (!res.ok) {
@@ -235,6 +242,7 @@ export class OpenRouterProvider implements LlmProvider {
           ],
           max_tokens: 256,
         }),
+        signal: AbortSignal.timeout(this.getOpenRouterTimeoutMs()),
       });
 
       if (!res.ok) {

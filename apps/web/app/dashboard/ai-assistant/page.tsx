@@ -2,14 +2,23 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { BookOpen, Plus, Trash2, MessageSquare, History, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { BookCitationCards } from '@/components/BookCitationCards';
-import { AIMessage } from '@/components/ui/ai-message';
 import { AssistantChatInput, type ChatSendPayload } from '@/components/ui/assistant-chat-input';
 import { type AiMode, type DisplayAiMode, normalizeAiModes, resolveAiModes } from '@/lib/ai-modes';
 import { AUTO_MODEL_ID, getAiModelLabel } from '@/lib/ai-models';
+
+const AIMessage = dynamic(
+  () => import('@/components/ui/ai-message').then((mod) => ({ default: mod.AIMessage })),
+  {
+    loading: () => (
+      <div className="h-4 w-32 animate-pulse rounded bg-gray-200 dark:bg-white/10" />
+    ),
+  },
+);
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 

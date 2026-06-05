@@ -7,7 +7,7 @@ import { ToolHookService } from './tools/tool-hook.service';
 import { ToolExecutionContext } from './tools/tool-hooks';
 import { TokenTrackerService } from './session/token-tracker.service';
 import { MaterialSearchService } from '../materials/material-search.service';
-import { buildMaterialAccessWhere } from '../materials/material-access.util';
+import { buildMaterialAccessWhere, MaterialAccessContext } from '../materials/material-access.util';
 import { BookDocumentService, BookPdfContent } from '../books/book-document.service';
 import { OPENROUTER_MODELS } from './providers/openrouter.provider';
 import { AUTO_MODEL_ID, getModelEntry, getPublicModelList, isAllowlistedModel } from './model-registry';
@@ -32,7 +32,7 @@ export interface ConversationModelState {
 }
 
 type ConversationMemoryMessage = { role: string; content: string };
-type LiteralPieChartSpec = { title: string; labels: string[]; values: number[] };
+type LiteralChartSpec = { type: 'bar' | 'pie'; title: string; labels: string[]; values: number[] };
 
 export type ChatChunk =
   | { type: 'mode_state'; modeState: AiModeState }
@@ -92,6 +92,20 @@ export class AgentService {
       'HTTP-Referer': process.env.FRONTEND_URL ?? 'http://localhost:3000',
       'X-Title': 'LibrarySystem',
     };
+  }
+
+  private getOpenRouterTimeoutMs(): number {
+    const parsed = Number(process.env.OPENROUTER_TIMEOUT_MS ?? 30000);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 30000;
+  }
+
+  private fetchOpenRouterChat(body: Record<string, unknown>): Promise<Response> {
+    return fetch(`${this.openRouterBaseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: this.openRouterHeaders,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(this.getOpenRouterTimeoutMs()),
+    });
   }
 
   private parseProviderErrorMessage(status: number, errText: string): string {
@@ -155,6 +169,16 @@ export class AgentService {
     return false;
   }
 
+  private isStudyFollowUpRequest(message: string): boolean {
+    const lower = message.trim().toLowerCase();
+    return (
+      /^(list|show|name)\s+(them|all)$/i.test(lower) ||
+      /^(list|show|name|give me)\s+(the\s+)?(chapters|sections|chapter titles|section titles)$/i.test(lower) ||
+      /^(what|which)\s+are\s+they\??$/i.test(lower) ||
+      /^titles\??$/i.test(lower)
+    );
+  }
+
   private detectScientificOutput(message: string): boolean {
     const lower = message.toLowerCase();
     return (
@@ -178,6 +202,8 @@ export class AgentService {
   }
 
   private isAdminAnalyticsRequest(message: string): boolean {
+    if (this.parseLiteralChartRequest(message)) return false;
+
     const lower = message.toLowerCase();
     const hasAdminDashboardIntent = /\badmin\b|\badministrative\b|\banalytics dashboard\b|\bdashboard\b/.test(lower);
     const hasRestrictedMetric =
@@ -186,8 +212,12 @@ export class AgentService {
     const hasOperationalMetric =
       /\bborrowed books?\b|\breservations?\b|\boverdue\b|\bfines?\b|\bfine payments?\b|\bfaculty\b|\bcategor(?:y|ies)\b/.test(lower);
     const hasAnalyticsIntent = /\banalytics?\b|\bcharts?\b|\bgraphs?\b|\btrends?\b|\breports?\b/.test(lower);
+    const hasSystemWideLibraryStats =
+      /\boverview\s+of\s+(?:current\s+)?library\s+(?:statistics|stats)\b/.test(lower) ||
+      /\b(?:current\s+)?library\s+(?:statistics|stats|overview)\b/.test(lower) ||
+      /\blibrary\s+holdings\s+(?:overview|statistics|stats)\b/.test(lower);
 
-    return hasRestrictedMetric || (hasOperationalMetric && hasAdminDashboardIntent && hasAnalyticsIntent);
+    return hasSystemWideLibraryStats || hasRestrictedMetric || (hasOperationalMetric && hasAdminDashboardIntent && hasAnalyticsIntent);
   }
 
   private isMostBorrowedCategoryRequest(message: string): boolean {
@@ -207,17 +237,22 @@ export class AgentService {
     return [
       'That request requires administrator privileges.',
       '',
-      `As a **${roleLabel}**, I cannot generate admin analytics dashboards, access admin-only operational data, or invent sample data for borrowed-book, reservation, overdue, or fine-payment charts.`,
+      `As a **${roleLabel}**, I cannot generate admin analytics dashboards, access admin-only operational data, or invent borrowed-book, reservation, overdue, or fine-payment chart data.`,
       '',
-      'I can still help you with your own borrows, reservations, reading lists, catalog searches, or study materials.',
+      'If you provide sample values directly, I can help turn those values into a chart.',
     ].join('\n');
   }
 
-  private parseLiteralPieChartRequest(message: string): LiteralPieChartSpec | null {
-    if (!/\bpie\s+chart\b/i.test(message)) return null;
+  private parseLiteralChartRequest(message: string): LiteralChartSpec | null {
+    const type = /\bpie\s+chart\b/i.test(message)
+      ? 'pie'
+      : /\b(?:bar\s+chart|bar\s+graph)\b/i.test(message)
+        ? 'bar'
+        : null;
+    if (!type) return null;
 
     const entries: Array<{ label: string; value: number }> = [];
-    const pattern = /(?:^|\n|[-*]\s*)([A-Za-z][A-Za-z0-9 &'()\/-]{0,79})\s*(?:=|:)\s*(\d+(?:\.\d+)?)\s*%?/g;
+    const pattern = /(?:^|\n)[ \t]*(?:[-*]\s*)?([A-Za-z][A-Za-z0-9 &'()\/-]{0,79})[ \t]*(?:=|:)[ \t]*(\d+(?:\.\d+)?)[ \t]*%?/g;
     let match: RegExpExecArray | null;
 
     while ((match = pattern.exec(message)) !== null) {
@@ -231,22 +266,24 @@ export class AgentService {
     if (entries.length < 2) return null;
 
     return {
-      title: 'Pie Chart',
+      type,
+      title: type === 'pie' ? 'Pie Chart' : 'Bar Chart',
       labels: entries.map((entry) => entry.label),
       values: entries.map((entry) => entry.value),
     };
   }
 
-  private buildLiteralPieChartResponse(spec: LiteralPieChartSpec): string {
+  private buildLiteralChartResponse(spec: LiteralChartSpec): string {
     return [
-      'Here is the pie chart from the values you provided:',
+      `Here is the ${spec.type === 'pie' ? 'pie chart' : 'bar chart'} from the values you provided:`,
       '',
       this.graphBlock({
         schemaVersion: 1,
-        type: 'pie',
+        type: spec.type,
         title: spec.title,
         labels: spec.labels,
         values: spec.values,
+        ...(spec.type === 'bar' ? { xLabel: 'Category', yLabel: 'Value' } : {}),
       }),
     ].join('\n');
   }
@@ -576,15 +613,11 @@ export class AgentService {
     fallbackText: string;
   }): Promise<string> {
     try {
-      const res = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: this.openRouterHeaders,
-        body: JSON.stringify({
+      const res = await this.fetchOpenRouterChat({
           model: args.model,
           messages: args.messages,
           stream: false,
           max_tokens: args.maxTokens,
-        }),
       });
 
       if (!res.ok) {
@@ -620,6 +653,35 @@ export class AgentService {
       }
     }
     return null;
+  }
+
+  private async buildMaterialStudyBlock(
+    materialId: string | null,
+    accessContext: MaterialAccessContext,
+  ): Promise<string> {
+    if (!materialId) return '';
+
+    const material = await this.prisma.material.findFirst({
+      where: {
+        id: materialId,
+        isApproved: true,
+        isPublished: true,
+        indexStatus: IndexStatus.INDEXED,
+        ...buildMaterialAccessWhere(accessContext),
+      },
+      select: {
+        title: true,
+        fileUrl: true,
+      },
+    });
+
+    if (!material) return '';
+
+    if (material.fileUrl) {
+      return `\n\n## Active Material Study Session\n\nThis conversation is a dedicated study session for: **${material.title}**\nThe uploaded material read URL is: \`${material.fileUrl}\`\nFor any question about page count, chapters, sections, table of contents, structure, content, quotes, summaries, or what a chapter/page contains, call \`read_ebook\` with this URL directly. Use \`get_material_outline\` only if \`read_ebook\` cannot extract readable content or the user asks for a quick indexed outline. When listing chapters, preserve or add explicit labels like "Chapter 1:", "Chapter 2:", etc., and render them as a vertical Markdown list with one chapter per line. Do not refuse these questions before trying the tool.`;
+    }
+
+    return `\n\n## Active Material Study Session\n\nThis conversation is a dedicated study session for: **${material.title}**. The material ID is \`${materialId}\`. When the user asks about chapters, sections, table of contents, outline, structure, or any question about what the material covers, call \`get_material_outline\` with \`materialId: "${materialId}"\`. When listing chapters, preserve or add explicit labels like "Chapter 1:", "Chapter 2:", etc., and render them as a vertical Markdown list with one chapter per line. Do not refuse these questions — always call the tool first.`;
   }
 
   private detectResponseIntent(message: string): ResponseIntent {
@@ -909,14 +971,10 @@ Be concise, practical, and encouraging. Base everything on the book details prov
 
     let studyGuide = '';
     try {
-      const res = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: this.openRouterHeaders,
-        body: JSON.stringify({
+      const res = await this.fetchOpenRouterChat({
           model: OPENROUTER_MODELS.STUDY,
           messages: [{ role: 'user', content: studyPrompt }],
           max_tokens: this.studyGuideMaxTokens,
-        }),
       });
 
       if (!res.ok) {
@@ -1031,14 +1089,10 @@ Be concise, accurate, and educational. Base the guide only on the material metad
 
     let studyGuide = '';
     try {
-      const res = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: this.openRouterHeaders,
-        body: JSON.stringify({
+      const res = await this.fetchOpenRouterChat({
           model: OPENROUTER_MODELS.STUDY,
           messages: [{ role: 'user', content: studyPrompt }],
           max_tokens: this.studyGuideMaxTokens,
-        }),
       });
 
       if (!res.ok) {
@@ -1133,12 +1187,12 @@ Be concise, accurate, and educational. Base the guide only on the material metad
         type: 'function',
         function: {
           name: 'read_ebook',
-          description: 'Read a managed e-book or uploaded book PDF from its URL. Use this for summaries, explanations, quotes, chapter lists, table of contents, or book structure questions.',
+          description: 'Read a managed e-book, uploaded book PDF, or uploaded study-material PDF from its URL. Use this for summaries, explanations, quotes, page count, chapter lists, table of contents, or document structure questions.',
           parameters: {
             type: 'object',
             properties: {
-              url: { type: 'string', description: 'E-book URL' },
-              question: { type: 'string', description: 'What to find in the book' },
+              url: { type: 'string', description: 'E-book, book PDF, or study-material PDF URL' },
+              question: { type: 'string', description: 'What to find in the document' },
             },
             required: ['url', 'question'],
           },
@@ -1465,12 +1519,12 @@ Be concise, accurate, and educational. Base the guide only on the material metad
   }
 
   private isStructureQuestion(question: string): boolean {
-    return /(table of contents|contents|chapter|chapters|part\b|parts\b|outline|structure|section|sections)/i.test(question);
+    return /(table of contents|contents|chapter|chapters|part\b|parts\b|outline|structure|section|sections|list them|show them|name them)/i.test(question);
   }
 
   private buildStructureExcerpt(text: string, maxChars = 5000): string {
     const normalized = text.replace(/\r/g, '').replace(/\f/g, '\n');
-    const tableOfContentsMatch = normalized.match(/(?:^|\n)(table of contents|contents)(?:\n|\s)/i);
+    const tableOfContentsMatch = normalized.match(/(?:^|\n)(table of contents|brief contents|contents)(?:\n|\s)/i);
 
     if (tableOfContentsMatch?.index != null) {
       const start = tableOfContentsMatch.index;
@@ -1482,12 +1536,58 @@ Be concise, accurate, and educational. Base the guide only on the material metad
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
 
-    const structureLines = lines.filter((line) => /^(part|chapter)\b/i.test(line) || /\bchapter\b/i.test(line));
+    // Only match short heading-like lines (TOC entries), not body sentences that mention "chapter"
+    const structureLines = lines.filter(
+      (line) => line.length < 120 && (
+        /^chapter\s+\d+/i.test(line) ||
+        /^part\s+\d+/i.test(line) ||
+        /^\d+\.\s+\S/.test(line) ||
+        /^\d{1,3}\s+(?!\d+\b)(?:[A-Z][\w+#-]*|[A-Z]\s+-?\s+\d)/.test(line)
+      ),
+    );
     if (structureLines.length > 0) {
       return structureLines.slice(0, 80).join('\n');
     }
 
     return normalized.slice(0, maxChars).trim();
+  }
+
+  private formatChapterList(structureText: string): string | null {
+    const lines = structureText
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+    const chapters = lines
+      .map((line) => {
+        const match =
+          /^chapter\s+(\d{1,3})\s*[:.\-]?\s+(.+)$/i.exec(line) ||
+          /^(\d{1,3})\s+(.+)$/.exec(line);
+
+        if (!match) return null;
+
+        const chapterNumber = Number(match[1]);
+        if (!Number.isInteger(chapterNumber) || chapterNumber < 1) return null;
+
+        const title = match[2]
+          .replace(/\s+\.{2,}\s*\d+(?:-\d+)?$/g, '')
+          .replace(/\s+\d+(?:-\d+)?$/g, '')
+          .trim();
+
+        if (!title || /^chapter\b/i.test(title) || /^appendix(?:es)?$/i.test(title) || /^index$/i.test(title)) {
+          return null;
+        }
+
+        return `Chapter ${chapterNumber}: ${title}`;
+      })
+      .filter((line): line is string => Boolean(line));
+
+    const uniqueChapters = Array.from(new Map(chapters.map((line) => {
+      const chapterNumber = /^Chapter\s+(\d+):/i.exec(line)?.[1] ?? line;
+      return [chapterNumber, line] as const;
+    })).values());
+
+    return uniqueChapters.length > 0 ? uniqueChapters.join('\n') : null;
   }
 
   private formatReadableBookContent(content: BookPdfContent, question: string): string {
@@ -1501,12 +1601,20 @@ Be concise, accurate, and educational. Base the guide only on the material metad
       content.description ? `Description: ${content.description}` : null,
     ].filter((line): line is string => Boolean(line));
 
-    const excerpt = this.isStructureQuestion(question)
+    const structureQuestion = this.isStructureQuestion(question);
+    const structureExcerpt = structureQuestion
       ? this.buildStructureExcerpt(content.text, 5000)
+      : '';
+
+    const excerpt = structureQuestion
+      ? this.formatChapterList(structureExcerpt) ?? structureExcerpt
       : this.buildRelevantExcerpt(content.text, question, 4000);
 
-    const heading = this.isStructureQuestion(question) ? 'BOOK STRUCTURE' : 'E-BOOK CONTENT';
-    return `${heading} (for: ${question}):\n\n${metadata.join('\n')}${metadata.length > 0 ? '\n\n' : ''}${excerpt}`;
+    const heading = structureQuestion ? 'BOOK STRUCTURE' : 'E-BOOK CONTENT';
+    const structureInstruction = structureQuestion
+      ? 'Use the chapter list below directly. Keep it as a vertical Markdown list with one chapter per line. Do not rewrite it as a single paragraph.\n\n'
+      : '';
+    return `${heading} (for: ${question}):\n\n${structureInstruction}${metadata.join('\n')}${metadata.length > 0 ? '\n\n' : ''}${excerpt}`;
   }
   private async executeToolInner(
     name: string,
@@ -1516,7 +1624,10 @@ Be concise, accurate, and educational. Base the guide only on the material metad
     cookieHeader: string,
     headers: Record<string, string>,
   ): Promise<{ result: string; citations: BookCitation[] }> {
-    const API_BASE = 'http://localhost:3001';
+    const API_BASE =
+      process.env.INTERNAL_API_URL ||
+      process.env.API_URL ||
+      `http://localhost:${process.env.PORT || 3001}`;
 
     switch (name) {
         case 'search_catalog': {
@@ -2001,6 +2112,8 @@ Be concise, accurate, and educational. Base the guide only on the material metad
     const dbHistory = conversationId
       ? await this.getRecentConversationMessages(userId, conversationId)
       : history;
+    const studyMaterialId = this.extractStudyMaterialId(dbHistory);
+    const isStudySession = !!conversation?.studyBookId || !!studyMaterialId;
 
     const storedModeState = this.buildConversationModeState(conversation ?? {});
     const storedModelState = this.buildConversationModelState(conversation ?? {});
@@ -2013,14 +2126,14 @@ Be concise, accurate, and educational. Base the guide only on the material metad
     const autoModes = inferAutoModes({
       message,
       history: dbHistory,
-      isStudySession: !!conversation?.studyBookId,
+      isStudySession,
     });
     const modeState = buildAiModeState({
       manualModes,
       lastAutoModes: autoModes,
-      isStudySession: !!conversation?.studyBookId,
+      isStudySession,
     });
-    let modelState = this.resolveModelSelection(message, hasImage, manualModel, !!conversation?.studyBookId);
+    let modelState = this.resolveModelSelection(message, hasImage, manualModel, isStudySession);
 
     // Inject study-session context blocks so OZ can call the right tools without re-discovery
     let bookStudyBlock = '';
@@ -2032,15 +2145,12 @@ Be concise, accurate, and educational. Base the guide only on the material metad
       if (studyBook) {
         const readUrl = studyBook.pdfUrl ?? studyBook.ebookUrl ?? null;
         bookStudyBlock = readUrl
-          ? `\n\n## Active Book Study Session\n\nThis conversation is a dedicated study session for: **${studyBook.title}**\nThe e-book read URL is: \`${readUrl}\`\nFor any question about chapters, table of contents, structure, content, quotes, or summaries, call \`read_ebook\` with this URL directly. Do not call \`get_book_details\` first — the readUrl is already provided above.`
+          ? `\n\n## Active Book Study Session\n\nThis conversation is a dedicated study session for: **${studyBook.title}**\nThe e-book read URL is: \`${readUrl}\`\nFor any question about chapters, table of contents, structure, content, quotes, or summaries, call \`read_ebook\` with this URL directly. When listing chapters, preserve or add explicit labels like "Chapter 1:", "Chapter 2:", etc., and render them as a vertical Markdown list with one chapter per line. Do not call \`get_book_details\` first — the readUrl is already provided above.`
           : `\n\n## Active Book Study Session\n\nThis conversation is a dedicated study session for: **${studyBook.title}**`;
       }
     }
 
-    const studyMaterialId = this.extractStudyMaterialId(dbHistory);
-    const materialStudyBlock = studyMaterialId
-      ? `\n\n## Active Material Study Session\n\nThis conversation is a dedicated study session for a specific indexed academic material. The material ID is \`${studyMaterialId}\`. When the user asks about chapters, sections, table of contents, outline, structure, or any question about what the material covers, call \`get_material_outline\` with \`materialId: "${studyMaterialId}"\`. Do not refuse these questions — always call the tool first.`
-      : '';
+    const materialStudyBlock = await this.buildMaterialStudyBlock(studyMaterialId, materialAccessContext);
     const systemPrompt = `${buildModeInstructionBlock(modeState.activeModes)}${buildSystemPromptFromModule(promptContext)}${bookStudyBlock}${materialStudyBlock}`;
 
     if (conversationId) {
@@ -2066,20 +2176,20 @@ Be concise, accurate, and educational. Base the guide only on the material metad
     yield { type: 'mode_state', modeState };
     yield { type: 'model_state', modelState };
 
+    const literalChart = this.parseLiteralChartRequest(message);
+    if (literalChart) {
+      const chartText = this.buildLiteralChartResponse(literalChart);
+      yield { type: 'text', text: chartText };
+      await this.saveMessage(userId, 'user', message, conversationId);
+      await this.saveMessage(userId, 'assistant', chartText, conversationId);
+      return;
+    }
+
     if (user.role !== Role.ADMIN && this.isAdminAnalyticsRequest(message)) {
       const deniedText = this.buildAdminAnalyticsDeniedResponse(user.role);
       yield { type: 'text', text: deniedText };
       await this.saveMessage(userId, 'user', message, conversationId);
       await this.saveMessage(userId, 'assistant', deniedText, conversationId);
-      return;
-    }
-
-    const literalPieChart = this.parseLiteralPieChartRequest(message);
-    if (literalPieChart) {
-      const chartText = this.buildLiteralPieChartResponse(literalPieChart);
-      yield { type: 'text', text: chartText };
-      await this.saveMessage(userId, 'user', message, conversationId);
-      await this.saveMessage(userId, 'assistant', chartText, conversationId);
       return;
     }
 
@@ -2268,7 +2378,7 @@ Be concise, accurate, and educational. Base the guide only on the material metad
     messages.push({ role: 'user', content: userContent });
 
     // Decide whether to use tools based on message complexity
-    const simple = this.isSimpleMessage(message);
+    const simple = this.isSimpleMessage(message) && !(isStudySession && this.isStudyFollowUpRequest(message));
     const deep = this.isDeepQuery(message);
     const useTools = !hasImage && !simple;
     let model = modelState.activeModel ?? OPENROUTER_MODELS.CHEAP;
@@ -2300,11 +2410,7 @@ Be concise, accurate, and educational. Base the guide only on the material metad
         this.logger.warn(`Round ${round}/${MAX_ROUNDS} — forcing text response (no tools)`);
       }
 
-      const res = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: this.openRouterHeaders,
-        body: JSON.stringify(body),
-      });
+      const res = await this.fetchOpenRouterChat(body);
 
       if (!res.ok) {
         const errText = await res.text();
@@ -2409,10 +2515,7 @@ Be concise, accurate, and educational. Base the guide only on the material metad
 
     const hasToolResults = messages.some((entry) => entry.role === 'tool');
     if (hasToolResults) {
-      const synthesisRes = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: this.openRouterHeaders,
-        body: JSON.stringify({
+      const synthesisRes = await this.fetchOpenRouterChat({
           model,
           messages: [
             ...messages,
@@ -2423,7 +2526,6 @@ Be concise, accurate, and educational. Base the guide only on the material metad
           ],
           stream: false,
           max_tokens: this.chatMaxTokens,
-        }),
       });
 
       if (synthesisRes.ok) {
