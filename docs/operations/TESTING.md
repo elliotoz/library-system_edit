@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This project has a backend test harness that both developers and AI agents can
+This project has backend and frontend test harnesses that developers and AI agents can
 use.
 
 It is designed to:
@@ -13,10 +13,10 @@ It is designed to:
 
 Current scope:
 
-- backend unit/service tests only
+- backend unit/service tests
 - backend type checking
+- frontend Vitest component/helper tests
 - web type checking
-- no frontend test runner yet
 - no DB-backed integration suite yet
 
 ---
@@ -28,6 +28,10 @@ Backend tests use:
 - `jest`
 - `ts-jest`
 
+Frontend tests use:
+
+- `vitest`
+
 Coverage currently focuses on:
 
 - standardized error contract
@@ -35,6 +39,7 @@ Coverage currently focuses on:
 - reservation conflict/limit/state-guard behavior
 - scheduler reconciliation behavior
 - AI mode resolution, model registry, model selection, and fallback behavior
+- AI graph parsing/render helpers, chart labels, and AI Markdown normalization
 
 Reusable test helpers live in:
 
@@ -53,6 +58,8 @@ npm run typecheck:web
 npm run test:web
 npm run test:api
 npm run test:api:critical
+npm run build:api
+npm run build:web
 ```
 
 From `apps/api`:
@@ -64,6 +71,14 @@ npm run test:critical
 npm run test:watch
 npm run test:cov
 npx nest build
+```
+
+From `apps/web`:
+
+```powershell
+npm run typecheck
+npm run test
+npm run build
 ```
 
 Targeted AI model-selection tests:
@@ -109,9 +124,9 @@ npx jest --runInBand src/ai/model-registry.spec.ts
 For frontend AI renderer changes, also run:
 
 ```powershell
-cd apps/web
-npm run test
-npm run build
+npm run typecheck:web
+npm run test:web
+npm run build:web
 ```
 
 For Python runner changes, also run:
@@ -153,13 +168,14 @@ They help confirm:
 - scheduler reconciliation paths still perform the expected transitions
 - AI model allowlisting, manual selection, capability fallback, and sequential
   state behavior remain stable
+- frontend AI rendering helpers and graph/chart/Markdown normalization remain stable
 
 They do **not** yet prove:
 
 - full HTTP wiring
 - real database behavior under concurrency
-- frontend behavior
-- visual correctness of Markdown, KaTeX, Plotly, or Mermaid rendering
+- full browser behavior
+- visual correctness of Markdown, KaTeX, Plotly, or Mermaid rendering beyond the existing unit tests
 - container-level Python sandboxing beyond the runner's application-level
   validation and subprocess timeout
 
