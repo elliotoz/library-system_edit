@@ -7,40 +7,43 @@ export interface AiModelOption {
   badge?: string;
 }
 
-export const AI_MODEL_OPTIONS: AiModelOption[] = [
-  {
-    id: AUTO_MODEL_ID,
-    name: 'Auto',
-    description: 'OZ chooses the best model for each request',
-    badge: 'Default',
-  },
-  {
-    id: 'google/gemini-3.1-flash-lite-preview',
-    name: 'Gemini Flash Lite',
-    description: 'Fast · catalog queries & tool use',
-  },
-  {
-    id: 'anthropic/claude-3-haiku',
-    name: 'Claude 3 Haiku',
-    description: 'Smart · deep analysis & research',
-  },
-  {
-    id: 'google/gemma-4-31b-it:free',
-    name: 'Gemma 4 (Free)',
-    description: 'Free · simple questions & greetings',
-    badge: 'Free',
-  },
-  {
-    id: 'openai/gpt-5.1-codex-mini',
-    name: 'GPT-5.1 Codex Mini',
-    description: 'Technical - coding and structured reasoning',
-  },
-];
-
-export function getAiModelOption(modelId?: string | null): AiModelOption | undefined {
-  return AI_MODEL_OPTIONS.find((model) => model.id === modelId);
+export interface BackendAiModelOption {
+  id: string;
+  label: string;
+  description: string;
+  badge?: string;
 }
 
-export function getAiModelLabel(modelId?: string | null): string {
-  return getAiModelOption(modelId)?.name ?? (modelId || 'Unknown model');
+export const AUTO_MODEL_OPTION: AiModelOption = {
+  id: AUTO_MODEL_ID,
+  name: 'Auto',
+  description: 'OZ chooses the best model for each request',
+  badge: 'Default',
+};
+
+export const AUTO_ONLY_MODEL_OPTIONS: AiModelOption[] = [AUTO_MODEL_OPTION];
+
+export function mapBackendModelOption(model: BackendAiModelOption): AiModelOption {
+  return {
+    id: model.id,
+    name: model.label,
+    description: model.description,
+    ...(model.badge ? { badge: model.badge } : {}),
+  };
+}
+
+export function mapBackendModelOptions(models: BackendAiModelOption[]): AiModelOption[] {
+  const mapped = models
+    .filter((model) => model.id && model.label && model.description)
+    .map(mapBackendModelOption);
+
+  return mapped.length > 0 ? mapped : AUTO_ONLY_MODEL_OPTIONS;
+}
+
+export function getAiModelOption(modelId?: string | null, models: AiModelOption[] = AUTO_ONLY_MODEL_OPTIONS): AiModelOption | undefined {
+  return models.find((model) => model.id === modelId);
+}
+
+export function getAiModelLabel(modelId?: string | null, models: AiModelOption[] = AUTO_ONLY_MODEL_OPTIONS): string {
+  return getAiModelOption(modelId, models)?.name ?? (modelId || 'Unknown model');
 }

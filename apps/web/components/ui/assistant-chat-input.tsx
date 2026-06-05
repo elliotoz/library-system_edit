@@ -5,7 +5,7 @@ import {
   Plus, ChevronDown, ArrowUp, X, FileText, Loader2, Check, Archive,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { AI_MODEL_OPTIONS, AUTO_MODEL_ID, type AiModelOption } from '@/lib/ai-models';
+import { AUTO_MODEL_ID, AUTO_ONLY_MODEL_OPTIONS, type AiModelOption } from '@/lib/ai-models';
 
 /* ── Icons ── */
 const ThinkingIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -178,9 +178,8 @@ interface AssistantChatInputProps {
   placeholder?: string;
   selectedModel?: string;
   onSelectedModelChange?: (model: string) => void;
+  models?: AiModelOption[];
 }
-
-const MODELS = AI_MODEL_OPTIONS;
 
 export const AssistantChatInput: React.FC<AssistantChatInputProps> = ({
   onSendMessage,
@@ -188,12 +187,14 @@ export const AssistantChatInput: React.FC<AssistantChatInputProps> = ({
   placeholder = 'Ask me anything about books…',
   selectedModel = AUTO_MODEL_ID,
   onSelectedModelChange,
+  models,
 }) => {
   const [message, setMessage] = useState('');
   const [files, setFiles] = useState<AttachedFile[]>([]);
   const [pastedContent, setPastedContent] = useState<PastedSnippet[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isThinkingEnabled, setIsThinkingEnabled] = useState(false);
+  const modelOptions = models && models.length > 0 ? models : AUTO_ONLY_MODEL_OPTIONS;
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -326,7 +327,7 @@ export const AssistantChatInput: React.FC<AssistantChatInputProps> = ({
 
             {/* Right */}
             <div className="flex items-center gap-1">
-              <ModelSelector models={MODELS} selectedModel={selectedModel} onSelect={(modelId) => onSelectedModelChange?.(modelId)} />
+              <ModelSelector models={modelOptions} selectedModel={selectedModel} onSelect={(modelId) => onSelectedModelChange?.(modelId)} />
               <button
                 onClick={handleSend}
                 disabled={!hasContent}

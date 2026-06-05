@@ -9,7 +9,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { BookCitationCards } from '@/components/BookCitationCards';
 import { AssistantChatInput, type ChatSendPayload } from '@/components/ui/assistant-chat-input';
 import { type AiMode, type DisplayAiMode, normalizeAiModes, resolveAiModes } from '@/lib/ai-modes';
-import { AUTO_MODEL_ID, getAiModelLabel } from '@/lib/ai-models';
+import {
+  AUTO_MODEL_ID,
+  AUTO_ONLY_MODEL_OPTIONS,
+  type AiModelOption,
+  getAiModelLabel,
+  mapBackendModelOptions,
+} from '@/lib/ai-models';
 
 const AIMessage = dynamic(
   () => import('@/components/ui/ai-message').then((mod) => ({ default: mod.AIMessage })),
@@ -173,6 +179,7 @@ export default function AIAssistantPage() {
   const [manualModes, setManualModes] = useState<AiMode[]>([]);
   const [autoModes, setAutoModes] = useState<AiMode[]>([]);
   const [selectedModel, setSelectedModel] = useState(AUTO_MODEL_ID);
+  const [modelOptions, setModelOptions] = useState<AiModelOption[]>(AUTO_ONLY_MODEL_OPTIONS);
   const [activeModelState, setActiveModelState] = useState<ConversationModelState>({
     manualModel: null,
     lastResolvedModel: null,
@@ -364,6 +371,16 @@ export default function AIAssistantPage() {
   }, []);
 
   useEffect(() => {
+    fetch('/api/ai/models', { credentials: 'include' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Failed to load AI models');
+        const data = await response.json();
+        setModelOptions(mapBackendModelOptions(data));
+      })
+      .catch(() => setModelOptions(AUTO_ONLY_MODEL_OPTIONS));
+  }, []);
+
+  useEffect(() => {
     (async () => {
       const convs = await loadConversations();
 
@@ -505,7 +522,7 @@ export default function AIAssistantPage() {
   const activeModes = resolveAiModes(manualModes, autoModes);
   const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId) ?? null;
   const currentIsStudySession = isStudySession || !!activeConversation?.studyBookId;
-  const activeModelLabel = getAiModelLabel(activeModelState.activeModel ?? selectedModel);
+  const activeModelLabel = getAiModelLabel(activeModelState.activeModel ?? selectedModel, modelOptions);
   const activeModelSourceLabel =
     activeModelState.lastModelSelectionSource === 'manual' ? 'Manual' :
     activeModelState.lastModelSelectionSource === 'capability_fallback' ? 'Cap. fallback' :
@@ -668,7 +685,7 @@ export default function AIAssistantPage() {
           <span className="text-xs text-gray-500 dark:text-gray-400 mr-0.5 flex-shrink-0">Model:</span>
           {activeModelState.manualModel && activeModelState.manualModel !== activeModelState.activeModel && (
             <span className="px-2.5 py-1 rounded-full text-xs font-medium border inline-flex items-center gap-1 border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400">
-              <span>{getAiModelLabel(activeModelState.manualModel)}</span>
+              <span>{getAiModelLabel(activeModelState.manualModel, modelOptions)}</span>
               <span className="text-[10px] opacity-60">Preferred</span>
             </span>
           )}
@@ -806,6 +823,7 @@ export default function AIAssistantPage() {
             placeholder={currentIsStudySession ? 'Ask about this book…' : 'Ask me anything about books…'}
             selectedModel={selectedModel}
             onSelectedModelChange={handleSelectedModelChange}
+            models={modelOptions}
           />
         </div>
       </div>
