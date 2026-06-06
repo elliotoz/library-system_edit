@@ -9,6 +9,13 @@ import { TokenTrackerService } from './session/token-tracker.service';
 import { MaterialSearchService } from '../materials/material-search.service';
 import { buildMaterialAccessWhere, MaterialAccessContext } from '../materials/material-access.util';
 import { BookDocumentService, BookPdfContent } from '../books/book-document.service';
+import {
+  BookChunkContextResult,
+  BookChunkSearchResult,
+  BookContentSearchService,
+  BookOutlineResult,
+  BookStructureResult,
+} from '../books/book-content-search.service';
 import { OPENROUTER_MODELS } from './providers/openrouter.provider';
 import { AUTO_MODEL_ID, getModelEntry, getPublicModelList, isAllowlistedModel } from './model-registry';
 import { AiModeState, buildAiModeState, buildModeInstructionBlock, getDefaultAutoModes, inferAutoModes, normalizeAiModes } from './ai-modes';
@@ -73,6 +80,7 @@ export class AgentService {
     private readonly tokenTrackerService: TokenTrackerService,
     private readonly materialSearch: MaterialSearchService,
     private readonly bookDocumentService: BookDocumentService,
+    private readonly bookContentSearch: BookContentSearchService,
     private readonly pythonExecution: PythonExecutionService,
   ) {}
 
@@ -923,6 +931,7 @@ export class AgentService {
         publisher: true,
         pageCount: true,
         isEbookAvailable: true,
+        _count: { select: { chunks: true } },
       },
     });
 
@@ -948,6 +957,10 @@ export class AgentService {
       ? book.subjectTags.join(', ')
       : 'none';
     const publisherSuffix = book.publisher ? `by ${book.publisher}` : '';
+    const indexedChunkCount = book._count?.chunks ?? 0;
+    const indexedContentNote = indexedChunkCount > 0
+      ? `Indexed chunks available: ${indexedChunkCount}. Mention that OZ can use indexed book content in follow-up questions.`
+      : 'Indexed chunks available: 0. Do not imply OZ has indexed page-level book content yet.';
 
     const studyPrompt = `You are a university library study assistant. A student has opened a dedicated study session for this book.
 
@@ -959,15 +972,22 @@ Description: ${book.description ?? 'No description available'}
 Published: ${book.publicationYear ?? 'Unknown'} ${publisherSuffix}
 Pages: ${book.pageCount ?? 'Unknown'}
 E-book available: ${book.isEbookAvailable ? 'Yes' : 'No'}
+${indexedContentNote}
 
 Write a structured study guide in markdown covering:
-1. **What this book is about** (2–3 sentences)
-2. **Who it is best suited for and why**
-3. **How to approach reading it** (strategy, order, pace)
-4. **5 key concepts or themes to watch for**
-5. **3 guiding questions to keep in mind while reading**
+1. **Quick summary**
+2. **Best for**
+3. **Difficulty level**
+4. **Prerequisites**
+5. **Key concepts**
+6. **Study roadmap**
+7. **Practice tasks**
+8. **Quiz questions**
+9. **Common mistakes to avoid**
+10. **Mastery checklist**
+11. **What to ask OZ next**
 
-Be concise, practical, and encouraging. Base everything on the book details provided above. Do not invent content beyond what is given.`;
+Keep the guide practical and not too long. Base it on the book metadata above. Do not invent chapters, page-specific details, or quotes unless indexed or readable content is supplied by a tool.`;
 
     let studyGuide = '';
     try {
@@ -989,17 +1009,41 @@ Be concise, practical, and encouraging. Base everything on the book details prov
     }
 
     if (!studyGuide) {
-      studyGuide = `## 📖 Study Guide: ${book.title}\n\n` +
+      studyGuide = `## Study Guide: ${book.title}\n\n` +
         `**Authors:** ${authorsStr || 'Unknown'}\n` +
         (book.category ? `**Category:** ${book.category}\n` : '') +
+        `**Indexed chunks available:** ${indexedChunkCount}\n` +
         (book.description ? `\n${book.description}\n` : '') +
-        `\n### How to approach this book\n` +
-        `Start with the table of contents to get a map of the material, then read chapter by chapter taking notes on key terms and arguments. Return to chapters that introduce new concepts.\n\n` +
-        `### Key questions to keep in mind\n` +
-        `1. What is the central argument or purpose of this book?\n` +
-        `2. What evidence or examples does the author use to support their points?\n` +
-        `3. How does this connect to what you already know about the subject?\n\n` +
-        `Ask me anything about this book to deepen your understanding.`;
+        `\n### Quick summary\n\n` +
+        `${book.description ?? 'Use the book metadata and follow-up questions to build a focused study path.'}\n\n` +
+        `### Best for\n\n` +
+        `Students studying ${book.category ?? 'this subject'} who want a guided reading path.\n\n` +
+        `### Difficulty level\n\n` +
+        `Use the first follow-up question to set this as beginner, intermediate, or advanced.\n\n` +
+        `### Prerequisites\n\n` +
+        `Review the basic vocabulary for this subject before reading deeply.\n\n` +
+        `### Key concepts\n\n` +
+        `Use the subject tags and follow-up questions to identify the most important concepts.\n\n` +
+        `### Study roadmap\n\n` +
+        `1. Skim the metadata and contents if available.\n` +
+        `2. Read one section at a time and write short notes.\n` +
+        `3. Ask OZ to explain hard passages or create practice questions.\n\n` +
+        `### Practice tasks\n\n` +
+        `Summarize the main idea in your own words, then list three terms you need to review.\n\n` +
+        `### Quiz questions\n\n` +
+        `1. What is the book mainly trying to help you understand?\n` +
+        `2. Which prerequisite ideas do you need to review first?\n` +
+        `3. How would you apply one concept from the book?\n\n` +
+        `### Common mistakes to avoid\n\n` +
+        `Do not memorize isolated facts without checking how they connect to the larger topic.\n\n` +
+        `### Mastery checklist\n\n` +
+        `- I can explain the topic in plain language.\n` +
+        `- I can answer basic questions without notes.\n` +
+        `- I know what to study next.\n\n` +
+        `### What to ask OZ next\n\n` +
+        (indexedChunkCount > 0
+          ? `Ask OZ to explain a topic from the book using indexed book content, create quiz questions, or build a weekly study plan.`
+          : `Ask OZ to make a study plan, explain the book metadata, or use readable e-book content if available.`);
     }
 
     await this.saveMessage(userId, 'assistant', studyGuide, conv.id);
@@ -1078,14 +1122,19 @@ Opening indexed content:
 ${outlineText}
 
 Write a structured study guide in markdown covering:
-1. **Material summary** based on the indexed content
-2. **Main topics or arguments**
-3. **How to study this material** with practical reading steps
-4. **5 key terms, ideas, or sections to focus on**
-5. **3 guiding questions for deeper understanding**
-6. **What the user can ask OZ next**
+1. **Quick summary**
+2. **Best for**
+3. **Difficulty level**
+4. **Prerequisites**
+5. **Key concepts**
+6. **Study roadmap**
+7. **Practice tasks**
+8. **Quiz questions**
+9. **Common mistakes to avoid**
+10. **Mastery checklist**
+11. **What to ask OZ next**
 
-Be concise, accurate, and educational. Base the guide only on the material metadata and indexed content above. Do not claim to have read sections that are not represented in the indexed content.`;
+Keep it practical and not too long. Base the guide only on the material metadata and outline chunks provided above. Do not claim to have read chunks that are not provided. If more detail is needed later, normal chat can use material tools.`;
 
     let studyGuide = '';
     try {
@@ -1112,16 +1161,33 @@ Be concise, accurate, and educational. Base the guide only on the material metad
         `**Type:** ${material.type}\n` +
         `**Author:** ${material.authorName}\n` +
         (material.description ? `\n${material.description}\n` : '') +
-        `\n### Material summary\n\n` +
+        `\n### Quick summary\n\n` +
         `${preview}\n\n` +
-        `### How to study this material\n\n` +
+        `### Best for\n\n` +
+        `Students reviewing ${material.courseCode ?? material.facultyCode ?? 'this subject'} from an indexed academic material.\n\n` +
+        `### Difficulty level\n\n` +
+        `Use the opening content and follow-up questions to set this as beginner, intermediate, or advanced.\n\n` +
+        `### Prerequisites\n\n` +
+        `Review the core terms introduced in the opening chunks before moving deeper.\n\n` +
+        `### Key concepts\n\n` +
+        `Focus on recurring terms, definitions, examples, and section goals from the indexed outline.\n\n` +
+        `### Study roadmap\n\n` +
         `1. Start by reading the opening section carefully and note the central topic.\n` +
         `2. Identify recurring terms, definitions, and examples.\n` +
         `3. Turn each major section into a short question and answer it in your own words.\n\n` +
-        `### Guiding questions\n\n` +
+        `### Practice tasks\n\n` +
+        `Write a five-sentence summary, define three key terms, and create one example from the material.\n\n` +
+        `### Quiz questions\n\n` +
         `1. What problem or topic is this material focused on?\n` +
         `2. Which concepts are most important for a course discussion or exam?\n` +
         `3. What examples or evidence does the author use?\n\n` +
+        `### Common mistakes to avoid\n\n` +
+        `Do not assume the guide covers sections that were not included in the indexed outline.\n\n` +
+        `### Mastery checklist\n\n` +
+        `- I can summarize the material's main topic.\n` +
+        `- I can define the key terms in my own words.\n` +
+        `- I can answer practice questions without relying on the text.\n\n` +
+        `### What to ask OZ next\n\n` +
         `Ask me to explain a section, create quiz questions, build flashcards, or make a study plan for this material.`;
     }
 
@@ -1195,6 +1261,69 @@ Be concise, accurate, and educational. Base the guide only on the material metad
               question: { type: 'string', description: 'What to find in the document' },
             },
             required: ['url', 'question'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'find_book_structure',
+          description: 'Find chapter, contents, table-of-contents, or structure evidence from indexed catalog book chunks. Use this for chapter lists, chapter counts, table of contents, book structure, and chapter-by-chapter overview questions.',
+          parameters: {
+            type: 'object',
+            properties: {
+              bookId: { type: 'string', description: 'Catalog book ID' },
+              limit: { type: 'number', description: 'Max evidence chunks to return (default 8, max 12)' },
+            },
+            required: ['bookId'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'search_book_content',
+          description: 'Search indexed chunks from catalog books. Use this after identifying a catalog book when the user asks to teach, explain, summarize, or answer using book content.',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: { type: 'string', description: 'Search query for indexed book content' },
+              bookId: { type: 'string', description: 'Optional catalog book ID to restrict search to one book' },
+              limit: { type: 'number', description: 'Max results to return (default 5, max 10)' },
+            },
+            required: ['query'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'get_book_chunk_context',
+          description: 'Get neighboring chunks around a specific book chunk for more complete context. Use when a book content search result needs surrounding explanation.',
+          parameters: {
+            type: 'object',
+            properties: {
+              bookId: { type: 'string', description: 'Catalog book ID' },
+              chunkIndex: { type: 'number', description: 'Chunk index to expand around' },
+              before: { type: 'number', description: 'Number of chunks before target (default 1, max 3)' },
+              after: { type: 'number', description: 'Number of chunks after target (default 1, max 3)' },
+            },
+            required: ['bookId', 'chunkIndex'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'get_book_outline',
+          description: 'Get the first indexed chunks and metadata for a catalog book to understand opening structure or available indexed content. This is not guaranteed to be a real table of contents.',
+          parameters: {
+            type: 'object',
+            properties: {
+              bookId: { type: 'string', description: 'Catalog book ID' },
+              limit: { type: 'number', description: 'Max opening chunks to return (default 5, max 10)' },
+            },
+            required: ['bookId'],
           },
         },
       },
@@ -1616,6 +1745,109 @@ Be concise, accurate, and educational. Base the guide only on the material metad
       : '';
     return `${heading} (for: ${question}):\n\n${structureInstruction}${metadata.join('\n')}${metadata.length > 0 ? '\n\n' : ''}${excerpt}`;
   }
+
+  private formatBookContentSearchResults(
+    query: string,
+    results: BookChunkSearchResult[],
+  ): string {
+    if (!results.length) {
+      return `No indexed catalog book chunks found for query: "${query}".`;
+    }
+
+    const formatted = results.map((chunk, index) => [
+      `[${index + 1}] ${chunk.title}`,
+      `Authors: ${chunk.authors.join(', ') || 'Unknown'}`,
+      `Book ID: ${chunk.bookId}`,
+      `Chunk: ${chunk.chunkIndex}${chunk.pageNumber != null ? ` | Page: ${chunk.pageNumber}` : ''} | Rank: ${chunk.rank.toFixed(3)}`,
+      this.truncateToolContent(chunk.content),
+    ].join('\n')).join('\n\n---\n\n');
+
+    return `BOOK CONTENT SEARCH RESULTS (query: "${query}"):\n\n${formatted}`;
+  }
+
+  private formatBookChunkContext(context: BookChunkContextResult): string {
+    if (!context.book || !context.chunks.length) {
+      return 'No indexed context found for that catalog book chunk.';
+    }
+
+    const formatted = context.chunks.map((chunk) =>
+      `[Chunk ${chunk.chunkIndex}${chunk.pageNumber != null ? `, page ${chunk.pageNumber}` : ''}]\n${this.truncateToolContent(chunk.content)}`,
+    ).join('\n\n---\n\n');
+
+    return [
+      'BOOK CHUNK CONTEXT',
+      `Book: ${context.book.title}`,
+      `Authors: ${context.book.authors.join(', ') || 'Unknown'}`,
+      `Book ID: ${context.book.id}`,
+      `Target chunk: ${context.targetChunkIndex}`,
+      '',
+      formatted,
+    ].join('\n');
+  }
+
+  private formatBookOutline(outline: BookOutlineResult): string {
+    if (!outline.book || !outline.chunks.length) {
+      return 'No indexed outline is available for that catalog book.';
+    }
+
+    const formatted = outline.chunks.map((chunk) =>
+      `[Chunk ${chunk.chunkIndex}${chunk.pageNumber != null ? `, page ${chunk.pageNumber}` : ''}]\n${this.truncateToolContent(chunk.content)}`,
+    ).join('\n\n---\n\n');
+
+    return [
+      'BOOK INDEXED OUTLINE',
+      'This is an opening indexed-content overview, not a guaranteed table of contents.',
+      `Book: ${outline.book.title}`,
+      `Authors: ${outline.book.authors.join(', ') || 'Unknown'}`,
+      `Book ID: ${outline.book.id}`,
+      `PDF index status: ${outline.book.pdfIndexStatus}`,
+      `PDF pages: ${outline.book.pdfPageCount ?? 'Unknown'}`,
+      `Total chunks: ${outline.book.totalChunkCount}`,
+      '',
+      formatted,
+    ].join('\n');
+  }
+
+  private formatBookStructure(structure: BookStructureResult): string {
+    if (!structure.book || !structure.evidence.length) {
+      return [
+        'BOOK STRUCTURE EVIDENCE',
+        `Confidence: ${structure.confidence}`,
+        structure.message,
+        'Do not claim a final chapter count unless confidence is complete.',
+        '',
+        'No indexed chapter, contents, or structure evidence was found for that catalog book.',
+      ].join('\n');
+    }
+
+    const formatted = structure.evidence.map((item) => [
+      `[Chunk ${item.chunkIndex}${item.pageNumber != null ? `, page ${item.pageNumber}` : ''}]`,
+      `Reason: ${item.reason}`,
+      this.truncateToolContent(item.excerpt, 1600),
+    ].join('\n')).join('\n\n---\n\n');
+
+    return [
+      'BOOK STRUCTURE EVIDENCE',
+      `Book: ${structure.book.title}`,
+      `Authors: ${structure.book.authors.join(', ') || 'Unknown'}`,
+      `Book ID: ${structure.book.id}`,
+      `PDF index status: ${structure.book.pdfIndexStatus}`,
+      `PDF pages: ${structure.book.pdfPageCount ?? 'Unknown'}`,
+      `Total chunks: ${structure.book.totalChunks}`,
+      `Confidence: ${structure.confidence}`,
+      structure.message,
+      'Do not claim a final chapter count unless confidence is complete.',
+      '',
+      formatted,
+    ].join('\n');
+  }
+
+  private truncateToolContent(content: string, maxChars = 900): string {
+    const compact = content.replace(/\s+/g, ' ').trim();
+    if (compact.length <= maxChars) return compact;
+    return `${compact.slice(0, maxChars).trimEnd()}...`;
+  }
+
   private async executeToolInner(
     name: string,
     args: Record<string, unknown>,
@@ -1723,6 +1955,58 @@ Be concise, accurate, and educational. Base the guide only on the material metad
 
           const excerpt = this.buildRelevantExcerpt(text, question, 4000);
           return { result: `E-BOOK CONTENT (for: ${question}):\n\n${excerpt}`, citations: [] };
+        }
+
+        case 'search_book_content': {
+          const query = String(args.query ?? '');
+          const results = await this.bookContentSearch.searchBookChunks({
+            query,
+            bookId: typeof args.bookId === 'string' ? args.bookId : undefined,
+            limit: typeof args.limit === 'number' ? args.limit : undefined,
+          });
+
+          return {
+            result: this.formatBookContentSearchResults(query, results),
+            citations: [],
+          };
+        }
+
+        case 'get_book_chunk_context': {
+          const context = await this.bookContentSearch.getBookChunkContext({
+            bookId: String(args.bookId ?? ''),
+            chunkIndex: Number(args.chunkIndex),
+            before: typeof args.before === 'number' ? args.before : undefined,
+            after: typeof args.after === 'number' ? args.after : undefined,
+          });
+
+          return {
+            result: this.formatBookChunkContext(context),
+            citations: [],
+          };
+        }
+
+        case 'get_book_outline': {
+          const outline = await this.bookContentSearch.getBookOutline({
+            bookId: String(args.bookId ?? ''),
+            limit: typeof args.limit === 'number' ? args.limit : undefined,
+          });
+
+          return {
+            result: this.formatBookOutline(outline),
+            citations: [],
+          };
+        }
+
+        case 'find_book_structure': {
+          const structure = await this.bookContentSearch.findBookStructure({
+            bookId: String(args.bookId ?? ''),
+            limit: typeof args.limit === 'number' ? args.limit : undefined,
+          });
+
+          return {
+            result: this.formatBookStructure(structure),
+            citations: [],
+          };
         }
 
         case 'fetch_webpage': {

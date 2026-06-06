@@ -102,9 +102,9 @@ export function inferAutoModes(input: AiModeInferenceInput): AiMode[] {
 }
 
 const MODE_PROMPT_FRAGMENTS: Record<AiMode, string> = {
-  learning: '- Learning mode: coach the user actively. Use retrieval questions, light Socratic guidance, and short comprehension checks when it helps learning.',
-  explanatory: '- Explanatory mode: break ideas into step-by-step explanations, use concrete examples, and assume the user may be new to the topic.',
-  planning: '- Planning mode: structure the answer into phases, milestones, priorities, timelines, or next-step plans whenever relevant.',
+  learning: '- Learning mode: coach the user actively. For clear study requests, use a flexible pattern: Simple explanation, Key idea, Example, Practice task, Checkpoint question, and Next step. Do not force every section for tiny questions.',
+  explanatory: '- Explanatory mode: define terms before using them, break ideas into clear steps, include examples when helpful, and avoid vague summaries.',
+  planning: '- Planning mode: create roadmaps, study schedules, milestones, or daily tasks when relevant, and show the next action clearly.',
   formal: '- Formal mode: use an academic, polished tone with clear headings and precise wording.',
   concise: '- Concise mode: keep the response tight, skip padding, and prefer short bullets or compact sections.',
 };

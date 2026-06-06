@@ -99,6 +99,7 @@ function makeService() {
     {} as never,
     {} as never,
     {} as never,
+    {} as never,
   );
 }
 
@@ -272,6 +273,7 @@ describe('AgentService.updateConversationModel', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
     await expect(service.updateConversationModel('missing-id', 'user-1', 'auto'))
       .rejects.toThrow('Conversation not found');
@@ -285,6 +287,7 @@ describe('AgentService.updateConversationModel', () => {
     };
     const service = new AgentService(
       prisma as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,

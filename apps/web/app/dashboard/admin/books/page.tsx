@@ -10,6 +10,14 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
+  Brain,
+  Loader2,
+  FileText,
+  ExternalLink,
+  Clock,
+  CheckCircle,
+  XCircle,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -24,6 +32,54 @@ interface Book {
   category: string | null;
   totalCopies: number;
   availableCopies: number;
+  pdfUrl: string | null;
+  ebookUrl: string | null;
+  pdfIndexStatus: 'PENDING' | 'PROCESSING' | 'INDEXED' | 'FAILED' | 'NOT_APPLICABLE';
+  pdfPageCount: number | null;
+  pdfIndexedAt: string | null;
+}
+
+const indexStatusConfig: Record<
+  Book['pdfIndexStatus'],
+  { label: string; className: string; title: string }
+> = {
+  PENDING: {
+    label: 'pending',
+    className:
+      'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200',
+    title: 'Waiting to be indexed',
+  },
+  PROCESSING: {
+    label: 'processing',
+    className:
+      'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200',
+    title: 'PDF indexing is in progress',
+  },
+  INDEXED: {
+    label: 'indexed',
+    className:
+      'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200',
+    title: 'PDF content is indexed',
+  },
+  FAILED: {
+    label: 'failed',
+    className: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200',
+    title: 'PDF indexing failed',
+  },
+  NOT_APPLICABLE: {
+    label: 'n/a',
+    className:
+      'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
+    title: 'No local PDF or direct PDF e-book URL is available',
+  },
+};
+
+function IndexStatusIcon({ status }: { status: Book['pdfIndexStatus'] }) {
+  if (status === 'PROCESSING') return <Loader2 className="h-3.5 w-3.5 animate-spin" />;
+  if (status === 'INDEXED') return <CheckCircle className="h-3.5 w-3.5" />;
+  if (status === 'FAILED') return <XCircle className="h-3.5 w-3.5" />;
+  if (status === 'PENDING') return <Clock className="h-3.5 w-3.5" />;
+  return <X className="h-3.5 w-3.5" />;
 }
 
 export default function ManageBooksPage() {
@@ -32,6 +88,7 @@ export default function ManageBooksPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [isReindexing, setIsReindexing] = useState(false);
 
   const fetchBooks = async () => {
     setIsLoading(true);
@@ -83,18 +140,51 @@ export default function ManageBooksPage() {
     }
   };
 
+  const handleReindexBooks = async () => {
+    setIsReindexing(true);
+    try {
+      const response = await fetch('/api/books/admin/reindex-pending-pdfs?limit=25', {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json() as { queued?: number };
+        toast.success(`Queued ${data.queued ?? 0} book PDFs for indexing`);
+        fetchBooks();
+      } else {
+        toast.error(await extractApiError(response, 'Failed to queue book indexing'));
+      }
+    } catch {
+      toast.error('Failed to queue book indexing');
+    } finally {
+      setIsReindexing(false);
+    }
+  };
+
   return (
     <AdminPageLayout
       title="Manage Books"
       description="Add, edit, and manage library books"
       action={
-        <Link
-          href="/dashboard/admin/books/new"
-          className="flex items-center gap-2 rounded-lg bg-primary-500 px-4 py-2 text-white hover:bg-primary-600"
-        >
-          <Plus className="h-4 w-4" />
-          Add Book
-        </Link>
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={handleReindexBooks}
+            disabled={isReindexing}
+            className="flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:opacity-50"
+          >
+            <Brain className="h-4 w-4" />
+            {isReindexing ? 'Re-indexing...' : 'Re-index Books'}
+          </button>
+          <Link
+            href="/dashboard/admin/books/new"
+            className="flex items-center gap-2 rounded-lg bg-primary-500 px-4 py-2 text-white hover:bg-primary-600"
+          >
+            <Plus className="h-4 w-4" />
+            Add Book
+          </Link>
+        </div>
       }
     >
       <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
@@ -140,6 +230,12 @@ export default function ManageBooksPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
                     Copies
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
+                    PDF / E-book
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
+                    AI Index
+                  </th>
                   <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
                     Actions
                   </th>
@@ -176,6 +272,57 @@ export default function ManageBooksPage() {
                       >
                         {book.availableCopies}/{book.totalCopies}
                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-1.5">
+                        <span
+                          className={cn(
+                            'inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium',
+                            book.pdfUrl
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
+                              : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                          )}
+                          title={book.pdfUrl ? 'Local book PDF is attached' : 'No local book PDF attached'}
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                          {book.pdfUrl ? 'PDF attached' : 'No PDF'}
+                        </span>
+                        <span
+                          className={cn(
+                            'inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium',
+                            book.ebookUrl
+                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200'
+                              : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                          )}
+                          title={book.ebookUrl ? 'E-book URL is set' : 'No e-book URL set'}
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          {book.ebookUrl ? 'E-book URL' : 'No e-book URL'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-1">
+                        <span
+                          className={cn(
+                            'inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium',
+                            indexStatusConfig[book.pdfIndexStatus]?.className ||
+                              indexStatusConfig.NOT_APPLICABLE.className
+                          )}
+                          title={
+                            indexStatusConfig[book.pdfIndexStatus]?.title ||
+                            indexStatusConfig.NOT_APPLICABLE.title
+                          }
+                        >
+                          <IndexStatusIcon status={book.pdfIndexStatus} />
+                          {indexStatusConfig[book.pdfIndexStatus]?.label || book.pdfIndexStatus}
+                        </span>
+                        {book.pdfPageCount ? (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {book.pdfPageCount} pages
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">

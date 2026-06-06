@@ -114,6 +114,75 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Never mix different conversations');
   });
 
+  it('makes the student role a practical study tutor', () => {
+    const prompt = buildSystemPrompt(baseContext);
+
+    expect(prompt).toContain('explain step by step');
+    expect(prompt).toContain('identify prerequisites');
+    expect(prompt).toContain('practice tasks');
+    expect(prompt).toContain('quiz or checkpoint questions');
+    expect(prompt).toContain('mastery checklist');
+    expect(prompt).toContain('indexed book content');
+    expect(prompt).toContain('practical and not too long');
+  });
+
+  it('routes catalog book learning questions to indexed book tools before URL fallback', () => {
+    const prompt = buildSystemPrompt(baseContext);
+
+    expect(prompt).toContain('For catalog books, use catalog tools first');
+    expect(prompt).toContain('Never ask the user for a URL before checking catalog and indexed book tools');
+    expect(prompt).toContain('search_book_content');
+    expect(prompt).toContain('get_book_chunk_context');
+    expect(prompt).toContain('get_book_outline');
+    expect(prompt).toContain('Use material tools only for uploaded academic materials');
+    expect(prompt).toContain('If neither indexed chunks nor a readable URL are available');
+  });
+
+  it('routes catalog book chapter and table-of-contents questions through indexed structure evidence', () => {
+    const prompt = buildSystemPrompt(baseContext);
+
+    expect(prompt).toContain('For catalog book chapter, table of contents, or structure questions');
+    expect(prompt).toContain('list chapters');
+    expect(prompt).toContain('how many chapters');
+    expect(prompt).toContain('chapter by chapter overview');
+    expect(prompt).toContain('call find_book_structure');
+    expect(prompt).toContain('use get_book_outline only if opening chunks are also needed');
+    expect(prompt).toContain('table of contents');
+    expect(prompt).toContain('brief contents');
+    expect(prompt).toContain('Chapter 1');
+    expect(prompt).toContain('Chapter 2');
+    expect(prompt).toContain('get_book_chunk_context');
+    expect(prompt).toContain('treat retrieved chunks as evidence');
+  });
+
+  it('forbids final chapter counts or complete chapter lists from partial indexed evidence', () => {
+    const prompt = buildSystemPrompt(baseContext);
+
+    expect(prompt).toContain('Never claim a final chapter count or complete chapter list unless the indexed content clearly provides the full table of contents or full chapter list');
+    expect(prompt).toContain('find_book_structure');
+    expect(prompt).toContain('I found partial chapter evidence from the indexed content. Here is what I can confirm so far...');
+    expect(prompt).toContain('Do not invent missing chapters');
+    expect(prompt).toContain('Do not infer a chapter count from scattered chunk matches');
+  });
+
+  it('keeps catalog book tools separate from material tools and checks book tools before URL requests', () => {
+    const prompt = buildSystemPrompt(baseContext);
+
+    expect(prompt).toContain('Never ask the user for a URL before checking catalog tools, indexed book tools, and any existing readable book URL fallback');
+    expect(prompt).toContain('Use catalog and indexed book tools for catalog books');
+    expect(prompt).toContain('Use material tools only for uploaded academic materials');
+    expect(prompt).toContain('Never use material tools for catalog books');
+  });
+
+  it('clarifies casual Java class method questions for students', () => {
+    const prompt = buildSystemPrompt(baseContext);
+
+    expect(prompt).toContain('When a student casually says "class methods" in Java');
+    expect(prompt).toContain('methods inside classes generally');
+    expect(prompt).toContain('static/class methods specifically');
+    expect(prompt).toContain('instance methods as the contrast');
+  });
+
   it('instructs the model to read active material PDFs before falling back to indexed outlines', () => {
     const prompt = buildSystemPrompt(baseContext);
 

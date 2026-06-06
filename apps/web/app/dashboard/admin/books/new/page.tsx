@@ -324,9 +324,9 @@ export default function AddBookPage() {
       <div className="space-y-6">
         <div className="flex items-center gap-4">
           <div className="flex-1">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Attach PDF</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Attach Book PDF</h1>
             <p className="mt-1 text-gray-500 dark:text-gray-400">
-              Optionally upload a PDF for AI search and RAG ingestion
+              The book record has been saved. You can now attach an optional local PDF for indexing.
             </p>
           </div>
         </div>
@@ -357,7 +357,9 @@ export default function AddBookPage() {
               <FileText className="h-12 w-12 text-gray-400" />
               <div>
                 <p className="text-base font-medium text-gray-700 dark:text-gray-300">Upload a PDF for this book</p>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Used for AI-powered search and RAG — max 50 MB</p>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  The file is stored with book PDFs and queued for indexing. Max 50 MB.
+                </p>
               </div>
               <button
                 type="button"
@@ -404,7 +406,7 @@ export default function AddBookPage() {
             Add New Book
           </h1>
           <p className="mt-1 text-gray-500 dark:text-gray-400">
-            Add a new book to the library catalog
+            First save the book metadata and copies. After the book exists, you can attach a local PDF.
           </p>
         </div>
         <input
@@ -426,6 +428,13 @@ export default function AddBookPage() {
             <><ScanLine className="h-4 w-4" />Scan Cover</>
           )}
         </button>
+      </div>
+
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
+        <p className="font-medium">PDF upload happens after saving.</p>
+        <p className="mt-1">
+          Complete this form first. The next step lets you upload an optional book PDF for indexing while keeping the e-book URL field for official online links.
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">

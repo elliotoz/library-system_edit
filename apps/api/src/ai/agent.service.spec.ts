@@ -6,6 +6,7 @@ function makeAgentService(overrides: {
   tokenTracker?: unknown;
   pythonExecution?: unknown;
   materialSearch?: unknown;
+  bookContentSearch?: unknown;
 } = {}) {
   const prisma = overrides.prisma ?? {};
   const catalogSearch = {};
@@ -13,6 +14,7 @@ function makeAgentService(overrides: {
   const tokenTracker = overrides.tokenTracker ?? { record: jest.fn() };
   const materialSearch = overrides.materialSearch ?? {};
   const bookDocumentService = {};
+  const bookContentSearch = overrides.bookContentSearch ?? {};
   const pythonExecution = overrides.pythonExecution ?? { isAvailable: jest.fn().mockReturnValue(false) };
 
   return new AgentService(
@@ -22,6 +24,7 @@ function makeAgentService(overrides: {
     tokenTracker as never,
     materialSearch as never,
     bookDocumentService as never,
+    bookContentSearch as never,
     pythonExecution as never,
   );
 }
@@ -210,6 +213,7 @@ describe('AgentService read_ebook', () => {
       tokenTracker as never,
       materialSearch as never,
       bookDocumentService as never,
+      {} as never,
       pythonExecution as never,
     );
 
@@ -226,6 +230,334 @@ describe('AgentService read_ebook', () => {
     expect(result.result).toContain('E-BOOK CONTENT');
     expect(result.result).toContain('Clean Architecture');
     expect(result.result).toContain('Architecture matters');
+  });
+});
+
+describe('AgentService catalog book content tools', () => {
+  it('defines indexed catalog book tools and keeps material tools available', () => {
+    const service = makeAgentService();
+
+    const toolNames = service['getTools'](Role.STUDENT).map((tool) => tool.function.name);
+
+    expect(toolNames).toEqual(expect.arrayContaining([
+      'search_book_content',
+      'get_book_chunk_context',
+      'get_book_outline',
+      'find_book_structure',
+      'search_study_material',
+      'get_chunk_context',
+      'get_material_outline',
+    ]));
+  });
+
+  it('executes search_book_content through BookContentSearchService with bounded metadata output', async () => {
+    const longContent = `${'Java class methods explain objects. '.repeat(80)}DO_NOT_INCLUDE_TAIL`;
+    const bookContentSearch = {
+      searchBookChunks: jest.fn().mockResolvedValue([
+        {
+          bookId: 'book-java',
+          title: 'Introduction to Java Programming',
+          authors: ['Y. Daniel Liang'],
+          chunkId: 'chunk-10',
+          chunkIndex: 10,
+          pageNumber: 42,
+          content: longContent,
+          rank: 0.321,
+        },
+      ]),
+    };
+    const service = makeAgentService({ bookContentSearch });
+
+    const result = await service['executeToolInner'](
+      'search_book_content',
+      { query: 'java class method', bookId: 'book-java', limit: 50 },
+      'user-1',
+      Role.STUDENT,
+      '',
+      {},
+    );
+
+    expect(bookContentSearch.searchBookChunks).toHaveBeenCalledWith({
+      query: 'java class method',
+      bookId: 'book-java',
+      limit: 50,
+    });
+    expect(result.result).toContain('BOOK CONTENT SEARCH RESULTS (query: "java class method")');
+    expect(result.result).toContain('[1] Introduction to Java Programming');
+    expect(result.result).toContain('Authors: Y. Daniel Liang');
+    expect(result.result).toContain('Book ID: book-java');
+    expect(result.result).toContain('Chunk: 10');
+    expect(result.result).toContain('Page: 42');
+    expect(result.result).toContain('Rank: 0.321');
+    expect(result.result).not.toContain('DO_NOT_INCLUDE_TAIL');
+  });
+
+  it('executes get_book_chunk_context through BookContentSearchService', async () => {
+    const bookContentSearch = {
+      getBookChunkContext: jest.fn().mockResolvedValue({
+        book: {
+          id: 'book-java',
+          title: 'Introduction to Java Programming',
+          authors: ['Y. Daniel Liang'],
+        },
+        targetChunkIndex: 10,
+        chunks: [
+          {
+            bookId: 'book-java',
+            chunkId: 'chunk-9',
+            chunkIndex: 9,
+            pageNumber: 41,
+            content: 'Previous chunk content',
+          },
+          {
+            bookId: 'book-java',
+            chunkId: 'chunk-10',
+            chunkIndex: 10,
+            pageNumber: 42,
+            content: 'Current chunk content',
+          },
+        ],
+      }),
+    };
+    const service = makeAgentService({ bookContentSearch });
+
+    const result = await service['executeToolInner'](
+      'get_book_chunk_context',
+      { bookId: 'book-java', chunkIndex: 10, before: 2, after: 2 },
+      'user-1',
+      Role.STUDENT,
+      '',
+      {},
+    );
+
+    expect(bookContentSearch.getBookChunkContext).toHaveBeenCalledWith({
+      bookId: 'book-java',
+      chunkIndex: 10,
+      before: 2,
+      after: 2,
+    });
+    expect(result.result).toContain('BOOK CHUNK CONTEXT');
+    expect(result.result).toContain('Introduction to Java Programming');
+    expect(result.result).toContain('Target chunk: 10');
+    expect(result.result).toContain('[Chunk 9, page 41]');
+    expect(result.result).toContain('[Chunk 10, page 42]');
+  });
+
+  it('executes get_book_outline through BookContentSearchService', async () => {
+    const bookContentSearch = {
+      getBookOutline: jest.fn().mockResolvedValue({
+        book: {
+          id: 'book-java',
+          title: 'Introduction to Java Programming',
+          authors: ['Y. Daniel Liang'],
+          pdfIndexStatus: 'INDEXED',
+          pdfPageCount: 1344,
+          totalChunkCount: 120,
+        },
+        chunks: [
+          {
+            bookId: 'book-java',
+            chunkId: 'chunk-0',
+            chunkIndex: 0,
+            pageNumber: 1,
+            content: 'Opening indexed content',
+          },
+        ],
+      }),
+    };
+    const service = makeAgentService({ bookContentSearch });
+
+    const result = await service['executeToolInner'](
+      'get_book_outline',
+      { bookId: 'book-java', limit: 20 },
+      'user-1',
+      Role.STUDENT,
+      '',
+      {},
+    );
+
+    expect(bookContentSearch.getBookOutline).toHaveBeenCalledWith({
+      bookId: 'book-java',
+      limit: 20,
+    });
+    expect(result.result).toContain('BOOK INDEXED OUTLINE');
+    expect(result.result).toContain('Introduction to Java Programming');
+    expect(result.result).toContain('PDF index status: INDEXED');
+    expect(result.result).toContain('PDF pages: 1344');
+    expect(result.result).toContain('Total chunks: 120');
+    expect(result.result).toContain('This is an opening indexed-content overview, not a guaranteed table of contents.');
+  });
+
+  it('executes find_book_structure through BookContentSearchService with confidence and warning', async () => {
+    const bookContentSearch = {
+      findBookStructure: jest.fn().mockResolvedValue({
+        book: {
+          id: 'book-bjp',
+          title: 'Building Java Programs',
+          authors: ['Stuart Reges', 'Marty Stepp'],
+          pdfIndexStatus: 'INDEXED',
+          pdfPageCount: 1234,
+          totalChunks: 80,
+        },
+        confidence: 'partial',
+        message: 'Structure evidence is partial unless the evidence clearly shows a full table of contents. Do not claim a final chapter count unless confidence is complete.',
+        evidence: [
+          {
+            chunkId: 'chunk-0',
+            chunkIndex: 0,
+            pageNumber: 4,
+            reason: 'early chunk with contents marker',
+            excerpt: 'Brief Contents\n1 Introduction\n2 Primitive Data',
+          },
+        ],
+      }),
+    };
+    const service = makeAgentService({ bookContentSearch });
+
+    const result = await service['executeToolInner'](
+      'find_book_structure',
+      { bookId: 'book-bjp', limit: 25 },
+      'user-1',
+      Role.STUDENT,
+      '',
+      {},
+    );
+
+    expect(bookContentSearch.findBookStructure).toHaveBeenCalledWith({
+      bookId: 'book-bjp',
+      limit: 25,
+    });
+    expect(result.result).toContain('BOOK STRUCTURE EVIDENCE');
+    expect(result.result).toContain('Building Java Programs');
+    expect(result.result).toContain('Confidence: partial');
+    expect(result.result).toContain('Do not claim a final chapter count unless confidence is complete.');
+    expect(result.result).toContain('[Chunk 0, page 4]');
+    expect(result.result).toContain('Reason: early chunk with contents marker');
+  });
+});
+
+describe('AgentService study guide opening prompts', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('asks for a practical book study guide and mentions indexed chunks when available', async () => {
+    const prisma = {
+      book: {
+        findUnique: jest.fn().mockResolvedValue({
+          title: 'Introduction to Java Programming',
+          authors: ['Y. Daniel Liang'],
+          description: 'A Java programming textbook.',
+          category: 'Computer Science',
+          subjectTags: ['java', 'programming'],
+          publicationYear: 2021,
+          publisher: 'Pearson',
+          pageCount: 1344,
+          isEbookAvailable: true,
+          _count: { chunks: 128 },
+        }),
+      },
+      aiConversation: {
+        create: jest.fn().mockResolvedValue({ id: 'conv-book' }),
+      },
+      aiMessage: {
+        create: jest.fn().mockResolvedValue({}),
+      },
+    };
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        choices: [{ message: { content: '## Study Guide\nGenerated guide' } }],
+      }),
+    } as never);
+    const service = makeAgentService({ prisma });
+
+    await service.createStudySession('user-1', 'book-java');
+
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as { body: string }).body) as {
+      messages: Array<{ role: string; content: string }>;
+    };
+    const prompt = body.messages[0].content;
+
+    expect(prompt).toContain('Quick summary');
+    expect(prompt).toContain('Best for');
+    expect(prompt).toContain('Difficulty level');
+    expect(prompt).toContain('Prerequisites');
+    expect(prompt).toContain('Key concepts');
+    expect(prompt).toContain('Study roadmap');
+    expect(prompt).toContain('Practice tasks');
+    expect(prompt).toContain('Quiz questions');
+    expect(prompt).toContain('Common mistakes to avoid');
+    expect(prompt).toContain('Mastery checklist');
+    expect(prompt).toContain('What to ask OZ next');
+    expect(prompt).toContain('Indexed chunks available: 128');
+    expect(prompt).toContain('Do not invent chapters, page-specific details, or quotes');
+  });
+
+  it('asks for a grounded material study guide based on metadata and provided outline chunks', async () => {
+    const prisma = {
+      material: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'mat-1',
+          title: 'Java Lecture Notes',
+          type: 'COURSE_MATERIAL',
+          description: 'Introductory Java notes.',
+          authorName: 'Prof. Ada',
+          keywords: ['java', 'classes'],
+          facultyCode: 'ENG',
+          courseCode: 'CS101',
+          year: 2026,
+        }),
+      },
+      aiConversation: {
+        create: jest.fn().mockResolvedValue({ id: 'conv-material' }),
+      },
+      aiMessage: {
+        create: jest.fn().mockResolvedValue({}),
+      },
+    };
+    const materialSearch = {
+      getAccessContextForUser: jest.fn().mockResolvedValue({
+        userId: 'user-1',
+        role: Role.STUDENT,
+        facultyCode: null,
+        courseCodes: [],
+      }),
+      getMaterialOutline: jest.fn().mockResolvedValue([
+        {
+          chunkIndex: 0,
+          pageNumber: 1,
+          content: 'Classes group data and methods in Java.',
+        },
+      ]),
+    };
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        choices: [{ message: { content: '## Study Guide\nGenerated material guide' } }],
+      }),
+    } as never);
+    const service = makeAgentService({ prisma, materialSearch });
+
+    await service.createMaterialStudySession('user-1', Role.STUDENT, 'mat-1');
+
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as { body: string }).body) as {
+      messages: Array<{ role: string; content: string }>;
+    };
+    const prompt = body.messages[0].content;
+
+    expect(prompt).toContain('Quick summary');
+    expect(prompt).toContain('Best for');
+    expect(prompt).toContain('Difficulty level');
+    expect(prompt).toContain('Prerequisites');
+    expect(prompt).toContain('Study roadmap');
+    expect(prompt).toContain('Practice tasks');
+    expect(prompt).toContain('Quiz questions');
+    expect(prompt).toContain('Common mistakes to avoid');
+    expect(prompt).toContain('Mastery checklist');
+    expect(prompt).toContain('What to ask OZ next');
+    expect(prompt).toContain('Base the guide only on the material metadata and outline chunks provided above');
+    expect(prompt).toContain('Do not claim to have read chunks that are not provided');
   });
 });
 
@@ -907,6 +1239,7 @@ describe('AgentService read_ebook structure questions', () => {
       tokenTracker as never,
       materialSearch as never,
       bookDocumentService as never,
+      {} as never,
       pythonExecution as never,
     );
 

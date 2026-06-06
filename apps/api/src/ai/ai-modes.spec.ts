@@ -42,4 +42,15 @@ describe('ai-modes helpers', () => {
     expect(block).toContain('Learning mode');
     expect(block).toContain('Concise mode');
   });
+
+  it('describes the richer tutor pattern for learning, explanatory, and planning modes', () => {
+    const block = buildModeInstructionBlock(['learning', 'explanatory', 'planning']);
+
+    expect(block).toContain('Simple explanation');
+    expect(block).toContain('Practice task');
+    expect(block).toContain('Checkpoint question');
+    expect(block).toContain('define terms before using them');
+    expect(block).toContain('roadmaps, study schedules, milestones, or daily tasks');
+    expect(block).toContain('next action');
+  });
 });
