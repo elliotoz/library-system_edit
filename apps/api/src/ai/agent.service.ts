@@ -1786,8 +1786,22 @@ Keep it practical and not too long. Base the guide only on the material metadata
   }
 
   private formatBookOutline(outline: BookOutlineResult): string {
-    if (!outline.book || !outline.chunks.length) {
+    if (!outline.book) {
       return 'No indexed outline is available for that catalog book.';
+    }
+
+    if (!outline.chunks.length) {
+      return [
+        'BOOK INDEXED OUTLINE',
+        `Book: ${outline.book.title}`,
+        `Authors: ${outline.book.authors.join(', ') || 'Unknown'}`,
+        `Book ID: ${outline.book.id}`,
+        `PDF index status: ${outline.book.pdfIndexStatus}`,
+        `PDF pages: ${outline.book.pdfPageCount ?? 'Unknown'}`,
+        `Total chunks: ${outline.book.totalChunkCount}`,
+        '',
+        'The book exists, but no indexed opening chunks are available. If the PDF index status is PENDING or PROCESSING, indexing has not completed yet. If it is FAILED, the PDF could not be indexed.',
+      ].join('\n');
     }
 
     const formatted = outline.chunks.map((chunk) =>
@@ -1809,7 +1823,7 @@ Keep it practical and not too long. Base the guide only on the material metadata
   }
 
   private formatBookStructure(structure: BookStructureResult): string {
-    if (!structure.book || !structure.evidence.length) {
+    if (!structure.book) {
       return [
         'BOOK STRUCTURE EVIDENCE',
         `Confidence: ${structure.confidence}`,
@@ -1817,6 +1831,23 @@ Keep it practical and not too long. Base the guide only on the material metadata
         'Do not claim a final chapter count unless confidence is complete.',
         '',
         'No indexed chapter, contents, or structure evidence was found for that catalog book.',
+      ].join('\n');
+    }
+
+    if (!structure.evidence.length) {
+      return [
+        'BOOK STRUCTURE EVIDENCE',
+        `Book: ${structure.book.title}`,
+        `Authors: ${structure.book.authors.join(', ') || 'Unknown'}`,
+        `Book ID: ${structure.book.id}`,
+        `PDF index status: ${structure.book.pdfIndexStatus}`,
+        `PDF pages: ${structure.book.pdfPageCount ?? 'Unknown'}`,
+        `Total chunks: ${structure.book.totalChunks}`,
+        `Confidence: ${structure.confidence}`,
+        structure.message,
+        'Do not claim a final chapter count unless confidence is complete.',
+        '',
+        'I found only partial or no chapter evidence from the indexed content. If the PDF index status is PENDING or PROCESSING, indexing has not completed yet. If it is FAILED, the PDF could not be indexed.',
       ].join('\n');
     }
 
@@ -2424,13 +2455,25 @@ Keep it practical and not too long. Base the guide only on the material metadata
     if (conversation?.studyBookId) {
       const studyBook = await this.prisma.book.findUnique({
         where: { id: conversation.studyBookId },
-        select: { title: true, pdfUrl: true, ebookUrl: true },
+        select: {
+          id: true,
+          title: true,
+          pdfUrl: true,
+          ebookUrl: true,
+          pdfIndexStatus: true,
+          _count: { select: { chunks: true } },
+        },
       });
       if (studyBook) {
         const readUrl = studyBook.pdfUrl ?? studyBook.ebookUrl ?? null;
-        bookStudyBlock = readUrl
-          ? `\n\n## Active Book Study Session\n\nThis conversation is a dedicated study session for: **${studyBook.title}**\nThe e-book read URL is: \`${readUrl}\`\nFor any question about chapters, table of contents, structure, content, quotes, or summaries, call \`read_ebook\` with this URL directly. When listing chapters, preserve or add explicit labels like "Chapter 1:", "Chapter 2:", etc., and render them as a vertical Markdown list with one chapter per line. Do not call \`get_book_details\` first — the readUrl is already provided above.`
-          : `\n\n## Active Book Study Session\n\nThis conversation is a dedicated study session for: **${studyBook.title}**`;
+        const indexedChunkCount = studyBook._count?.chunks ?? 0;
+        const indexedGuidance = indexedChunkCount > 0
+          ? `Indexed chunks available: ${indexedChunkCount}. For questions about this book's content, teaching, summaries, quizzes, roadmap, chapters, table of contents, or structure, use indexed catalog book tools with bookId \`${studyBook.id}\` before any URL fallback. Use \`find_book_structure\` for chapter/table-of-contents questions, \`search_book_content\` for topic/content questions, and \`get_book_chunk_context\` when surrounding context is needed.`
+          : `Indexed chunks available: 0. If the user asks about this book's content and a read URL is available, use \`read_ebook\` as the fallback. If no read URL is available, clearly say indexing has not completed or no readable source is available.`;
+        const readUrlGuidance = readUrl
+          ? `Fallback read URL: \`${readUrl}\`. Use it only when indexed chunks are unavailable or insufficient.`
+          : 'Fallback read URL: not available.';
+        bookStudyBlock = `\n\n## Active Book Study Session\n\nThis conversation is a dedicated study session for: **${studyBook.title}**\nActive catalog book ID: \`${studyBook.id}\`\nPDF index status: ${studyBook.pdfIndexStatus}\n${indexedGuidance}\n${readUrlGuidance}\nIf the user asks about a different book, search the catalog for that book first instead of assuming they still mean this active study book. When listing chapters, preserve or add explicit labels like "Chapter 1:", "Chapter 2:", etc., and render them as a vertical Markdown list with one chapter per line.`;
       }
     }
 

@@ -388,6 +388,38 @@ describe('AgentService catalog book content tools', () => {
     expect(result.result).toContain('This is an opening indexed-content overview, not a guaranteed table of contents.');
   });
 
+  it('explains unavailable indexed outline with book index status', async () => {
+    const bookContentSearch = {
+      getBookOutline: jest.fn().mockResolvedValue({
+        book: {
+          id: 'book-pending',
+          title: 'Pending Book',
+          authors: ['A. Author'],
+          pdfIndexStatus: 'PROCESSING',
+          pdfPageCount: null,
+          totalChunkCount: 0,
+        },
+        chunks: [],
+      }),
+    };
+    const service = makeAgentService({ bookContentSearch });
+
+    const result = await service['executeToolInner'](
+      'get_book_outline',
+      { bookId: 'book-pending' },
+      'user-1',
+      Role.STUDENT,
+      '',
+      {},
+    );
+
+    expect(result.result).toContain('BOOK INDEXED OUTLINE');
+    expect(result.result).toContain('Pending Book');
+    expect(result.result).toContain('PDF index status: PROCESSING');
+    expect(result.result).toContain('Total chunks: 0');
+    expect(result.result).toContain('indexing has not completed yet');
+  });
+
   it('executes find_book_structure through BookContentSearchService with confidence and warning', async () => {
     const bookContentSearch = {
       findBookStructure: jest.fn().mockResolvedValue({
@@ -433,6 +465,41 @@ describe('AgentService catalog book content tools', () => {
     expect(result.result).toContain('Do not claim a final chapter count unless confidence is complete.');
     expect(result.result).toContain('[Chunk 0, page 4]');
     expect(result.result).toContain('Reason: early chunk with contents marker');
+  });
+
+  it('explains missing structure evidence with confidence and index status', async () => {
+    const bookContentSearch = {
+      findBookStructure: jest.fn().mockResolvedValue({
+        book: {
+          id: 'book-failed',
+          title: 'Failed Book',
+          authors: ['A. Author'],
+          pdfIndexStatus: 'FAILED',
+          pdfPageCount: 12,
+          totalChunks: 0,
+        },
+        confidence: 'unknown',
+        message: 'No reliable structure evidence was found. Do not claim a final chapter count unless confidence is complete.',
+        evidence: [],
+      }),
+    };
+    const service = makeAgentService({ bookContentSearch });
+
+    const result = await service['executeToolInner'](
+      'find_book_structure',
+      { bookId: 'book-failed' },
+      'user-1',
+      Role.STUDENT,
+      '',
+      {},
+    );
+
+    expect(result.result).toContain('BOOK STRUCTURE EVIDENCE');
+    expect(result.result).toContain('Failed Book');
+    expect(result.result).toContain('PDF index status: FAILED');
+    expect(result.result).toContain('Confidence: unknown');
+    expect(result.result).toContain('Do not claim a final chapter count unless confidence is complete.');
+    expect(result.result).toContain('PDF could not be indexed');
   });
 });
 
@@ -685,6 +752,92 @@ describe('AgentService conversation memory helpers', () => {
 
     expect(result).toBe('safe fallback');
     expect(record).not.toHaveBeenCalled();
+  });
+});
+
+describe('AgentService book study sessions', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('routes active indexed book study questions to indexed tools before read_ebook fallback', async () => {
+    const prisma = {
+      ...makeChatPrisma(Role.STUDENT),
+      book: {
+        count: jest.fn().mockResolvedValue(5),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'book-java',
+          title: 'Introduction to Java Programming',
+          pdfUrl: '/uploads/pdfs/java.pdf',
+          ebookUrl: null,
+          pdfIndexStatus: 'INDEXED',
+          _count: { chunks: 128 },
+        }),
+      },
+      aiConversation: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'conv-book',
+          studyBookId: 'book-java',
+          manualModes: [],
+          lastAutoModes: [],
+          manualModel: null,
+          lastResolvedModel: null,
+          lastModelSelectionSource: null,
+        }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      aiMessage: {
+        count: jest.fn().mockResolvedValue(1),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            role: 'assistant',
+            content: '## Study Guide: Introduction to Java Programming',
+          },
+        ]),
+        create: jest.fn().mockResolvedValue({}),
+      },
+    };
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        choices: [{ message: { content: 'Use indexed content first.' } }],
+        usage: { prompt_tokens: 10, completion_tokens: 7 },
+      }),
+    } as never);
+    const service = makeAgentService({
+      prisma,
+      materialSearch: { countAccessibleIndexedMaterials: jest.fn().mockResolvedValue(0) },
+    });
+
+    for await (const _chunk of service.chatStream(
+      'user-1',
+      'list the chapters',
+      [],
+      false,
+      null,
+      '',
+      'conv-book',
+    )) {
+      // Drain stream.
+    }
+
+    const firstBody = JSON.parse((fetchMock.mock.calls[0][1] as { body: string }).body) as {
+      messages: Array<{ role: string; content: string }>;
+      tools?: Array<{ function: { name: string } }>;
+    };
+    const systemMessage = firstBody.messages.find((entry) => entry.role === 'system')?.content ?? '';
+
+    expect(systemMessage).toContain('Active Book Study Session');
+    expect(systemMessage).toContain('Active catalog book ID: `book-java`');
+    expect(systemMessage).toContain('PDF index status: INDEXED');
+    expect(systemMessage).toContain('Indexed chunks available: 128');
+    expect(systemMessage).toContain('use indexed catalog book tools with bookId `book-java` before any URL fallback');
+    expect(systemMessage).toContain('Use `find_book_structure` for chapter/table-of-contents questions');
+    expect(systemMessage).toContain('Fallback read URL: `/uploads/pdfs/java.pdf`. Use it only when indexed chunks are unavailable or insufficient.');
+    expect(systemMessage).toContain('If the user asks about a different book, search the catalog for that book first');
+    expect(systemMessage).not.toContain('call `read_ebook` with this URL directly');
+    expect(firstBody.tools?.some((tool) => tool.function.name === 'find_book_structure')).toBe(true);
+    expect(firstBody.tools?.some((tool) => tool.function.name === 'search_book_content')).toBe(true);
   });
 });
 

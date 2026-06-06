@@ -24,29 +24,29 @@
   - [x] Delete old chunks before re-indexing a book.
   - [x] Keep `pdfIndexStatus`, `pdfIndexedAt`, and `pdfPageCount` accurate.
   - [x] Support `pdfUrl` and PDF-like `ebookUrl` sources.
-- [ ] **Phase 3: Book content search service**
-  - [ ] Create `BookContentSearchService`.
-  - [ ] Add `searchBookChunks(query, bookId?, limit?)`.
-  - [ ] Add `getBookChunkNeighbors(bookId, chunkIndex)`.
-  - [ ] Add `getBookOutline(bookId)`.
-  - [ ] Add focused service tests.
-- [ ] **Phase 4: Admin backfill and indexing controls**
-  - [ ] Add bounded admin endpoint for readable book indexing.
-  - [ ] Include books with `pdfUrl` or PDF-like `ebookUrl`.
-  - [ ] Avoid blocking request completion on long indexing work.
-  - [ ] Add tests for queuing behavior.
-- [ ] **Phase 5: OZ AI book-content tools**
-  - [ ] Add `search_book_content`.
-  - [ ] Add `get_book_chunk_context`.
-  - [ ] Add `get_book_outline`.
-  - [ ] Keep material tools scoped to uploaded academic materials.
-  - [ ] Add `AgentService` tests for tool definitions and execution.
-- [ ] **Phase 6: Prompt routing and study behavior**
-  - [ ] Update system prompt rules for indexed catalog books.
-  - [ ] Use catalog tools before book-content tools.
-  - [ ] Prefer book chunks for teaching/summarizing/explaining indexed books.
-  - [ ] Use `read_ebook` only as fallback or for full-document structure extraction.
-  - [ ] Add prompt tests.
+- [x] **Phase 3: Book content search service**
+  - [x] Create `BookContentSearchService`.
+  - [x] Add `searchBookChunks(query, bookId?, limit?)`.
+  - [x] Add `getBookChunkContext(bookId, chunkIndex)` for neighboring chunks.
+  - [x] Add `getBookOutline(bookId)`.
+  - [x] Add focused service tests.
+- [x] **Phase 4: Admin backfill and indexing controls**
+  - [x] Add bounded admin endpoint for readable book indexing.
+  - [x] Include books with `pdfUrl` or PDF-like `ebookUrl`.
+  - [x] Avoid blocking request completion on long indexing work.
+  - [x] Add tests for queuing behavior.
+- [x] **Phase 5: OZ AI book-content tools**
+  - [x] Add `search_book_content`.
+  - [x] Add `get_book_chunk_context`.
+  - [x] Add `get_book_outline`.
+  - [x] Keep material tools scoped to uploaded academic materials.
+  - [x] Add `AgentService` tests for tool definitions and execution.
+- [x] **Phase 6: Prompt routing and study behavior**
+  - [x] Update system prompt rules for indexed catalog books.
+  - [x] Use catalog tools before book-content tools.
+  - [x] Prefer book chunks for teaching/summarizing/explaining indexed books.
+  - [x] Use `read_ebook` only as fallback or for full-document structure extraction.
+  - [x] Add prompt tests.
 - [ ] **Phase 7: Documentation and final verification**
   - [ ] Update README AI/tool/database sections.
   - [ ] Run Prisma, typecheck, build, and targeted Jest tests.
