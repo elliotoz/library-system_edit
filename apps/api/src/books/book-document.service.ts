@@ -1,9 +1,22 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { IndexStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import { DocumentContentService } from "../storage/document-content.service";
+import {
+  DocumentContentService,
+  ExtractedDocument,
+  ExtractedParagraph,
+} from "../storage/document-content.service";
 
 const MIN_BOOK_TEXT_CHARS = 200;
+const BOOK_CHUNK_WORDS = 700;
+const BOOK_CHUNK_OVERLAP_WORDS = 80;
+const MIN_BOOK_CHUNK_CHARS = 50;
+
+interface BookChunkDraft {
+  content: string;
+  tokenCount: number;
+  pageNumber: number | null;
+}
 
 export interface BookPdfContent {
   title: string | null;
@@ -55,17 +68,20 @@ export class BookDocumentService {
         publicationYear: true,
         publisher: true,
         pdfUrl: true,
+        ebookUrl: true,
         pdfExtractedText: true,
         pdfIndexStatus: true,
         pdfPageCount: true,
       },
     });
 
-    if (book?.pdfUrl === url && !book.pdfExtractedText) {
+    const readableUrl = book ? this.getReadablePdfUrl(book) : null;
+
+    if (book && readableUrl === url && !book.pdfExtractedText) {
       await this.indexBookPdf(book.id);
     }
 
-    const refreshedBook = book?.pdfUrl === url
+    const refreshedBook = book && readableUrl === url
       ? await this.prisma.book.findUnique({
           where: { id: book.id },
           select: {
@@ -118,7 +134,7 @@ export class BookDocumentService {
   private async doIndexBookPdf(bookId: string): Promise<void> {
     const book = await this.prisma.book.findUnique({
       where: { id: bookId },
-      select: { id: true, title: true, pdfUrl: true },
+      select: { id: true, title: true, pdfUrl: true, ebookUrl: true },
     });
 
     if (!book) {
@@ -126,16 +142,21 @@ export class BookDocumentService {
       return;
     }
 
-    if (!book.pdfUrl) {
-      await this.prisma.book.update({
-        where: { id: bookId },
-        data: {
-          pdfIndexStatus: IndexStatus.NOT_APPLICABLE,
-          pdfExtractedText: null,
-          pdfIndexedAt: null,
-          pdfPageCount: null,
-        },
-      });
+    const readableUrl = this.getReadablePdfUrl(book);
+
+    if (!readableUrl) {
+      await this.prisma.$transaction([
+        this.prisma.bookChunk.deleteMany({ where: { bookId } }),
+        this.prisma.book.update({
+          where: { id: bookId },
+          data: {
+            pdfIndexStatus: IndexStatus.NOT_APPLICABLE,
+            pdfExtractedText: null,
+            pdfIndexedAt: null,
+            pdfPageCount: null,
+          },
+        }),
+      ]);
       return;
     }
 
@@ -148,39 +169,115 @@ export class BookDocumentService {
     });
 
     try {
-      const extracted = await this.documentContent.extractFromFileUrl(book.pdfUrl);
+      const extracted = await this.documentContent.extractFromFileUrl(readableUrl);
 
       if (extracted.text.trim().length < MIN_BOOK_TEXT_CHARS) {
-        await this.prisma.book.update({
+        await this.prisma.$transaction([
+          this.prisma.bookChunk.deleteMany({ where: { bookId } }),
+          this.prisma.book.update({
+            where: { id: bookId },
+            data: {
+              pdfIndexStatus: IndexStatus.FAILED,
+              pdfExtractedText: null,
+              pdfIndexedAt: null,
+              pdfPageCount: extracted.pageCount,
+            },
+          }),
+        ]);
+        return;
+      }
+
+      const chunks = this.buildChunks(extracted);
+
+      await this.prisma.$transaction([
+        this.prisma.bookChunk.deleteMany({ where: { bookId } }),
+        this.prisma.bookChunk.createMany({
+          data: chunks.map((chunk, chunkIndex) => ({
+            bookId,
+            chunkIndex,
+            content: chunk.content,
+            tokenCount: chunk.tokenCount,
+            pageNumber: chunk.pageNumber,
+          })),
+        }),
+        this.prisma.book.update({
+          where: { id: bookId },
+          data: {
+            pdfExtractedText: extracted.text,
+            pdfIndexStatus: IndexStatus.INDEXED,
+            pdfIndexedAt: new Date(),
+            pdfPageCount: extracted.pageCount,
+          },
+        }),
+      ]);
+    } catch (error) {
+      this.logger.error(`Book PDF indexing failed for ${bookId}: ${String(error)}`);
+      await this.prisma.$transaction([
+        this.prisma.bookChunk.deleteMany({ where: { bookId } }),
+        this.prisma.book.update({
           where: { id: bookId },
           data: {
             pdfIndexStatus: IndexStatus.FAILED,
             pdfExtractedText: null,
             pdfIndexedAt: null,
-            pdfPageCount: extracted.pageCount,
           },
-        });
-        return;
-      }
-
-      await this.prisma.book.update({
-        where: { id: bookId },
-        data: {
-          pdfExtractedText: extracted.text,
-          pdfIndexStatus: IndexStatus.INDEXED,
-          pdfIndexedAt: new Date(),
-          pdfPageCount: extracted.pageCount,
-        },
-      });
-    } catch (error) {
-      this.logger.error(`Book PDF indexing failed for ${bookId}: ${String(error)}`);
-      await this.prisma.book.update({
-        where: { id: bookId },
-        data: {
-          pdfIndexStatus: IndexStatus.FAILED,
-          pdfExtractedText: null,
-        },
-      });
+        }),
+      ]);
     }
+  }
+
+  private getReadablePdfUrl(book: { pdfUrl: string | null; ebookUrl: string | null }): string | null {
+    if (book.pdfUrl) return book.pdfUrl;
+    if (book.ebookUrl && this.isPdfLikeUrl(book.ebookUrl)) return book.ebookUrl;
+    return null;
+  }
+
+  private isPdfLikeUrl(url: string): boolean {
+    const path = url.split("?")[0].split("#")[0].toLowerCase();
+    return path.endsWith(".pdf");
+  }
+
+  private buildChunks(extracted: ExtractedDocument): BookChunkDraft[] {
+    const sourceParagraphs = extracted.paragraphs.length > 0
+      ? extracted.paragraphs
+      : [{ text: extracted.text, pageNumber: null }];
+    const chunks: Array<{ content: string; pageNumber: number | null }> = [];
+    let currentWords: string[] = [];
+    let currentPage: number | null = null;
+
+    for (const para of sourceParagraphs as ExtractedParagraph[]) {
+      const words = para.text.split(/\s+/).filter((word) => word.length > 0);
+      if (words.length === 0) continue;
+
+      if (
+        currentWords.length > 0 &&
+        currentWords.length + words.length > BOOK_CHUNK_WORDS
+      ) {
+        chunks.push({
+          content: currentWords.join(" "),
+          pageNumber: currentPage,
+        });
+
+        const overlap = currentWords.slice(-BOOK_CHUNK_OVERLAP_WORDS);
+        currentWords = [...overlap, ...words];
+        currentPage = para.pageNumber;
+      } else {
+        if (currentWords.length === 0) {
+          currentPage = para.pageNumber;
+        }
+        currentWords.push(...words);
+      }
+    }
+
+    if (currentWords.length > 0) {
+      chunks.push({ content: currentWords.join(" "), pageNumber: currentPage });
+    }
+
+    return chunks
+      .filter((chunk) => chunk.content.length >= MIN_BOOK_CHUNK_CHARS)
+      .map((chunk) => ({
+        ...chunk,
+        tokenCount: Math.ceil(chunk.content.length / 4),
+      }));
   }
 }

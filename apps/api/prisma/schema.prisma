@@ -289,11 +289,27 @@ model Book {
   // Relations
   copies           BookCopy[]
   readingListItems ReadingListItem[]
+  chunks           BookChunk[]
 
   @@index([title])
   @@index([mainFacultyId])
   @@index([pdfIndexStatus])
   @@map("books")
+}
+
+model BookChunk {
+  id         String   @id @default(cuid())
+  bookId     String
+  book       Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  chunkIndex Int
+  content    String   @db.Text
+  tokenCount Int
+  pageNumber Int?
+  createdAt  DateTime @default(now())
+
+  @@unique([bookId, chunkIndex])
+  @@index([bookId])
+  @@map("book_chunks")
 }
 
 model BookCopy {
@@ -657,5 +673,4 @@ model AiMessage {
   @@index([conversationId, createdAt])
   @@map("ai_messages")
 }
-
 

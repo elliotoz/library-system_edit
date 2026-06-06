@@ -12,6 +12,11 @@ import { BookDocumentService } from "./book-document.service";
 
 const DEFAULT_PDF_BACKFILL_LIMIT = 25;
 const MAX_PDF_BACKFILL_LIMIT = 200;
+const REINDEXABLE_BOOK_STATUSES = [
+  IndexStatus.PENDING,
+  IndexStatus.FAILED,
+  IndexStatus.NOT_APPLICABLE,
+];
 
 @Injectable()
 export class BooksService {
@@ -229,7 +234,12 @@ export class BooksService {
           ebookUrl: dto.ebookUrl,
           source: "Manual",
           isActive: true,
-          pdfIndexStatus: IndexStatus.NOT_APPLICABLE,
+          pdfIndexStatus: this.hasReadablePdfSource({
+            pdfUrl: null,
+            ebookUrl: dto.ebookUrl ?? null,
+          })
+            ? IndexStatus.PENDING
+            : IndexStatus.NOT_APPLICABLE,
         },
       });
 
@@ -282,30 +292,58 @@ export class BooksService {
       }
     }
 
-    const updated = await this.prisma.book.update({
+    const ebookUrlChanged =
+      Object.prototype.hasOwnProperty.call(dto, "ebookUrl") &&
+      dto.ebookUrl !== book.ebookUrl;
+    const previousReadableSource = this.getReadablePdfSource(book);
+    const nextReadableSource = this.getReadablePdfSource({
+      pdfUrl: book.pdfUrl,
+      ebookUrl: ebookUrlChanged ? dto.ebookUrl ?? null : book.ebookUrl,
+    });
+    const readableSourceChanged = ebookUrlChanged && previousReadableSource !== nextReadableSource;
+
+    const updateData: Record<string, unknown> = {
+      title: dto.title,
+      authors: dto.authors,
+      isbn: dto.isbn,
+      description: dto.description,
+      publisher: dto.publisher,
+      publicationYear: dto.publicationYear,
+      edition: dto.edition,
+      pageCount: dto.pageCount,
+      language: dto.language,
+      category: dto.category,
+      coverImageUrl: dto.coverImageUrl,
+      mainFacultyId: dto.mainFacultyId,
+      subjectTags: dto.subjectTags,
+      isEbookAvailable: dto.isEbookAvailable,
+      ebookUrl: dto.ebookUrl,
+      isActive: dto.isActive,
+    };
+
+    if (readableSourceChanged) {
+      updateData.pdfIndexStatus = nextReadableSource
+        ? IndexStatus.PENDING
+        : IndexStatus.NOT_APPLICABLE;
+      updateData.pdfExtractedText = null;
+      updateData.pdfIndexedAt = null;
+      updateData.pdfPageCount = null;
+    }
+
+    const updateArgs = {
       where: { id },
-      data: {
-        title: dto.title,
-        authors: dto.authors,
-        isbn: dto.isbn,
-        description: dto.description,
-        publisher: dto.publisher,
-        publicationYear: dto.publicationYear,
-        edition: dto.edition,
-        pageCount: dto.pageCount,
-        language: dto.language,
-        category: dto.category,
-        coverImageUrl: dto.coverImageUrl,
-        mainFacultyId: dto.mainFacultyId,
-        subjectTags: dto.subjectTags,
-        isEbookAvailable: dto.isEbookAvailable,
-        ebookUrl: dto.ebookUrl,
-        isActive: dto.isActive,
-      },
+      data: updateData,
       include: {
         mainFaculty: { select: { id: true, name: true, code: true } },
       },
-    });
+    };
+
+    const updated = readableSourceChanged
+      ? (await this.prisma.$transaction([
+          this.prisma.bookChunk.deleteMany({ where: { bookId: id } }),
+          this.prisma.book.update(updateArgs),
+        ]))[1]
+      : await this.prisma.book.update(updateArgs);
 
     return updated;
   }
@@ -382,10 +420,17 @@ export class BooksService {
       ? Math.min(Math.floor(parsedLimit), MAX_PDF_BACKFILL_LIMIT)
       : DEFAULT_PDF_BACKFILL_LIMIT;
 
+    // Existing endpoint name says "PDFs", but this intentionally includes
+    // catalog books whose e-book URL is a direct PDF link.
     const pendingBooks = await this.prisma.book.findMany({
       where: {
-        pdfUrl: { not: null },
-        pdfIndexStatus: IndexStatus.PENDING,
+        OR: [
+          { pdfUrl: { not: null } },
+          { ebookUrl: { endsWith: ".pdf", mode: "insensitive" } },
+          { ebookUrl: { contains: ".pdf?", mode: "insensitive" } },
+          { ebookUrl: { contains: ".pdf#", mode: "insensitive" } },
+        ],
+        pdfIndexStatus: { in: REINDEXABLE_BOOK_STATUSES },
       },
       select: {
         id: true,
@@ -467,5 +512,20 @@ export class BooksService {
     this.bookDocumentService.indexBookPdf(bookId).catch(() => undefined);
 
     return { pdfUrl };
+  }
+
+  private hasReadablePdfSource(book: { pdfUrl: string | null; ebookUrl: string | null }): boolean {
+    return this.getReadablePdfSource(book) !== null;
+  }
+
+  private getReadablePdfSource(book: { pdfUrl: string | null; ebookUrl: string | null }): string | null {
+    if (book.pdfUrl) return book.pdfUrl;
+    if (book.ebookUrl && this.isPdfLikeUrl(book.ebookUrl)) return book.ebookUrl;
+    return null;
+  }
+
+  private isPdfLikeUrl(url: string): boolean {
+    const path = url.split("?")[0].split("#")[0].toLowerCase();
+    return path.endsWith(".pdf");
   }
 }
