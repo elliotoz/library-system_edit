@@ -37,6 +37,7 @@ import {
   DollarSign,
   FileDown,
   Globe,
+  HelpCircle,
   Library,
   ChevronRight,
 } from 'lucide-react';
@@ -156,6 +157,7 @@ export default function DashboardLayout({
           { label: 'Borrow History', href: '/dashboard/history', icon: History },
           ...(role !== 'ADMIN' ? [{ label: 'My Fines', href: '/dashboard/fines', icon: DollarSign }] : []),
           { label: 'AI Assistant', href: '/dashboard/ai-assistant', icon: Sparkles },
+          { label: 'User Guide', href: '/dashboard/user-guide', icon: HelpCircle },
         ],
       },
       {

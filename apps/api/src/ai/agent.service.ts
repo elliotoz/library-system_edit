@@ -16,6 +16,7 @@ import {
   BookOutlineResult,
   BookStructureResult,
 } from '../books/book-content-search.service';
+import { DashboardService } from '../dashboard/dashboard.service';
 import { OPENROUTER_MODELS } from './providers/openrouter.provider';
 import { AUTO_MODEL_ID, getModelEntry, getPublicModelList, isAllowlistedModel } from './model-registry';
 import { AiModeState, buildAiModeState, buildModeInstructionBlock, getDefaultAutoModes, inferAutoModes, normalizeAiModes } from './ai-modes';
@@ -40,6 +41,7 @@ export interface ConversationModelState {
 
 type ConversationMemoryMessage = { role: string; content: string };
 type LiteralChartSpec = { type: 'bar' | 'pie'; title: string; labels: string[]; values: number[] };
+type AdminSnapshot = Awaited<ReturnType<DashboardService['getAdminSnapshot']>>;
 
 export type ChatChunk =
   | { type: 'mode_state'; modeState: AiModeState }
@@ -81,6 +83,7 @@ export class AgentService {
     private readonly materialSearch: MaterialSearchService,
     private readonly bookDocumentService: BookDocumentService,
     private readonly bookContentSearch: BookContentSearchService,
+    private readonly dashboardService: DashboardService,
     private readonly pythonExecution: PythonExecutionService,
   ) {}
 
@@ -551,6 +554,233 @@ export class AgentService {
       '',
       this.graphBlock(graphSpec),
     ].join('\n');
+  }
+
+  private async buildAdminDashboardSnapshotResponse(): Promise<string> {
+    const snapshot = await this.dashboardService.getAdminSnapshot();
+    const statusLines = this.formatIndexStatusLines(snapshot);
+    const failedBooks = this.formatFailedBookPreviewLines(snapshot, 5);
+    const metadataPreview = this.formatMetadataIssuesPreview(snapshot, 2);
+    const facultyLines = this.formatCountList(
+      snapshot.collectionInsights.booksByFaculty.slice(0, 5).map((item) => ({ label: item.facultyName, count: item.count })),
+      'None available',
+    );
+    const categoryLines = this.formatCountList(
+      snapshot.collectionInsights.booksByCategory.slice(0, 5).map((item) => ({ label: item.category, count: item.count })),
+      'None available',
+    );
+    const borrowedLines = this.formatCountList(
+      snapshot.collectionInsights.mostBorrowedBooks.slice(0, 5).map((item) => ({ label: item.title, count: item.borrowCount })),
+      'None available',
+    );
+    const reservedLines = this.formatCountList(
+      snapshot.collectionInsights.mostReservedBooks.slice(0, 5).map((item) => ({ label: item.title, count: item.reservationCount })),
+      'None available',
+    );
+    const materialStatusLines = snapshot.materialsOverview.byIndexStatus.map((entry) => `${entry.status} (${entry.count})`);
+
+    return [
+      '## Admin Dashboard Snapshot',
+      '',
+      'This summary uses live database data only. It is capped and does not include AI message content or book chunk text.',
+      '',
+      '### Command Summary',
+      `- Total books: ${snapshot.commandSummary.totalBooks}`,
+      `- Indexed books: ${snapshot.commandSummary.indexedBooks} (${snapshot.commandSummary.indexedBooksPercent}%)`,
+      `- Failed indexing books: ${snapshot.commandSummary.failedIndexingBooks}`,
+      `- Pending reservations: ${snapshot.commandSummary.pendingReservations}`,
+      `- Overdue borrows: ${snapshot.commandSummary.overdueBorrows}`,
+      `- Pending materials: ${snapshot.commandSummary.pendingMaterials}`,
+      `- Active users: ${snapshot.commandSummary.activeUsers}`,
+      '',
+      '### Indexing Health',
+      `- Status distribution: ${statusLines.length > 0 ? statusLines.join(', ') : 'No indexing records'}`,
+      `- Total chunks: ${snapshot.indexingHealth.totalChunks}`,
+      `- Average chunks per indexed book: ${snapshot.indexingHealth.averageChunksPerIndexedBook}`,
+      `- Zero-chunk indexed books: ${snapshot.indexingHealth.zeroChunkIndexedBooks}`,
+      `- Last indexed at: ${snapshot.indexingHealth.lastIndexedAt ?? 'Not available'}`,
+      `- Failed books preview: ${failedBooks.length > 0 ? failedBooks.join('; ') : 'None'}`,
+      `- Failure reason note: the current schema does not store indexing failure reasons, so only status, chunk count, and page data are available.`,
+      '',
+      '### Operations Queue',
+      `- Pending reservations: ${snapshot.operationsQueue.pendingReservations}`,
+      `- Ready pickups: ${snapshot.operationsQueue.readyPickups}`,
+      `- Active borrows: ${snapshot.operationsQueue.activeBorrows}`,
+      `- Overdue borrows: ${snapshot.operationsQueue.overdueBorrows}`,
+      `- Pending material approvals: ${snapshot.operationsQueue.pendingMaterialApprovals}`,
+      `- Failed indexing review: ${snapshot.operationsQueue.failedIndexingReview}`,
+      '',
+      '### Collection Insights',
+      `- Books by faculty: ${facultyLines}`,
+      `- Books by category: ${categoryLines}`,
+      `- Missing metadata: ISBN ${snapshot.collectionInsights.missingMetadata.missingIsbn}, description ${snapshot.collectionInsights.missingMetadata.missingDescription}, category ${snapshot.collectionInsights.missingMetadata.missingCategory}, subject tags ${snapshot.collectionInsights.missingMetadata.missingSubjectTags}, faculty ${snapshot.collectionInsights.missingMetadata.missingFaculty}, cover image ${snapshot.collectionInsights.missingMetadata.missingCoverImage}`,
+      `- Metadata issue preview:\n${metadataPreview.length > 0 ? metadataPreview : '  No metadata issues in preview.'}`,
+      `- Most borrowed books: ${borrowedLines}`,
+      `- Most reserved books: ${reservedLines}`,
+      '',
+      '### Materials Overview',
+      `- Total materials: ${snapshot.materialsOverview.total}`,
+      `- Pending approval: ${snapshot.materialsOverview.pendingApproval}`,
+      `- Approved: ${snapshot.materialsOverview.approved}`,
+      `- Published: ${snapshot.materialsOverview.published}`,
+      `- By index status: ${materialStatusLines.length > 0 ? materialStatusLines.join(', ') : 'No material index records'}`,
+      `- Total material chunks: ${snapshot.materialsOverview.totalChunks}`,
+      '',
+      '### OZ AI Usage',
+      `- Conversations: ${snapshot.aiUsage.conversations}`,
+      `- Messages: ${snapshot.aiUsage.messages}`,
+      `- Active users: ${snapshot.aiUsage.activeUsers}`,
+      `- Assistant response rate: ${snapshot.aiUsage.assistantResponseRate}%`,
+      `- Period: ${snapshot.aiUsage.period}`,
+      '',
+      'Use this snapshot for real operational summaries, indexing health checks, metadata cleanup, and prioritizing admin actions. If a requested metric is not present here, say the backend data is unavailable rather than guessing.',
+    ].join('\n');
+  }
+
+  private async buildAdminIndexingReportResponse(): Promise<string> {
+    const snapshot = await this.dashboardService.getAdminSnapshot();
+    const statusLines = this.formatIndexStatusLines(snapshot);
+    const failedBooks = this.formatFailedBookPreviewLines(snapshot, 5);
+
+    return [
+      '## Indexing Health Report',
+      '',
+      `- Total books: ${snapshot.commandSummary.totalBooks}`,
+      `- Indexed books: ${snapshot.commandSummary.indexedBooks} (${snapshot.commandSummary.indexedBooksPercent}%)`,
+      `- Failed indexing books: ${snapshot.commandSummary.failedIndexingBooks}`,
+      `- Status distribution: ${statusLines.length > 0 ? statusLines.join(', ') : 'No indexing records'}`,
+      `- Total chunks: ${snapshot.indexingHealth.totalChunks}`,
+      `- Average chunks per indexed book: ${snapshot.indexingHealth.averageChunksPerIndexedBook}`,
+      `- Zero-chunk indexed books: ${snapshot.indexingHealth.zeroChunkIndexedBooks}`,
+      `- Last indexed at: ${snapshot.indexingHealth.lastIndexedAt ?? 'Not available'}`,
+      `- Failed books preview: ${failedBooks.length > 0 ? failedBooks.join('; ') : 'None'}`,
+      '- Failure reason note: the current schema does not store indexing failure reasons, so only status, chunk count, and page data are available.',
+      '',
+      'RAG readiness depends on indexed chunks and the presence of readable source URLs. If a requested metric is not present here, the backend data is unavailable rather than guessed.',
+    ].join('\n');
+  }
+
+  private async buildCatalogMetadataHealthResponse(): Promise<string> {
+    const snapshot = await this.dashboardService.getAdminSnapshot();
+    const facultyLines = this.formatCountList(
+      snapshot.collectionInsights.booksByFaculty.slice(0, 5).map((item) => ({ label: item.facultyName, count: item.count })),
+      'None available',
+    );
+    const categoryLines = this.formatCountList(
+      snapshot.collectionInsights.booksByCategory.slice(0, 5).map((item) => ({ label: item.category, count: item.count })),
+      'None available',
+    );
+    const preview = snapshot.collectionInsights.metadataIssuesPreview ?? [];
+    const previewLines = this.formatMetadataIssuesPreview(snapshot, 10);
+    const hasIssues = [
+      snapshot.collectionInsights.missingMetadata.missingIsbn,
+      snapshot.collectionInsights.missingMetadata.missingDescription,
+      snapshot.collectionInsights.missingMetadata.missingCategory,
+      snapshot.collectionInsights.missingMetadata.missingSubjectTags,
+      snapshot.collectionInsights.missingMetadata.missingFaculty,
+      snapshot.collectionInsights.missingMetadata.missingCoverImage,
+    ].some((count) => count > 0);
+
+    const recommendedActions = [
+      snapshot.collectionInsights.missingMetadata.missingCategory > 0 ? 'Prioritize assigning missing categories and subjects.' : null,
+      snapshot.collectionInsights.missingMetadata.missingIsbn > 0 ? 'Fill missing ISBN values for catalog integrity.' : null,
+      snapshot.collectionInsights.missingMetadata.missingDescription > 0 ? 'Add short descriptions to improve discovery.' : null,
+      snapshot.collectionInsights.missingMetadata.missingFaculty > 0 ? 'Assign faculty to uncategorized books.' : null,
+      snapshot.collectionInsights.missingMetadata.missingCoverImage > 0 ? 'Add cover images for visually incomplete catalog records.' : null,
+      snapshot.collectionInsights.missingMetadata.missingSubjectTags > 0 ? 'Add subject tags to improve search and recommendations.' : null,
+    ].filter((action): action is string => Boolean(action));
+
+    return [
+      '## Catalog Metadata Health',
+      '',
+      `- Missing ISBN: ${snapshot.collectionInsights.missingMetadata.missingIsbn}`,
+      `- Missing description: ${snapshot.collectionInsights.missingMetadata.missingDescription}`,
+      `- Missing category: ${snapshot.collectionInsights.missingMetadata.missingCategory}`,
+      `- Missing subject tags: ${snapshot.collectionInsights.missingMetadata.missingSubjectTags}`,
+      `- Missing faculty: ${snapshot.collectionInsights.missingMetadata.missingFaculty}`,
+      `- Missing cover image: ${snapshot.collectionInsights.missingMetadata.missingCoverImage}`,
+      `- Books by faculty: ${facultyLines}`,
+      `- Books by category: ${categoryLines}`,
+      '',
+      hasIssues
+        ? 'Here are the books I can identify from the dashboard data.'
+        : 'All checked catalog metadata fields are complete.',
+      ...(preview.length > 0
+        ? [previewLines]
+        : []),
+      '',
+      `Recommended actions: ${recommendedActions.length > 0 ? recommendedActions.join(' ') : 'Catalog metadata is complete for the tracked fields.'}`,
+      'Do not invent missing book titles: this report only exposes aggregate counts and grouped catalog health data from the dashboard snapshot.',
+    ].join('\n');
+  }
+
+  private async buildLibraryOperationsSummaryResponse(): Promise<string> {
+    const snapshot = await this.dashboardService.getAdminSnapshot();
+
+    const priorityOrder = [
+      snapshot.operationsQueue.failedIndexingReview > 0 ? 'Review failed indexing items first.' : null,
+      snapshot.operationsQueue.pendingMaterialApprovals > 0 ? 'Process pending material approvals next.' : null,
+      snapshot.operationsQueue.overdueBorrows > 0 ? 'Handle overdue borrows and follow-up actions.' : null,
+      snapshot.operationsQueue.pendingReservations > 0 ? 'Clear pending reservations.' : null,
+      snapshot.operationsQueue.readyPickups > 0 ? 'Notify users about ready pickups.' : null,
+    ].filter((item): item is string => Boolean(item));
+
+    return [
+      '## Library Operations Summary',
+      '',
+      `- Pending reservations: ${snapshot.operationsQueue.pendingReservations}`,
+      `- Ready pickups: ${snapshot.operationsQueue.readyPickups}`,
+      `- Active borrows: ${snapshot.operationsQueue.activeBorrows}`,
+      `- Overdue borrows: ${snapshot.operationsQueue.overdueBorrows}`,
+      `- Pending material approvals: ${snapshot.operationsQueue.pendingMaterialApprovals}`,
+      `- Failed indexing review: ${snapshot.operationsQueue.failedIndexingReview}`,
+      `- Pending materials: ${snapshot.commandSummary.pendingMaterials}`,
+      '',
+      `Recommended priority order: ${priorityOrder.length > 0 ? priorityOrder.join(' ') : 'No pending admin actions were found in the snapshot.'}`,
+      'Use this summary for current admin actions and operational triage only. It does not include user names, AI message content, or book chunk text.',
+    ].join('\n');
+  }
+
+  private formatCountList(items: Array<{ label: string; count: number }>, emptyLabel: string): string {
+    if (!items.length) return emptyLabel;
+    return items.map((item) => `${item.label} (${item.count})`).join(', ');
+  }
+
+  private formatIndexStatusLines(snapshot: AdminSnapshot): string[] {
+    return snapshot.indexingHealth.byStatus.map((entry) => `${entry.status} (${entry.count}, ${entry.percentage}%)`);
+  }
+
+  private formatFailedBookPreviewLines(snapshot: AdminSnapshot, limit: number): string[] {
+    return snapshot.indexingHealth.failedBooksPreview.slice(0, limit).map((book) =>
+      `${book.title} [${book.pdfIndexStatus}; chunks=${book.chunks}; pages=${book.pdfPageCount ?? 'n/a'}]`,
+    );
+  }
+
+  private formatMetadataIssuesPreview(snapshot: AdminSnapshot, limit: number): string {
+    const entries = (snapshot.collectionInsights.metadataIssuesPreview ?? []).slice(0, limit);
+    if (!entries.length) {
+      return '';
+    }
+
+    return entries.map((book) => [
+      `- ${book.title}`,
+      `  Missing: ${book.missingFields.length > 0 ? book.missingFields.join(', ') : 'none'}`,
+      `  Catalog: [Open catalog page](${book.catalogUrl})`,
+      `  Edit: [Edit book](${book.adminEditUrl})`,
+    ].join('\n')).join('\n\n');
+  }
+
+  private normalizeAdminToolName(name: string): string {
+    const aliases: Record<string, string> = {
+      get_admin_dashboard: 'get_admin_dashboard_snapshot',
+      get_admin_dashboard_summary: 'get_admin_dashboard_snapshot',
+      get_admin_snapshot: 'get_admin_dashboard_snapshot',
+      get_dashboard_snapshot: 'get_admin_dashboard_snapshot',
+      get_librarian_priority_summary: 'get_library_operations_summary',
+      get_admin_priority_summary: 'get_library_operations_summary',
+    };
+
+    return aliases[name] ?? name;
   }
 
   private detectFullRecall(message: string): boolean {
@@ -1509,17 +1739,53 @@ Keep it practical and not too long. Base the guide only on the material metadata
             },
           },
         },
-        {
-          type: 'function',
-          function: {
-            name: 'get_admin_analytics',
-            description:
-              'Returns the full admin analytics dashboard: active borrows, overdue count, fine totals, pending reservations, and borrow trends. Use when the user asks for general library statistics or an overview.',
-            parameters: { type: 'object', properties: {} },
-          },
+      {
+        type: 'function',
+        function: {
+          name: 'get_admin_analytics',
+          description:
+            'Returns the full admin analytics dashboard: active borrows, overdue count, fine totals, pending reservations, and borrow trends. Use when the user asks for general library statistics or an overview.',
+          parameters: { type: 'object', properties: {} },
         },
-      );
-    }
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'get_admin_dashboard_snapshot',
+          description:
+            'Get a real-time admin dashboard snapshot with library operations, indexing health, catalog metadata quality, materials overview, collection insights, and OZ AI usage. Use this only for Admin users when they ask for operational summaries, indexing health, catalog quality, or pending actions.',
+          parameters: { type: 'object', properties: {} },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'get_book_indexing_report',
+          description:
+            'Get a focused admin report on book indexing health, failed indexing, zero-chunk books, total chunks, average chunks, and RAG readiness. Use this for indexing health questions and failed indexing triage.',
+          parameters: { type: 'object', properties: {} },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'get_catalog_metadata_health',
+          description:
+            'Get a focused admin report on missing catalog metadata and catalog quality. Use this for questions about missing ISBNs, descriptions, categories, subject tags, faculty, cover images, and catalog cleanup priorities.',
+          parameters: { type: 'object', properties: {} },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'get_library_operations_summary',
+          description:
+            'Get a focused admin summary of pending reservations, ready pickups, active borrows, overdue borrows, pending material approvals, and failed indexing review. Use this for operational triage and admin action prioritization.',
+          parameters: { type: 'object', properties: {} },
+        },
+      },
+    );
+  }
 
     return tools;
   }
@@ -1891,6 +2157,8 @@ Keep it practical and not too long. Base the guide only on the material metadata
       process.env.INTERNAL_API_URL ||
       process.env.API_URL ||
       `http://localhost:${process.env.PORT || 3001}`;
+
+    name = this.normalizeAdminToolName(name);
 
     switch (name) {
         case 'search_catalog': {
@@ -2318,6 +2586,34 @@ Keep it practical and not too long. Base the guide only on the material metadata
             return { result: 'Access denied: admin only.', citations: [] };
           }
           return { result: await this.buildAdminAnalyticsDashboardResponse(), citations: [] };
+        }
+
+        case 'get_admin_dashboard_snapshot': {
+          if (userRole !== Role.ADMIN) {
+            return { result: 'Access denied: this tool is only available to administrators.', citations: [] };
+          }
+          return { result: await this.buildAdminDashboardSnapshotResponse(), citations: [] };
+        }
+
+        case 'get_book_indexing_report': {
+          if (userRole !== Role.ADMIN) {
+            return { result: 'Access denied: this tool is only available to administrators.', citations: [] };
+          }
+          return { result: await this.buildAdminIndexingReportResponse(), citations: [] };
+        }
+
+        case 'get_catalog_metadata_health': {
+          if (userRole !== Role.ADMIN) {
+            return { result: 'Access denied: this tool is only available to administrators.', citations: [] };
+          }
+          return { result: await this.buildCatalogMetadataHealthResponse(), citations: [] };
+        }
+
+        case 'get_library_operations_summary': {
+          if (userRole !== Role.ADMIN) {
+            return { result: 'Access denied: this tool is only available to administrators.', citations: [] };
+          }
+          return { result: await this.buildLibraryOperationsSummaryResponse(), citations: [] };
         }
 
         default:

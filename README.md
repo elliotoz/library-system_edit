@@ -104,9 +104,10 @@ research support.
   materials, policies, reports, statistics, uploads, and external book imports.
 - AI assistant with conversations, saved messages, streaming SSE chat, study
   sessions, live model auto-selection, manual model override, response modes,
-  tool calling, catalog access, reading-list access, borrow/reservation/stat
-  lookups, study-material search, e-book/PDF reading, webpage fetching,
-  scientific response rendering, and admin book-cover scanning.
+  tool calling, catalog access, indexed catalog-book content and structure
+  retrieval, reading-list access, borrow/reservation/stat lookups,
+  study-material search, e-book/PDF reading, webpage fetching, scientific
+  response rendering, role-based user guidance, and admin book-cover scanning.
 - Swagger API documentation at `/api/docs`.
 - Health probes at `/health/live`, `/health/ready`, and `/auth/health`.
 
@@ -168,6 +169,7 @@ for non-admin roles.
   manage profile/settings/notifications.
 - Use `/dashboard/ai-assistant` to ask catalog, borrowing, reading-list, study-material, and
   study-session questions with a streaming AI assistant.
+- Use `/dashboard/user-guide` for role-specific library workflows and OZ AI prompt tips.
 - Browse published reading lists at `/dashboard/reading-lists` and details at
   `/dashboard/reading-lists/[id]`.
 - View instructor profiles at `/dashboard/instructors/[id]`.
@@ -332,6 +334,7 @@ Discovered frontend pages:
 | `/dashboard/reading-lists/[id]` | Reading list detail |
 | `/dashboard/instructors/[id]` | Instructor profile |
 | `/dashboard/ai-assistant` | AI assistant chat |
+| `/dashboard/user-guide` | Role-based library and OZ AI user guide |
 | `/dashboard/notifications` | Notifications |
 | `/dashboard/profile` | User profile |
 | `/dashboard/settings` | User settings |
@@ -597,6 +600,10 @@ Tools registered in `AgentService.getTools()` and executed via `AgentService.exe
 | `search_catalog` | Keyword search across the library catalog |
 | `get_book_details` | Full details for a specific book including availability |
 | `read_ebook` | Read an e-book or uploaded book PDF for summaries and quotes |
+| `find_book_structure` | Chapter, contents, and structure evidence from indexed catalog book chunks |
+| `search_book_content` | Full-text search across indexed catalog book chunks |
+| `get_book_chunk_context` | Neighbouring chunks around a specific catalog book chunk |
+| `get_book_outline` | Opening indexed chunks and metadata for a catalog book |
 | `fetch_webpage` | Fetch any public URL |
 | `get_my_borrows` | Current user's active borrows and due dates |
 | `get_catalog_stats` | Total book, copy, and e-book counts from the database |
@@ -623,8 +630,17 @@ Tools registered in `AgentService.getTools()` and executed via `AgentService.exe
   `MaterialChunk`, and searches with PostgreSQL full-text search.
 - **Material access control**: enforced by role, uploader identity, public access, faculty
   code, and course code.
-- **Book PDF indexing**: extracts text into `Book.pdfExtractedText`, tracks page count and
-  index status (`pdfIndexStatus`), used by the `read_ebook` tool.
+- **Book PDF indexing**: extracts local uploaded PDFs and direct PDF-like `ebookUrl`
+  sources into `Book.pdfExtractedText` for backward compatibility, creates
+  `BookChunk` rows using approximately 700-word chunks with 80-word overlap, and
+  tracks `pdfIndexStatus`, `pdfIndexedAt`, and `pdfPageCount`.
+- **Book chunk search**: stores catalog book chunks in `book_chunks`, uses the
+  PostgreSQL full-text GIN index on `book_chunks.content`, searches only active
+  books, and bounds tool results to avoid full-book dumping.
+- **Book indexing controls**: admin book management can queue eligible books with
+  uploaded PDFs or PDF-like e-book URLs through the Re-index Books workflow. HTML
+  or unknown e-book URLs remain readable through `read_ebook` fallback instead of
+  being indexed as chunks.
 
 ### System Prompt Behavior
 
@@ -637,6 +653,15 @@ The system prompt is built by `buildSystemPrompt()` in
   count, and current date.
 - Explicitly instructs the assistant to use tools for all live library data questions and
   never to guess or invent catalog or statistical values.
+- Routes catalog-book questions through catalog tools first, then indexed catalog
+  book tools for teaching, summaries, explanations, quizzes, roadmaps, chapters,
+  table-of-contents questions, and structure evidence.
+- Keeps indexed catalog book tools separate from indexed study-material tools.
+- Requires `find_book_structure` for chapter and table-of-contents questions, and
+  forbids final chapter counts or complete chapter lists when the indexed evidence
+  is only partial.
+- Treats active Study Help sessions as focused on the selected book or material
+  unless the user clearly names a different full title.
 - Instructs the assistant to respond in English by default and switch to Turkish only when the
   user's message is written in Turkish.
 - Instructs the assistant to read attached file content when present in the message.

@@ -99,6 +99,7 @@ function makeService() {
     {} as never,
     {} as never,
     {} as never,
+    { getAdminSnapshot: jest.fn() } as never,
     {} as never,
   );
 }
@@ -273,6 +274,7 @@ describe('AgentService.updateConversationModel', () => {
       {} as never,
       {} as never,
       {} as never,
+      { getAdminSnapshot: jest.fn() } as never,
       {} as never,
     );
     await expect(service.updateConversationModel('missing-id', 'user-1', 'auto'))
@@ -293,6 +295,7 @@ describe('AgentService.updateConversationModel', () => {
       {} as never,
       {} as never,
       {} as never,
+      { getAdminSnapshot: jest.fn() } as never,
       {} as never,
     );
     await expect(service.updateConversationModel('conv-1', 'user-1', 'auto'))

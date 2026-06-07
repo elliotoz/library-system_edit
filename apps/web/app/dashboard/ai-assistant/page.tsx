@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { BookOpen, Plus, Trash2, MessageSquare, History, X } from 'lucide-react';
+import { BookOpen, HelpCircle, Plus, Trash2, MessageSquare, History, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { BookCitationCards } from '@/components/BookCitationCards';
@@ -630,6 +631,13 @@ export default function AIAssistantPage() {
           )}
           <h1 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">OZ AI</h1>
         </div>
+        <Link
+          href="/dashboard/user-guide"
+          className="hidden items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:border-primary-500/40 hover:text-primary-500 dark:border-white/20 dark:text-gray-400 sm:flex"
+        >
+          <HelpCircle className="h-3.5 w-3.5" />
+          How to ask OZ AI better
+        </Link>
         <button
           onClick={createNewChat}
           disabled={isStreaming}

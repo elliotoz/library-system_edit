@@ -206,6 +206,21 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('If the user explicitly provides all chart values');
   });
 
+  it('tells administrators to use the dashboard snapshot tool for operational questions', () => {
+    const prompt = buildSystemPrompt({ ...baseContext, userRole: Role.ADMIN });
+
+    expect(prompt).toContain('Use admin dashboard tools for real operational summaries, indexing health, catalog metadata problems, pending actions, and OZ AI usage.');
+    expect(prompt).toContain('For a full dashboard overview, use get_admin_dashboard_snapshot.');
+    expect(prompt).toContain('For indexing health, failed indexing, zero-chunk books, or RAG readiness, use get_book_indexing_report.');
+    expect(prompt).toContain('For missing catalog metadata or catalog quality, use get_catalog_metadata_health.');
+    expect(prompt).toContain('For pending reservations, ready pickups, overdue borrows, or other admin actions, use get_library_operations_summary.');
+    expect(prompt).toContain('what should I fix first');
+    expect(prompt).toContain('If the most specific tool is unavailable or does not cover the request, fall back to get_admin_dashboard_snapshot instead of telling the user the tool is unavailable.');
+    expect(prompt).toContain('invent dashboard numbers');
+    expect(prompt).toContain('If data is missing, say exactly which backend data is unavailable');
+    expect(prompt).toContain('Prefer the admin dashboard snapshot tool when the user asks for overall operational, indexing, or collection health');
+  });
+
   it('preserves library tool rules when scientific output is enabled', () => {
     const prompt = buildSystemPrompt({ ...baseContext, scientificOutput: true });
 

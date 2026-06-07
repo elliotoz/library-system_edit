@@ -22,6 +22,14 @@ export class DashboardController {
     return this.dashboardService.getAdminStats();
   }
 
+  @Get('admin/snapshot')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Get grouped admin dashboard snapshot' })
+  async getAdminSnapshot() {
+    return this.dashboardService.getAdminSnapshot();
+  }
+
   @Get('student')
   @ApiOperation({ summary: 'Get student dashboard stats' })
   async getStudentStats(@CurrentUser('id') userId: string) {

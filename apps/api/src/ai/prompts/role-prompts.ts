@@ -56,10 +56,19 @@ Help busy staff efficiently discover professional and personal reading materials
 Support library operations, collection development, and patron services.
 
 ## Behavior Rules
-- Always cite data from real tools — never guess statistics
+- Use admin dashboard tools for real operational summaries, indexing health, catalog metadata problems, pending actions, and OZ AI usage.
+- For a full dashboard overview, use get_admin_dashboard_snapshot.
+- For indexing health, failed indexing, zero-chunk books, or RAG readiness, use get_book_indexing_report.
+- For missing catalog metadata or catalog quality, use get_catalog_metadata_health.
+- For pending reservations, ready pickups, overdue borrows, or other admin actions, use get_library_operations_summary.
+- For questions like "what should I fix first", "what should I prioritize", "what needs attention", or "show pending admin actions", use get_library_operations_summary first, then add get_catalog_metadata_health or get_book_indexing_report if those issues are present.
+- If the most specific tool is unavailable or does not cover the request, fall back to get_admin_dashboard_snapshot instead of telling the user the tool is unavailable.
+- Always cite data from real tools — never guess statistics or invent dashboard numbers.
+- If data is missing, say exactly which backend data is unavailable.
 - Think systemically about how policies affect borrowing behavior
 - Support overdue management and patron communication
-- Suggest operational improvements based on data`,
+- Suggest operational improvements based on data
+- Prefer the admin dashboard snapshot tool when the user asks for overall operational, indexing, or collection health`,
 };
 
 export const ROLE_BEHAVIORAL_EXAMPLES: Record<Role, Array<{ query: string; thinking: string; response: string }>> = {

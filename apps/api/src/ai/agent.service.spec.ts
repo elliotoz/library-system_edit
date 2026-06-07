@@ -7,6 +7,7 @@ function makeAgentService(overrides: {
   pythonExecution?: unknown;
   materialSearch?: unknown;
   bookContentSearch?: unknown;
+  dashboardService?: unknown;
 } = {}) {
   const prisma = overrides.prisma ?? {};
   const catalogSearch = {};
@@ -15,6 +16,7 @@ function makeAgentService(overrides: {
   const materialSearch = overrides.materialSearch ?? {};
   const bookDocumentService = {};
   const bookContentSearch = overrides.bookContentSearch ?? {};
+  const dashboardService = overrides.dashboardService ?? { getAdminSnapshot: jest.fn().mockResolvedValue(makeDashboardSnapshot()) };
   const pythonExecution = overrides.pythonExecution ?? { isAvailable: jest.fn().mockReturnValue(false) };
 
   return new AgentService(
@@ -25,8 +27,71 @@ function makeAgentService(overrides: {
     materialSearch as never,
     bookDocumentService as never,
     bookContentSearch as never,
+    dashboardService as never,
     pythonExecution as never,
   );
+}
+
+function makeDashboardSnapshot() {
+  return {
+    commandSummary: {
+      totalBooks: 0,
+      indexedBooks: 0,
+      indexedBooksPercent: 0,
+      failedIndexingBooks: 0,
+      pendingReservations: 0,
+      overdueBorrows: 0,
+      pendingMaterials: 0,
+      activeUsers: 0,
+    },
+    indexingHealth: {
+      byStatus: [],
+      totalChunks: 0,
+      averageChunksPerIndexedBook: 0,
+      zeroChunkIndexedBooks: 0,
+      failedBooksPreview: [],
+      lastIndexedAt: null,
+    },
+    operationsQueue: {
+      pendingReservations: 0,
+      readyPickups: 0,
+      activeBorrows: 0,
+      overdueBorrows: 0,
+      pendingMaterialApprovals: 0,
+      failedIndexingReview: 0,
+    },
+    collectionInsights: {
+      booksByFaculty: [],
+      booksByCategory: [],
+      missingMetadata: {
+        missingIsbn: 0,
+        missingDescription: 0,
+        missingCategory: 0,
+        missingSubjectTags: 0,
+        missingFaculty: 0,
+        missingCoverImage: 0,
+      },
+      metadataIssuesPreview: [],
+      mostBorrowedBooks: [],
+      mostReservedBooks: [],
+    },
+    materialsOverview: {
+      total: 0,
+      pendingApproval: 0,
+      approved: 0,
+      published: 0,
+      byIndexStatus: [],
+      totalChunks: 0,
+    },
+    aiUsage: {
+      conversations: 0,
+      messages: 0,
+      activeUsers: 0,
+      assistantResponseRate: 0,
+      period: '7d',
+    },
+    generatedAt: '2026-06-07T12:00:00.000Z',
+  };
 }
 
 function makeChatPrisma(role: Role) {
@@ -214,6 +279,7 @@ describe('AgentService read_ebook', () => {
       materialSearch as never,
       bookDocumentService as never,
       {} as never,
+      { getAdminSnapshot: jest.fn().mockResolvedValue(makeDashboardSnapshot()) } as never,
       pythonExecution as never,
     );
 
@@ -993,6 +1059,29 @@ describe('AgentService admin analytics authorization', () => {
     jest.restoreAllMocks();
   });
 
+  it('includes the admin dashboard snapshot tool for administrators', () => {
+    const service = makeAgentService();
+
+    const tools = service['getTools'](Role.ADMIN);
+
+    expect(tools.some((tool) => tool.function.name === 'get_admin_dashboard_snapshot')).toBe(true);
+    expect(tools.some((tool) => tool.function.name === 'get_book_indexing_report')).toBe(true);
+    expect(tools.some((tool) => tool.function.name === 'get_catalog_metadata_health')).toBe(true);
+    expect(tools.some((tool) => tool.function.name === 'get_library_operations_summary')).toBe(true);
+  });
+
+  it('does not expose specialized admin snapshot tools to non-admin roles', () => {
+    const service = makeAgentService();
+
+    for (const role of [Role.STUDENT, Role.INSTRUCTOR, Role.STAFF]) {
+      const tools = service['getTools'](role);
+      expect(tools.some((tool) => tool.function.name === 'get_admin_dashboard_snapshot')).toBe(false);
+      expect(tools.some((tool) => tool.function.name === 'get_book_indexing_report')).toBe(false);
+      expect(tools.some((tool) => tool.function.name === 'get_catalog_metadata_health')).toBe(false);
+      expect(tools.some((tool) => tool.function.name === 'get_library_operations_summary')).toBe(false);
+    }
+  });
+
   it('detects admin analytics dashboard requests', () => {
     const service = makeAgentService();
 
@@ -1162,6 +1251,313 @@ describe('AgentService admin analytics authorization', () => {
     expect(prisma.reservation.findMany).toHaveBeenCalledTimes(1);
     expect(prisma.finePayment.findMany).toHaveBeenCalledTimes(1);
     expect(prisma.aiMessage.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns a bounded admin dashboard snapshot summary from the dashboard service for administrators', async () => {
+    const dashboardSnapshot = {
+      ...makeDashboardSnapshot(),
+      commandSummary: {
+        totalBooks: 2,
+        indexedBooks: 2,
+        indexedBooksPercent: 100,
+        failedIndexingBooks: 0,
+        pendingReservations: 4,
+        overdueBorrows: 1,
+        pendingMaterials: 3,
+        activeUsers: 21,
+      },
+      indexingHealth: {
+        byStatus: [
+          { status: 'INDEXED', count: 2, percentage: 100 },
+          { status: 'FAILED', count: 0, percentage: 0 },
+        ],
+        totalChunks: 1893,
+        averageChunksPerIndexedBook: 946.5,
+        zeroChunkIndexedBooks: 0,
+        failedBooksPreview: [
+          {
+            id: 'book-1',
+            title: 'Broken PDF',
+            authors: ['Author'],
+            pdfIndexStatus: 'FAILED',
+            pdfPageCount: 120,
+            chunks: 0,
+            hasPdfUrl: true,
+            hasEbookUrl: false,
+            pdfIndexedAt: '2026-06-06T10:00:00.000Z',
+          },
+        ],
+        lastIndexedAt: '2026-06-06T10:00:00.000Z',
+      },
+      collectionInsights: {
+        booksByFaculty: [{ facultyId: 'faculty-1', facultyName: 'Engineering', count: 1 }],
+        booksByCategory: [{ category: 'Computer Science', count: 2 }],
+        missingMetadata: {
+          missingIsbn: 1,
+          missingDescription: 0,
+          missingCategory: 0,
+          missingSubjectTags: 2,
+          missingFaculty: 1,
+          missingCoverImage: 1,
+        },
+        metadataIssuesPreview: [
+          {
+            id: 'book-1',
+            title: 'Missing Category',
+            authors: ['Author'],
+            missingFields: ['category'],
+            catalogUrl: '/dashboard/catalog/book-1',
+            adminEditUrl: '/dashboard/admin/books/book-1/edit',
+          },
+        ],
+        mostBorrowedBooks: [{ bookId: 'book-1', title: 'Clean Code', borrowCount: 7 }],
+        mostReservedBooks: [{ bookId: 'book-2', title: 'Design Patterns', reservationCount: 5 }],
+      },
+      materialsOverview: {
+        total: 11,
+        pendingApproval: 3,
+        approved: 6,
+        published: 4,
+        byIndexStatus: [{ status: 'INDEXED', count: 3 }],
+        totalChunks: 25,
+      },
+      aiUsage: {
+        conversations: 9,
+        messages: 23,
+        activeUsers: 5,
+        assistantResponseRate: 78,
+        period: '7d' as const,
+      },
+    };
+    const dashboardService = { getAdminSnapshot: jest.fn().mockResolvedValue(dashboardSnapshot) };
+    const service = makeAgentService({ dashboardService });
+
+    const result = await service['executeToolInner'](
+      'get_admin_dashboard_snapshot',
+      {},
+      'admin-1',
+      Role.ADMIN,
+      '',
+      {},
+    );
+
+    expect(dashboardService.getAdminSnapshot).toHaveBeenCalledTimes(1);
+    expect(result.result).toContain('## Admin Dashboard Snapshot');
+    expect(result.result).toContain('### Indexing Health');
+    expect(result.result).toContain('FAILED (0, 0%)');
+    expect(result.result).toContain('Missing metadata: ISBN 1');
+    expect(result.result).toContain('Total material chunks: 25');
+    expect(result.result).toContain('Metadata issue preview:');
+    expect(result.result).toContain('Missing Category');
+    expect(result.result).toContain('Missing: category');
+    expect(result.result).toContain('[Open catalog page](/dashboard/catalog/book-1)');
+    expect(result.result).toContain('[Edit book](/dashboard/admin/books/book-1/edit)');
+    expect(result.result).not.toContain('secret assistant content');
+  });
+
+  it('returns focused specialized admin snapshot reports from the dashboard service without leaking AI content', async () => {
+    const dashboardSnapshot = {
+      ...makeDashboardSnapshot(),
+      commandSummary: {
+        totalBooks: 6,
+        indexedBooks: 6,
+        indexedBooksPercent: 100,
+        failedIndexingBooks: 0,
+        pendingReservations: 2,
+        overdueBorrows: 1,
+        pendingMaterials: 4,
+        activeUsers: 18,
+      },
+      indexingHealth: {
+        byStatus: [
+          { status: 'INDEXED', count: 6, percentage: 100 },
+        ],
+        totalChunks: 5146,
+        averageChunksPerIndexedBook: 857.7,
+        zeroChunkIndexedBooks: 0,
+        failedBooksPreview: [
+          {
+            id: 'book-1',
+            title: 'Broken PDF',
+            authors: ['Author'],
+            pdfIndexStatus: 'FAILED',
+            pdfPageCount: 120,
+            chunks: 0,
+            hasPdfUrl: true,
+            hasEbookUrl: false,
+            pdfIndexedAt: '2026-06-06T10:00:00.000Z',
+          },
+        ],
+        lastIndexedAt: '2026-06-06T10:00:00.000Z',
+      },
+      collectionInsights: {
+        booksByFaculty: [{ facultyId: null, facultyName: 'Unassigned', count: 1 }],
+        booksByCategory: [{ category: 'Computer Science', count: 5 }],
+        missingMetadata: {
+          missingIsbn: 0,
+          missingDescription: 0,
+          missingCategory: 1,
+          missingSubjectTags: 0,
+          missingFaculty: 0,
+          missingCoverImage: 0,
+        },
+        metadataIssuesPreview: [
+          {
+            id: 'book-meta-1',
+            title: 'Missing Category',
+            authors: ['Author'],
+            missingFields: ['category'],
+            catalogUrl: '/dashboard/catalog/book-meta-1',
+            adminEditUrl: '/dashboard/admin/books/book-meta-1/edit',
+          },
+        ],
+        mostBorrowedBooks: [],
+        mostReservedBooks: [],
+      },
+      materialsOverview: {
+        total: 9,
+        pendingApproval: 4,
+        approved: 5,
+        published: 3,
+        byIndexStatus: [{ status: 'INDEXED', count: 5 }],
+        totalChunks: 31,
+      },
+      operationsQueue: {
+        pendingReservations: 2,
+        readyPickups: 1,
+        activeBorrows: 18,
+        overdueBorrows: 1,
+        pendingMaterialApprovals: 4,
+        failedIndexingReview: 0,
+      },
+      aiUsage: {
+        conversations: 13,
+        messages: 62,
+        activeUsers: 7,
+        assistantResponseRate: 84.6,
+        period: '7d' as const,
+      },
+    };
+    const dashboardService = { getAdminSnapshot: jest.fn().mockResolvedValue(dashboardSnapshot) };
+    const service = makeAgentService({ dashboardService });
+
+    const indexingReport = await service['executeToolInner']('get_book_indexing_report', {}, 'admin-1', Role.ADMIN, '', {});
+    const metadataHealth = await service['executeToolInner']('get_catalog_metadata_health', {}, 'admin-1', Role.ADMIN, '', {});
+    const operationsSummary = await service['executeToolInner']('get_library_operations_summary', {}, 'admin-1', Role.ADMIN, '', {});
+
+    expect(dashboardService.getAdminSnapshot).toHaveBeenCalledTimes(3);
+    expect(indexingReport.result).toContain('## Indexing Health Report');
+    expect(indexingReport.result).toContain('Total chunks: 5146');
+    expect(indexingReport.result).toContain('Failed indexing books: 0');
+    expect(indexingReport.result).toContain('Failure reason note: the current schema does not store indexing failure reasons');
+    expect(metadataHealth.result).toContain('## Catalog Metadata Health');
+    expect(metadataHealth.result).toContain('Missing category: 1');
+    expect(metadataHealth.result).toContain('Here are the books I can identify from the dashboard data.');
+    expect(metadataHealth.result).toContain('Missing Category');
+    expect(metadataHealth.result).toContain('Missing: category');
+    expect(metadataHealth.result).toContain('[Open catalog page](/dashboard/catalog/book-meta-1)');
+    expect(metadataHealth.result).toContain('[Edit book](/dashboard/admin/books/book-meta-1/edit)');
+    expect(metadataHealth.result).toContain('Recommended actions: Prioritize assigning missing categories and subjects.');
+    expect(operationsSummary.result).toContain('## Library Operations Summary');
+    expect(operationsSummary.result).toContain('Pending reservations: 2');
+    expect(operationsSummary.result).toContain('Recommended priority order: Process pending material approvals next.');
+    expect(operationsSummary.result).toContain('Handle overdue borrows and follow-up actions.');
+    expect(JSON.stringify({ indexingReport, metadataHealth, operationsSummary })).not.toContain('secret assistant content');
+  });
+
+  it('denies non-admin access to the admin dashboard snapshot tool', async () => {
+    const dashboardService = { getAdminSnapshot: jest.fn() };
+    const service = makeAgentService({ dashboardService });
+
+    const result = await service['executeToolInner'](
+      'get_admin_dashboard_snapshot',
+      {},
+      'student-1',
+      Role.STUDENT,
+      '',
+      {},
+    );
+
+    expect(dashboardService.getAdminSnapshot).not.toHaveBeenCalled();
+    expect(result.result).toBe('Access denied: this tool is only available to administrators.');
+  });
+
+  it('denies non-admin access to the specialized admin snapshot tools', async () => {
+    const dashboardService = { getAdminSnapshot: jest.fn() };
+    const service = makeAgentService({ dashboardService });
+
+    for (const toolName of ['get_book_indexing_report', 'get_catalog_metadata_health', 'get_library_operations_summary'] as const) {
+      const result = await service['executeToolInner'](toolName, {}, 'student-1', Role.STUDENT, '', {});
+      expect(result.result).toBe('Access denied: this tool is only available to administrators.');
+    }
+
+    expect(dashboardService.getAdminSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('returns the complete metadata message when no issues are present', async () => {
+    const dashboardSnapshot = {
+      ...makeDashboardSnapshot(),
+      collectionInsights: {
+        ...makeDashboardSnapshot().collectionInsights,
+        metadataIssuesPreview: [],
+        missingMetadata: {
+          missingIsbn: 0,
+          missingDescription: 0,
+          missingCategory: 0,
+          missingSubjectTags: 0,
+          missingFaculty: 0,
+          missingCoverImage: 0,
+        },
+      },
+    };
+    const dashboardService = { getAdminSnapshot: jest.fn().mockResolvedValue(dashboardSnapshot) };
+    const service = makeAgentService({ dashboardService });
+
+    const result = await service['executeToolInner'](
+      'get_catalog_metadata_health',
+      {},
+      'admin-1',
+      Role.ADMIN,
+      '',
+      {},
+    );
+
+    expect(result.result).toContain('All checked catalog metadata fields are complete.');
+    expect(result.result).not.toContain('Here are the books I can identify from the dashboard data.');
+  });
+
+  it('resolves safe admin aliases to the dashboard tools', async () => {
+    const dashboardService = { getAdminSnapshot: jest.fn().mockResolvedValue(makeDashboardSnapshot()) };
+    const service = makeAgentService({ dashboardService });
+
+    const aliasResult = await service['executeToolInner'](
+      'get_admin_snapshot',
+      {},
+      'admin-1',
+      Role.ADMIN,
+      '',
+      {},
+    );
+
+    expect(dashboardService.getAdminSnapshot).toHaveBeenCalled();
+    expect(aliasResult.result).toContain('## Admin Dashboard Snapshot');
+  });
+
+  it('denies safe admin aliases for non-admin users', async () => {
+    const dashboardService = { getAdminSnapshot: jest.fn() };
+    const service = makeAgentService({ dashboardService });
+
+    const aliasResult = await service['executeToolInner'](
+      'get_admin_dashboard_summary',
+      {},
+      'student-1',
+      Role.STUDENT,
+      '',
+      {},
+    );
+
+    expect(aliasResult.result).toBe('Access denied: this tool is only available to administrators.');
+    expect(dashboardService.getAdminSnapshot).not.toHaveBeenCalled();
   });
 
   it('returns a category-specific dashboard instead of the default dashboard', async () => {
@@ -1393,6 +1789,7 @@ describe('AgentService read_ebook structure questions', () => {
       materialSearch as never,
       bookDocumentService as never,
       {} as never,
+      { getAdminSnapshot: jest.fn().mockResolvedValue(makeDashboardSnapshot()) } as never,
       pythonExecution as never,
     );
 

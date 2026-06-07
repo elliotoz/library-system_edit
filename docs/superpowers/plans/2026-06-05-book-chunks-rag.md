@@ -48,8 +48,8 @@
   - [x] Use `read_ebook` only as fallback or for full-document structure extraction.
   - [x] Add prompt tests.
 - [ ] **Phase 7: Documentation and final verification**
-  - [ ] Update README AI/tool/database sections.
-  - [ ] Run Prisma, typecheck, build, and targeted Jest tests.
+  - [x] Update README AI/tool/database sections.
+  - [x] Run Prisma, typecheck, build, and targeted Jest tests.
   - [ ] Manually verify Pro Git indexing and retrieval once Phase 2+ is implemented.
 
 ## Phase 1 Scope
