@@ -4,7 +4,8 @@ import { BorrowStatus, IndexStatus, ReservationStatus, Role } from '@prisma/clie
 
 const AI_USAGE_WINDOW_DAYS = 7;
 const FAILED_BOOK_PREVIEW_LIMIT = 10;
-const TOP_BOOK_LIMIT = 5;
+const TOP_BORROWED_BOOK_LIMIT = 10;
+const TOP_RESERVED_BOOK_LIMIT = 5;
 const INDEX_STATUS_ORDER = [
   IndexStatus.INDEXED,
   IndexStatus.FAILED,
@@ -493,7 +494,7 @@ export class DashboardService {
       WHERE b."isActive" = true
       GROUP BY b.id, b.title
       ORDER BY "borrowCount" DESC, b.title ASC
-      LIMIT ${TOP_BOOK_LIMIT}
+      LIMIT ${TOP_BORROWED_BOOK_LIMIT}
     `;
 
     return rows.map((row) => ({
@@ -511,7 +512,7 @@ export class DashboardService {
       WHERE b."isActive" = true
       GROUP BY b.id, b.title
       ORDER BY "reservationCount" DESC, b.title ASC
-      LIMIT ${TOP_BOOK_LIMIT}
+      LIMIT ${TOP_RESERVED_BOOK_LIMIT}
     `;
 
     return rows.map((row) => ({
